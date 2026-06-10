@@ -901,13 +901,19 @@ async function cloudLoadAll(){
 
 // ====== REALTIME ======
 let _rtTimer = null;
+async function _rtRefetch(){
+  // ถ้ากำลังบันทึกขึ้นคลาวด์อยู่ · เลื่อนการโหลดสดออกไปก่อน กันข้อมูลชนกัน
+  if(Object.values(_syncBusy).some(Boolean)){
+    _rtTimer = setTimeout(_rtRefetch, 1500);
+    return;
+  }
+  try{ await cloudLoadAll(); rerenderActive(); } catch(e){ console.error(e); }
+}
 function startRealtime(){
   sb.channel('vipawee-sync')
     .on('postgres_changes', {event:'*', schema:'public'}, () => {
       clearTimeout(_rtTimer);
-      _rtTimer = setTimeout(async () => {
-        try{ await cloudLoadAll(); rerenderActive(); } catch(e){ console.error(e); }
-      }, 1200);
+      _rtTimer = setTimeout(_rtRefetch, 1200);
     })
     .subscribe();
 }

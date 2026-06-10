@@ -1030,7 +1030,7 @@ function goto(page){
   if(page==='invoice') renderInvoice();
   window.scrollTo(0,0);
 }
-document.querySelectorAll('.menu a').forEach(a=>{ a.onclick = ()=>goto(a.dataset.page); });
+document.querySelectorAll('.menu a[data-page]').forEach(a=>{ a.onclick = ()=>goto(a.dataset.page); });
 
 // === RECORD: Search ===
 let selStudent = null;

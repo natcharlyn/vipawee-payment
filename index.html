@@ -23,6 +23,8 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .menu .badge{margin-left:auto;background:#E8804B;color:white;padding:1px 7px;border-radius:8px;font-size:11px;font-weight:700}
 .sidebar-foot{padding:14px 20px;font-size:11px;color:rgba(255,255,255,0.6);border-top:1px solid rgba(255,255,255,0.15)}
 
+.print-only{display:none}
+
 /* MAIN */
 .main{padding:24px 32px;overflow-x:hidden}
 .page{display:none}
@@ -184,6 +186,7 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 /* PRINT */
 @media print {
   .sidebar,.topbar,.no-print,.menu{display:none!important}
+  .print-only{display:block!important}
   body{background:white}
   .app{grid-template-columns:1fr}
   .main{padding:0;margin:0}
@@ -485,6 +488,7 @@ details summary{cursor:pointer;outline:none}
 
 <!-- REPORT -->
 <div class="page" id="page-report">
+<div class="print-only" id="rpt-print-head" style="margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:8px"></div>
   <div class="topbar">
     <div>
       <div class="page-title">📊 รายงาน</div>
@@ -703,7 +707,7 @@ details summary{cursor:pointer;outline:none}
     </div>
     
     <div class="modal-actions">
-      <button class="btn btn-danger" onclick="confirmDelTxFromEdit()">🗑 ลบบันทึกนี้</button>
+      <button class="btn btn-danger" onclick="confirmDelTxFromEdit()">🚫 ยกเลิกใบเสร็จนี้</button>
       <button class="btn" onclick="closeEditTx()">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveEditTx()">💾 บันทึก + ออกใบเสร็จใหม่</button>
     </div>
@@ -825,8 +829,8 @@ function _rowsOf(table){
   if(table==='stock') { STOCK.forEach((s,i)=>{ if(!s.id) s.id = Date.now()+i; }); return STOCK.map(stockToRow); }
   return [];
 }
-function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date, payer_name:t.payerName||null, items:t.items, total:t.total, method:t.method, style:t.style||'F', edited_at:t.editedAt||null, student_name:t.studentName||null, student_nick:t.studentNick||null, student_class:t.studentClass||null}; }
-function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
+function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date, payer_name:t.payerName||null, items:t.items, total:t.total, method:t.method, style:t.style||'F', edited_at:t.editedAt||null, receipt_no:t.receiptNo||null, voided_at:t.voidedAt||null, void_reason:t.voidReason||null, student_name:t.studentName||null, student_nick:t.studentNick||null, student_class:t.studentClass||null}; }
+function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
 function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null}; }
@@ -835,6 +839,111 @@ function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||nu
 function rowToPo(r){ const months = r.months||[]; return {id:Number(r.id), busCode:r.bus_code, busName:r.bus_name||'', driver:r.driver||'', months:months, month:months.join(', '), year:r.year, amount:Number(r.amount), entries:r.entries||[], date:r.date, receiver:r.receiver, method:r.method, note:r.note||'', payer:r.payer||''}; }
 function stockToRow(s){ return {id:s.id, item:s.item, price:s.price||'-', cat:s.cat||'', note:s.note||''}; }
 function rowToStock(r){ return {id:Number(r.id), item:r.item, price:r.price||'-', cat:r.cat||'', note:r.note||''}; }
+
+// ====== เลขที่ใบเสร็จ · จำนวนเงินตัวอักษร · ระบบยกเลิก ======
+let currentRcptTx = null;
+function activeTX(){ return TX.filter(t => !t.voidedAt); }
+function fmt2(x){ return Number(x).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function bahtText(amount){
+  const t = ['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+  const p = ['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  function read(numStr){
+    let s = '';
+    const len = numStr.length;
+    for(let i=0;i<len;i++){
+      const d = +numStr[i], pos = len-i-1;
+      if(d===0) continue;
+      if(pos===0 && d===1 && len>1) s += 'เอ็ด';
+      else if(pos===1 && d===2) s += 'ยี่สิบ';
+      else if(pos===1 && d===1) s += 'สิบ';
+      else s += t[d] + p[pos];
+    }
+    return s;
+  }
+  const nn = Math.round(Number(amount)*100)/100;
+  const parts = nn.toFixed(2).split('.');
+  let intPart = parts[0], dec = +parts[1];
+  let out = '';
+  if(+intPart === 0) out = 'ศูนย์';
+  else {
+    const segs = [];
+    while(intPart.length > 6){ segs.unshift(intPart.slice(-6)); intPart = intPart.slice(0,-6); }
+    segs.unshift(intPart);
+    segs.forEach((sg,i) => { out += read(String(+sg)); if(i < segs.length-1) out += 'ล้าน'; });
+  }
+  out += 'บาท';
+  out += dec === 0 ? 'ถ้วน' : read(String(dec)) + 'สตางค์';
+  return out;
+}
+function nextReceiptNo(){
+  const prefix = AY + '-';
+  let mx = 0;
+  TX.forEach(tt => {
+    if(tt.receiptNo && String(tt.receiptNo).indexOf(prefix) === 0){
+      const v = parseInt(String(tt.receiptNo).slice(prefix.length), 10);
+      if(v > mx) mx = v;
+    }
+  });
+  return prefix + String(mx+1).padStart(5,'0');
+}
+function ensureReceiptNos(){
+  const missing = TX.filter(tt => !tt.receiptNo);
+  if(missing.length === 0) return;
+  missing.sort((a,b) => new Date(a.date) - new Date(b.date));
+  missing.forEach(tt => { tt.receiptNo = nextReceiptNo(); });
+  saveTX();
+}
+function receiptPrintDual(tx){
+  const stu = (tx.payerName || tx.studentNick) + ' (' + tx.studentNick + ' · ' + tx.studentClass + ')';
+  const dt = new Date(tx.date).toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
+  const no = tx.receiptNo || ('#' + tx.id);
+  const rows = tx.items.map((it,i) => '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+it.label+'</td><td class="amt">'+fmt2(it.amount)+'</td></tr>').join('');
+  const cash = tx.method === 'เงินสด';
+  const voidMark = tx.voidedAt ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="transform:rotate(-18deg);font-size:52px;font-weight:800;color:rgba(220,38,38,0.45);border:5px solid rgba(220,38,38,0.45);padding:2px 26px;border-radius:10px">ยกเลิก</div></div>' : '';
+  function copyBlock(tag, tagStyle){
+    return '<div class="copy">' + voidMark +
+      '<div class="tag" style="'+tagStyle+'">'+tag+'</div>' +
+      '<div class="head"><div class="rlogo">วภว</div><div class="sch">' +
+      '<div class="nm">'+SCHOOL.name+'</div>' +
+      '<div class="ad">'+SCHOOL.addr+' · โทร '+SCHOOL.phone+(SCHOOL.phoneNote?' ('+SCHOOL.phoneNote+')':'')+'</div>' +
+      '</div></div>' +
+      '<div class="ttl">ใบเสร็จรับเงิน</div>' +
+      '<div class="meta"><span>เลขที่: <b>'+no+'</b></span><span>วันที่: <b>'+dt+'</b></span></div>' +
+      '<div class="meta"><span>ได้รับเงินจาก: <b>'+stu+'</b></span></div>' +
+      '<table class="items"><tr><th style="width:8mm">ที่</th><th>รายการ</th><th style="width:32mm">จำนวนเงิน (บาท)</th></tr>' + rows +
+      '<tr class="totalrow"><td colspan="2" style="text-align:right">รวมทั้งสิ้น</td><td class="amt">'+fmt2(tx.total)+'</td></tr></table>' +
+      '<div class="baht-text">จำนวนเงิน (ตัวอักษร): <b>'+bahtText(tx.total)+'</b></div>' +
+      '<div class="payrow">ชำระโดย: '+(cash?'☑':'☐')+' เงินสด &nbsp;&nbsp; '+(cash?'☐':'☑')+' โอนเข้าบัญชี ('+SCHOOL.bank+' '+SCHOOL.bankNo+')</div>' +
+      '<div class="sigs"><div class="sig"><div class="line"></div>ผู้จ่ายเงิน</div><div class="sig"><div class="line"></div>ผู้รับเงิน</div></div>' +
+      '<div class="rfoot">'+SCHOOL.motto+' · ขอบคุณที่ไว้วางใจ'+SCHOOL.name+'</div>' +
+      '</div>';
+  }
+  return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>ใบเสร็จ '+no+'</title><style>' +
+    '@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box;margin:0;padding:0}' +
+    "body{font-family:'Sarabun','TH SarabunPSK',sans-serif;background:white}" +
+    '.copy{border:1.6px solid #000;padding:6mm 7mm;height:126mm;position:relative}' +
+    '.cutline{text-align:center;color:#555;font-size:11px;margin:4mm 0;border-top:1.5px dashed #888;padding-top:1mm}' +
+    '.tag{position:absolute;top:6mm;right:7mm;border:1.4px solid #000;padding:2px 10px;font-size:13px;font-weight:700}' +
+    '.head{display:flex;gap:5mm;align-items:center;border-bottom:2px solid #000;padding-bottom:3mm}' +
+    '.rlogo{width:17mm;height:17mm;border-radius:50%;border:1.6px solid #000;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}' +
+    '.sch{flex:1}.sch .nm{font-size:17px;font-weight:800}.sch .ad{font-size:11.5px;line-height:1.45}' +
+    '.ttl{text-align:center;font-size:16px;font-weight:800;margin:3mm 0 2mm;letter-spacing:1px}' +
+    '.meta{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:2mm}' +
+    'table.items{width:100%;border-collapse:collapse;font-size:12.5px}' +
+    'table.items th,table.items td{border:1px solid #000;padding:1.6mm 2.5mm}' +
+    'table.items th{font-weight:700;text-align:center;background:#f0f0f0}' +
+    'table.items td.amt{text-align:right}.totalrow td{font-weight:800;font-size:13.5px}' +
+    '.baht-text{border:1px solid #000;border-top:none;padding:1.6mm 2.5mm;font-size:12.5px}' +
+    '.payrow{font-size:12px;margin-top:2mm}' +
+    '.sigs{display:flex;justify-content:space-around;margin-top:5mm;text-align:center;font-size:12.5px}' +
+    '.sig .line{width:52mm;border-bottom:1px dotted #000;height:8mm;margin-bottom:1.5mm}' +
+    '.rfoot{font-size:10.5px;color:#333;margin-top:3mm;text-align:center}' +
+    '</style></head><body>' +
+    copyBlock('ต้นฉบับ','') +
+    '<div class="cutline">✂ ตัดตามเส้นประ</div>' +
+    copyBlock('สำเนา · โรงเรียนเก็บ','background:#000;color:#fff') +
+    '</body></html>';
+}
 
 async function cloudSync(table){
   try{
@@ -958,6 +1067,7 @@ async function afterLogin(){
   try{
     await cloudLoadAll();
     startRealtime();
+    ensureReceiptNos();
     $('login-overlay').style.display = 'none';
     document.querySelectorAll('.ay-label').forEach(el => el.textContent = AY);
     renderHome();
@@ -1405,7 +1515,8 @@ function saveTx(){
     items: items,
     total: total,
     method: payMethod,
-    style: receiptStyle
+    style: receiptStyle,
+    receiptNo: nextReceiptNo()
   };
   TX.unshift(tx);
   saveTX();
@@ -1414,9 +1525,16 @@ function saveTx(){
 
 // === RECEIPT (F or C style) ===
 function showReceipt(tx){
-  $('rcpt-content').innerHTML = tx.style === 'C' ? receiptC(tx) : receiptF(tx);
+  currentRcptTx = tx;
+  let inner = tx.style === 'C' ? receiptC(tx) : receiptF(tx);
+  if(tx.voidedAt){
+    inner = '<div style="position:relative">' + inner +
+      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="transform:rotate(-18deg);font-size:60px;font-weight:800;color:rgba(220,38,38,0.4);border:6px solid rgba(220,38,38,0.4);padding:4px 28px;border-radius:12px">ยกเลิก</div></div></div>' +
+      '<div style="background:#FEE2E2;color:#991B1B;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:13px;text-align:center">🚫 ใบเสร็จนี้ถูกยกเลิกเมื่อ ' + new Date(tx.voidedAt).toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) + '<br>เหตุผล: ' + (tx.voidReason || '-') + '</div>';
+  }
+  $('rcpt-content').innerHTML = inner;
   $('rcpt-modal').classList.add('active');
-  toast('บันทึกเรียบร้อย ✓');
+  toast(tx.voidedAt ? 'ใบเสร็จนี้ถูกยกเลิกแล้ว' : 'บันทึกเรียบร้อย ✓');
 }
 function receiptF(tx){
   return `
@@ -1424,7 +1542,7 @@ function receiptF(tx){
       <div style="background:linear-gradient(135deg,#1A3A8F,#3B5998);color:white;padding:24px 20px;text-align:center">
         <div style="font-size:11px;opacity:0.85">${SCHOOL.name}</div>
         <div style="font-size:22px;font-weight:800;margin-top:8px">ใบเสร็จรับเงิน</div>
-        <div style="font-size:12px;opacity:0.85;margin-top:4px">${new Date(tx.date).toLocaleDateString('th-TH')}</div>
+        <div style="font-size:12px;opacity:0.85;margin-top:4px">${new Date(tx.date).toLocaleDateString('th-TH')} · เลขที่ ${tx.receiptNo || '-'}</div>
       </div>
       <div style="padding:20px">
         <div style="background:#FBE7D8;border-radius:10px;padding:12px 14px;margin-bottom:14px">
@@ -1452,7 +1570,7 @@ function receiptF(tx){
 function receiptC(tx){
   const ayStart = new Date(AY - 543, 4, 1);
   const ayEnd = new Date(AY - 543 + 1, 3, 30, 23, 59, 59);
-  const yearTotal = TX.filter(t => t.studentId === tx.studentId && new Date(t.date) >= ayStart && new Date(t.date) <= ayEnd).reduce((s,t)=>s+t.total, 0);
+  const yearTotal = TX.filter(t => !t.voidedAt && t.studentId === tx.studentId && new Date(t.date) >= ayStart && new Date(t.date) <= ayEnd).reduce((s,t)=>s+t.total, 0);
   return `
     <div id="rcpt-print" style="font-family:'Sarabun',sans-serif;max-width:560px;margin:0 auto;background:white;border:2px solid #1A3A8F;border-radius:10px;overflow:hidden">
       <div style="padding:14px 20px;border-bottom:2px solid #1A3A8F;display:flex;justify-content:space-between;align-items:center">
@@ -1463,7 +1581,7 @@ function receiptC(tx){
         </div>
         <div style="text-align:right">
           <div style="font-size:11px;color:#6B7280">เลขที่</div>
-          <div style="font-size:14px;font-weight:700">${tx.id}</div>
+          <div style="font-size:14px;font-weight:700">${tx.receiptNo || tx.id}</div>
         </div>
       </div>
       <div style="background:linear-gradient(135deg,#FBE7D8,#FFF7F0);padding:16px 20px;display:flex;align-items:center;gap:12px">
@@ -1506,9 +1624,14 @@ function closeRcpt(){
 }
 function printRcpt(){
   const w = window.open('', '_blank');
-  w.document.write('<html><head><title>ใบเสร็จ</title><style>body{font-family:Sarabun,sans-serif;padding:20px;background:#F0E9DA}</style></head><body>' + $('rcpt-content').innerHTML + '</body></html>');
+  if(!w){ toast('เบราว์เซอร์บล็อคหน้าต่างพิมพ์ · อนุญาต popup ก่อน', 'error'); return; }
+  if(currentRcptTx){
+    w.document.write(receiptPrintDual(currentRcptTx));
+  } else {
+    w.document.write('<html><head><title>ใบเสร็จ</title></head><body style="font-family:Sarabun,sans-serif;padding:20px">' + $('rcpt-content').innerHTML + '</body></html>');
+  }
   w.document.close();
-  setTimeout(()=>w.print(), 400);
+  setTimeout(()=>w.print(), 500);
 }
 
 // === RENDERS ===
@@ -1517,7 +1640,7 @@ function renderHome(){
   $('h-students').textContent = activeStudents().length;
   $('h-bus').textContent = activeStudents().filter(s=>s.useBus && s.useBus!=='ไม่ใช้').length;
   const now = new Date();
-  const monthTx = TX.filter(t => {
+  const monthTx = activeTX().filter(t => {
     const d = new Date(t.date);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
@@ -1535,8 +1658,8 @@ function renderHome(){
     $('recent-tx').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีบันทึก · กด "บันทึกรับเงิน" เริ่มได้เลย</td></tr>';
   } else {
     $('recent-tx').innerHTML = recent.map(t => `
-      <tr ${t.editedAt ? 'style="background:#FEF3C7"' : ''}>
-        <td onclick="openDetail(${t.studentId})" style="cursor:pointer">${new Date(t.date).toLocaleDateString('th-TH')}${t.editedAt ? ' <span style="font-size:10px;color:#92400E">✏</span>' : ''}</td>
+      <tr ${t.voidedAt ? 'style="opacity:0.55;text-decoration:line-through"' : (t.editedAt ? 'style="background:#FEF3C7"' : '')}>
+        <td onclick="openDetail(${t.studentId})" style="cursor:pointer">${new Date(t.date).toLocaleDateString('th-TH')}${t.voidedAt ? ' <span style="font-size:10px;color:#DC2626">🚫</span>' : (t.editedAt ? ' <span style="font-size:10px;color:#92400E">✏</span>' : '')}</td>
         <td onclick="openDetail(${t.studentId})" style="cursor:pointer"><strong>${t.studentNick}</strong> · ${t.studentClass}</td>
         <td onclick="openDetail(${t.studentId})" style="cursor:pointer">${t.items.length} รายการ</td>
         <td onclick="openDetail(${t.studentId})" style="cursor:pointer;text-align:right;font-weight:700">฿${fmt(t.total)}</td>
@@ -1843,10 +1966,10 @@ function renderDetail(s){
     $('d-history').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีบันทึกการรับเงินสำหรับเด็กคนนี้</td></tr>';
   } else {
     $('d-history').innerHTML = myTx.map(t => `
-      <tr ${t.editedAt ? 'style="background:#FEF3C7"' : ''}>
-        <td>${new Date(t.date).toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}${t.editedAt ? '<br><span style="font-size:10px;color:#92400E">✏ แก้ไข</span>' : ''}</td>
-        <td>${t.items.map(i=>i.label).join('<br>')}</td>
-        <td style="text-align:right;font-weight:700">฿${fmt(t.total)}</td>
+      <tr ${t.voidedAt ? 'style="opacity:0.6"' : (t.editedAt ? 'style="background:#FEF3C7"' : '')}>
+        <td>${new Date(t.date).toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}${t.voidedAt ? '<br><span style="font-size:10px;color:#DC2626">🚫 ยกเลิก'+(t.voidReason ? ' · '+t.voidReason : '')+'</span>' : (t.editedAt ? '<br><span style="font-size:10px;color:#92400E">✏ แก้ไข</span>' : '')}</td>
+        <td ${t.voidedAt ? 'style="text-decoration:line-through"' : ''}>${t.items.map(i=>i.label).join('<br>')}</td>
+        <td style="text-align:right;font-weight:700${t.voidedAt ? ';text-decoration:line-through' : ''}">฿${fmt(t.total)}</td>
         <td><span class="b ${t.method==='เงินสด'?'b-paid':'b-info'}">${t.method}</span></td>
         <td>
           <button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button>
@@ -1873,7 +1996,7 @@ function renderTimeline(s, myTx){
   });
   
   // check tx for tuition / bus
-  myTx.forEach(t => {
+  myTx.filter(t => !t.voidedAt).forEach(t => {
     t.items.forEach(it => {
       // tuition: use monthsList if available, else fallback consecutive
       if(it.label && it.label.startsWith('ค่าเทอม')){
@@ -2125,7 +2248,7 @@ function printPayout(id){
 function expandBusEntries(){
   const codes = ['A1','A2','A3','A4'];
   const allEntries = [];
-  TX.forEach(tx => {
+  activeTX().forEach(tx => {
     const stu = STUDENTS.find(s => s.id === tx.studentId);
     if(!stu || !stu.busCode || !codes.includes(stu.busCode) || stu.deleted) return;
     tx.items.forEach((it, itemIdx) => {
@@ -2340,7 +2463,22 @@ const CLASS_ORDER = ['เนอร์เซอรี่','เตรียมอ�
 
 function renderReport(){
   const period = $('rpt-filter').value;
-  const list = TX.filter(t => inPeriod(t.date, period));
+  const listAll = TX.filter(t => inPeriod(t.date, period));
+  const list = listAll.filter(t => !t.voidedAt);
+  const voidedCount = listAll.length - list.length;
+  // หัวรายงานสำหรับพิมพ์
+  const periodNames = {day:'รายวัน', week:'รายสัปดาห์', month:'รายเดือน', year:'รายปี', all:'ทั้งหมด'};
+  const nw = new Date();
+  let rangeTxt = '';
+  if(period === 'day') rangeTxt = nw.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
+  else if(period === 'week') rangeTxt = 'สัปดาห์นี้ (ถึง ' + nw.toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'}) + ')';
+  else if(period === 'month') rangeTxt = nw.toLocaleDateString('th-TH', {month:'long', year:'numeric'});
+  else if(period === 'year') rangeTxt = 'ปี ' + (nw.getFullYear() + 543);
+  else rangeTxt = 'ข้อมูลทั้งหมดในระบบ';
+  if($('rpt-print-head')) $('rpt-print-head').innerHTML =
+    '<div style="font-size:17px;font-weight:800">' + SCHOOL.name + ' · รายงานสรุปการเงิน</div>' +
+    '<div style="font-size:13px;margin-top:2px">ช่วงรายงาน: <b>' + (periodNames[period] || period) + ' · ' + rangeTxt + '</b></div>' +
+    '<div style="font-size:12px;color:#444">พิมพ์เมื่อ ' + nw.toLocaleString('th-TH', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'}) + ' น.' + (voidedCount > 0 ? ' · ไม่นับใบเสร็จที่ยกเลิก ' + voidedCount + ' รายการ' : '') + '</div>';
   const periodPayouts = PAYOUTS.filter(p => inPeriod(p.date, period));
   
   // === Top stats ===
@@ -2442,20 +2580,20 @@ function renderReport(){
   }
   
   // === Detailed list ===
-  if(list.length === 0){
+  if(listAll.length === 0){
     $('all-tx').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:30px">ไม่มีบันทึก</td></tr>';
   } else {
-    $('all-tx').innerHTML = list.map(t => `
-      <tr ${t.editedAt ? 'style="background:#FEF3C7"' : ''}>
-        <td>${new Date(t.date).toLocaleString('th-TH',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}${t.editedAt ? '<br><span style="font-size:10px;color:#92400E">✏ แก้ไข</span>' : ''}</td>
-        <td><span class="lnk" onclick="openDetail(${t.studentId})">${t.studentNick}</span> · ${t.studentClass}</td>
-        <td style="font-size:12px">${t.items.map(i=>i.label).join(', ')}</td>
-        <td style="text-align:right;font-weight:700">฿${fmt(t.total)}</td>
+    $('all-tx').innerHTML = listAll.map(t => `
+      <tr ${t.voidedAt ? 'style="background:#F9FAFB;opacity:0.65"' : (t.editedAt ? 'style="background:#FEF3C7"' : '')}>
+        <td>${t.receiptNo ? '<span style="font-size:10px;color:#6B7280">'+t.receiptNo+'</span><br>' : ''}${new Date(t.date).toLocaleString('th-TH',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}${t.voidedAt ? '<br><span style="font-size:10px;color:#DC2626">🚫 ยกเลิก '+new Date(t.voidedAt).toLocaleDateString('th-TH')+(t.voidReason ? ' · '+t.voidReason : '')+'</span>' : (t.editedAt ? '<br><span style="font-size:10px;color:#92400E">✏ แก้ไข</span>' : '')}</td>
+        <td ${t.voidedAt ? 'style="text-decoration:line-through"' : ''}><span class="lnk" onclick="openDetail(${t.studentId})">${t.studentNick}</span> · ${t.studentClass}</td>
+        <td style="font-size:12px${t.voidedAt ? ';text-decoration:line-through' : ''}">${t.items.map(i=>i.label).join(', ')}</td>
+        <td style="text-align:right;font-weight:700${t.voidedAt ? ';text-decoration:line-through' : ''}">฿${fmt(t.total)}</td>
         <td><span class="b ${t.method==='เงินสด'?'b-paid':'b-info'}">${t.method}</span></td>
         <td>
-          <button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button>
+          ${t.voidedAt ? `<button class="btn btn-sm" onclick="reprintTx(${t.id})" title="ดูใบเสร็จที่ยกเลิก">👁</button>` : `<button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button>
           <button class="btn btn-sm" onclick="reprintTx(${t.id})" title="พิมพ์ซ้ำ">🖨</button>
-          <button class="btn btn-sm btn-danger" onclick="delTx(${t.id})" title="ลบ">×</button>
+          <button class="btn btn-sm btn-danger" onclick="delTx(${t.id})" title="ยกเลิกใบเสร็จ">🚫</button>`}
         </td>
       </tr>`).join('');
   }
@@ -2472,6 +2610,7 @@ let etxNewStudent = null;
 function openEditTx(id){
   const tx = TX.find(t => t.id === id);
   if(!tx){ toast('ไม่เจอบันทึก', 'error'); return; }
+  if(tx.voidedAt){ toast('ใบเสร็จนี้ถูกยกเลิกแล้ว · แก้ไขไม่ได้', 'error'); showReceipt(tx); return; }
   editingTxId = id;
   etxNewStudent = null;
   
@@ -2588,35 +2727,26 @@ function saveEditTx(){
 
 function confirmDelTxFromEdit(){
   if(!editingTxId) return;
-  const tx = TX.find(t => t.id === editingTxId);
-  if(!tx) return;
-  const inPayout = PAYOUTS.some(p => p.entries && p.entries.some(e => e.txId === editingTxId));
-  if(inPayout){
-    if(!confirm('⚠ บันทึกนี้รวมอยู่ในใบส่งคนขับแล้ว\n\nถ้าลบ · ประวัติใบส่งจะไม่ตรงกับยอดจริง\nครูควรย้อนใบส่งก่อน (ปุ่ม ↶ ในหน้า 🤝 ส่งเจ้าของรถ)\n\nยังจะลบต่อมั้ย?')) return;
-  }
-  if(!confirm('ลบบันทึกของ ' + tx.studentNick + ' (฿' + fmt(tx.total) + ')?')) return;
-  TX = TX.filter(t => t.id !== editingTxId);
-  saveTX();
-  toast('ลบบันทึกแล้ว');
+  const id = editingTxId;
   closeEditTx();
-  const activeId = document.querySelector('.page.active')?.id;
-  if(activeId === 'page-report') renderReport();
-  else if(activeId === 'page-detail' && detailStudentId){
-    const s = STUDENTS.find(x => x.id === detailStudentId);
-    if(s) renderDetail(s);
-  }
-  else if(activeId === 'page-home') renderHome();
+  delTx(id);
 }
+
 function delTx(id){
+  const tx = TX.find(t => t.id === id);
+  if(!tx) return;
+  if(tx.voidedAt){ toast('รายการนี้ถูกยกเลิกไปแล้ว'); return; }
   const inPayout = PAYOUTS.some(p => p.entries && p.entries.some(e => e.txId === id));
   if(inPayout){
-    if(!confirm('⚠ บันทึกนี้รวมอยู่ในใบส่งคนขับแล้ว\n\nถ้าลบ · ประวัติใบส่งจะไม่ตรงกับยอดจริง\nครูควรย้อนใบส่งก่อน (ปุ่ม ↶ ในหน้า 🤝 ส่งเจ้าของรถ)\n\nยังจะลบต่อมั้ย?')) return;
+    if(!confirm('⚠ บันทึกนี้รวมอยู่ในใบส่งคนขับแล้ว\n\nถ้ายกเลิก · ใบส่งจะไม่ตรงกับยอดจริง\nครูควรย้อนใบส่งก่อน (ปุ่ม ↶ ในหน้า 🤝 ส่งเจ้าของรถ)\n\nยังจะยกเลิกต่อมั้ย?')) return;
   }
-  if(!confirm('ลบบันทึกนี้?')) return;
-  TX = TX.filter(t=>t.id!==id);
+  const reason = prompt('ยกเลิกใบเสร็จ ' + (tx.receiptNo || '#'+tx.id) + ' ของ ' + tx.studentNick + ' (฿' + fmt(tx.total) + ')\nกรอกเหตุผล (เช่น ออกผิดคน):');
+  if(reason === null) return;
+  tx.voidedAt = new Date().toISOString();
+  tx.voidReason = (reason || '').trim() || 'ไม่ระบุ';
   saveTX();
-  renderReport();
-  toast('ลบแล้ว');
+  rerenderActive();
+  toast('🚫 ยกเลิกใบเสร็จแล้ว · รายการยังเก็บไว้ในประวัติ');
 }
 
 // === SLIPS ===
@@ -2732,7 +2862,7 @@ function renderInvoice(){
 $('inv-filter') && ($('inv-filter').oninput = renderInvoice);
 // Helper: count overdue months from timeline
 function getOverdueMonths(s){
-  const myTx = TX.filter(t => t.studentId === s.id);
+  const myTx = activeTX().filter(t => t.studentId === s.id);
   const curMonth = new Date().getMonth() + 1;
   const curMonthIdx = MONTH_NUMS.indexOf(curMonth);
   if(curMonthIdx < 0) return {tuition: [], bus: []};
@@ -3051,6 +3181,7 @@ function restoreBackup(input){
           await cloudSync('slips');
           await cloudSync('payouts');
           await cloudSaveSchool();
+          ensureReceiptNos();
           toast('☁ อัปโหลดขึ้นคลาวด์ครบ ✓');
           renderHome();
         } catch(e){ toast('⚠ อัปโหลดไม่ครบ: '+(e.message||e), 'error'); }

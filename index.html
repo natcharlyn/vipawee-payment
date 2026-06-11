@@ -1664,7 +1664,7 @@ function renderHome(){
         <td onclick="openDetail(${t.studentId})" style="cursor:pointer">${t.items.length} รายการ</td>
         <td onclick="openDetail(${t.studentId})" style="cursor:pointer;text-align:right;font-weight:700">฿${fmt(t.total)}</td>
         <td><span class="b ${t.method==='เงินสด'?'b-paid':'b-info'}">${t.method}</span></td>
-        <td><button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button></td>
+        <td>${t.voidedAt ? `<button class="btn btn-sm" onclick="reprintTx(${t.id})" title="ดูใบเสร็จที่ยกเลิก">👁</button>` : `<button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button> <button class="btn btn-sm btn-danger" onclick="delTx(${t.id})" title="ยกเลิกใบเสร็จ">🚫</button>`}</td>
       </tr>`).join('');
   }
 }
@@ -1972,8 +1972,9 @@ function renderDetail(s){
         <td style="text-align:right;font-weight:700${t.voidedAt ? ';text-decoration:line-through' : ''}">฿${fmt(t.total)}</td>
         <td><span class="b ${t.method==='เงินสด'?'b-paid':'b-info'}">${t.method}</span></td>
         <td>
-          <button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button>
+          ${t.voidedAt ? `<button class="btn btn-sm" onclick="reprintTx(${t.id})" title="ดูใบเสร็จที่ยกเลิก">👁</button>` : `<button class="btn btn-sm" onclick="openEditTx(${t.id})" title="แก้ไข">✏</button>
           <button class="btn btn-sm" onclick="reprintTx(${t.id})" title="พิมพ์ซ้ำ">🖨</button>
+          <button class="btn btn-sm btn-danger" onclick="delTx(${t.id})" title="ยกเลิกใบเสร็จ">🚫</button>`}
         </td>
       </tr>`).join('');
   }

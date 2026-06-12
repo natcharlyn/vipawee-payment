@@ -798,7 +798,7 @@ details summary{cursor:pointer;outline:none}
         <option value="">-</option><option>พิการ</option><option>อันดับ 1 ของชั้น</option><option>ลูกบุคคลากร</option><option>อื่นๆ</option>
       </select></div>
       <div class="field"><label>🤝 ผู้แนะนำ (เพื่อนบ้านชวนเรียน)</label><input class="input" id="f-referrerName" placeholder="ชื่อ ผปค./ครู ที่แนะนำ (ถ้ามี)"></div>
-      <div class="field"><label>ลูกของผู้แนะนำ (ชื่อเล่น)</label><input class="input" id="f-referrerNick" placeholder="ไว้หักส่วนลดในใบเสร็จ"></div>
+      <div class="field" style="position:relative"><label>ลูกของผู้แนะนำ (พิมพ์ค้นหาแล้วเลือก)</label><input class="input" id="f-referrerNick" placeholder="พิมพ์ชื่อเล่น/ชื่อจริง..." oninput="refSearch(this)" autocomplete="off"><input type="hidden" id="f-referrerChildId"><div id="ref-results" class="hidden" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #D1D5DB;border-radius:8px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div></div>
       <div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea class="input" id="f-note" rows="2"></textarea></div>
     </div>
     <div class="modal-actions">
@@ -847,8 +847,8 @@ function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date,
 function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
-function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null}; }
-function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||''}; }
+function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null}; }
+function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null}; }
 function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||null, driver:p.driver||null, months:p.months||[], year:p.year||null, amount:p.amount, entries:p.entries, date:p.date, receiver:p.receiver, method:p.method, note:p.note||null, payer:p.payer||null}; }
 function rowToPo(r){ const months = r.months||[]; return {id:Number(r.id), busCode:r.bus_code, busName:r.bus_name||'', driver:r.driver||'', months:months, month:months.join(', '), year:r.year, amount:Number(r.amount), entries:r.entries||[], date:r.date, receiver:r.receiver, method:r.method, note:r.note||'', payer:r.payer||''}; }
 function stockToRow(s){ return {id:s.id, item:s.item, price:s.price||'-', cat:s.cat||'', note:s.note||''}; }
@@ -1700,7 +1700,8 @@ function newStu(){
   $('f-delete-btn').classList.add('hidden');
   populateVillageDropdown();
   // Clear form
-  ['f-name','f-nick','f-cls','f-village','f-busCode','f-note','f-referrerName','f-referrerNick'].forEach(id => $(id).value = '');
+  ['f-name','f-nick','f-cls','f-village','f-busCode','f-note','f-referrerName','f-referrerNick','f-referrerChildId'].forEach(id => $(id).value = '');
+  $('ref-results').classList.add('hidden');
   $('f-useBus').value = 'ไม่ใช้';
   $('f-payTuition').value = 'รายเดือน';
   $('f-payBus').value = '-';
@@ -1731,6 +1732,8 @@ function editStu(id){
   $('f-note').value = s.note || '';
   $('f-referrerName').value = s.referrerName || '';
   $('f-referrerNick').value = s.referrerNick || '';
+  $('f-referrerChildId').value = s.referrerChildId || '';
+  $('ref-results').classList.add('hidden');
   $('stu-modal').classList.add('active');
 }
 
@@ -1751,7 +1754,8 @@ function saveStu(){
     discountReason: $('f-discountReason').value,
     note: $('f-note').value,
     referrerName: $('f-referrerName').value.trim(),
-    referrerNick: $('f-referrerNick').value.trim()
+    referrerNick: $('f-referrerNick').value.trim(),
+    referrerChildId: +$('f-referrerChildId').value || null
   };
   // Validate
   if(!data.name || !data.nick || !data.cls){ toast('กรอก ชื่อ + ชื่อเล่น + ชั้น ก่อน', 'error'); return; }
@@ -2499,6 +2503,28 @@ function updDiscount(id){
   else { delete owedSelected[id]; }
   updateTotal();
 }
+function refSearch(input){
+  const q = input.value.trim().toLowerCase();
+  const box = $('ref-results');
+  $('f-referrerChildId').value = '';
+  if(!q){ box.classList.add('hidden'); return; }
+  const matches = activeStudents().filter(s =>
+    (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)
+  ).slice(0, 10);
+  if(matches.length === 0){ box.innerHTML = '<div style="padding:8px 12px;color:#9CA3AF;font-size:13px">ไม่พบ</div>'; box.classList.remove('hidden'); return; }
+  box.innerHTML = matches.map(s => `
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='white'" onclick="refPickStu(${s.id})">
+      <strong>${s.nick}</strong> <span style="color:#6B7280;font-size:12px">· ${s.name} · ${s.cls}</span>
+    </div>`).join('');
+  box.classList.remove('hidden');
+}
+function refPickStu(id){
+  const s = STUDENTS.find(x => x.id === id);
+  if(!s) return;
+  $('f-referrerNick').value = s.nick;
+  $('f-referrerChildId').value = s.id;
+  $('ref-results').classList.add('hidden');
+}
 function renderReferral(){
   const box = $('r-referral');
   if(!box) return;
@@ -2528,7 +2554,7 @@ function renderReferral(){
       if(!ontime){
         status = '<span class="b" style="background:#FEE2E2;color:#991B1B">เดือน ' + prevName + ' ไม่เข้าเงื่อนไข</span>';
       } else {
-        const refChild = activeStudents().find(x => x.nick === s.referrerNick);
+        const refChild = activeStudents().find(x => x.id === s.referrerChildId) || activeStudents().find(x => x.nick === s.referrerNick);
         const given = refChild && activeTX().some(t => t.studentId === refChild.id &&
           new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
           t.items.some(it => it.label && it.label.includes('ส่วนลดเพื่อนบ้านชวนเรียน')));

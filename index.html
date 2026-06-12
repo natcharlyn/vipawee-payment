@@ -507,6 +507,7 @@ details summary{cursor:pointer;outline:none}
         <option value="year">📅 ปีนี้</option>
         <option value="all">📊 ทั้งหมด</option>
       </select>
+      <button class="btn" onclick="copyMonthSummary()">📋 คัดลอกยอดลงชีต</button>
       <button class="btn" onclick="window.print()">🖨 พิมพ์รายงาน</button>
     </div>
   </div>
@@ -550,6 +551,11 @@ details summary{cursor:pointer;outline:none}
   </div>
   
   <!-- Detailed transactions -->
+  <div class="card">
+    <div class="card-title">🤝 เพื่อนบ้านชวนเรียน · ทะเบียนสิทธิ์ส่วนลด</div>
+    <div id="r-referral"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">📋 รายละเอียดทุกบันทึก</div>
     <table class="tbl">
@@ -791,6 +797,8 @@ details summary{cursor:pointer;outline:none}
       <div class="field" style="grid-column:1/-1"><label>เหตุผลส่วนลด</label><select class="select" id="f-discountReason">
         <option value="">-</option><option>พิการ</option><option>อันดับ 1 ของชั้น</option><option>ลูกบุคคลากร</option><option>อื่นๆ</option>
       </select></div>
+      <div class="field"><label>🤝 ผู้แนะนำ (เพื่อนบ้านชวนเรียน)</label><input class="input" id="f-referrerName" placeholder="ชื่อ ผปค./ครู ที่แนะนำ (ถ้ามี)"></div>
+      <div class="field"><label>ลูกของผู้แนะนำ (ชื่อเล่น)</label><input class="input" id="f-referrerNick" placeholder="ไว้หักส่วนลดในใบเสร็จ"></div>
       <div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea class="input" id="f-note" rows="2"></textarea></div>
     </div>
     <div class="modal-actions">
@@ -839,8 +847,8 @@ function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date,
 function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
-function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null}; }
-function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null}; }
+function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null}; }
+function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||''}; }
 function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||null, driver:p.driver||null, months:p.months||[], year:p.year||null, amount:p.amount, entries:p.entries, date:p.date, receiver:p.receiver, method:p.method, note:p.note||null, payer:p.payer||null}; }
 function rowToPo(r){ const months = r.months||[]; return {id:Number(r.id), busCode:r.bus_code, busName:r.bus_name||'', driver:r.driver||'', months:months, month:months.join(', '), year:r.year, amount:Number(r.amount), entries:r.entries||[], date:r.date, receiver:r.receiver, method:r.method, note:r.note||'', payer:r.payer||''}; }
 function stockToRow(s){ return {id:s.id, item:s.item, price:s.price||'-', cat:s.cat||'', note:s.note||''}; }
@@ -1274,6 +1282,7 @@ function renderOwed(){
     <div class="owed-cat">🛍 ของขาย / รายการอื่นๆ</div>
     <div id="extra-items"></div>
     <button class="btn btn-sm" style="margin-top:8px" onclick="addExtra()">➕ เพิ่มของขาย</button>
+    <button class="btn btn-sm" style="margin-top:8px;border:1px solid #16A34A;color:#16A34A" onclick="addDiscount()">🤝 เพิ่มส่วนลด</button>
   </div>`;
   
   $('owed-list').innerHTML = html;
@@ -1510,6 +1519,7 @@ function saveTx(){
   }
   const items = Object.values(owedSelected);
   const total = items.reduce((s,x)=>s+x.amount, 0);
+  if(total <= 0){ toast('ยอดรวมต้องมากกว่า 0 บาท · ส่วนลดห้ามเกินยอดที่จ่าย', 'error'); return; }
   const tx = {
     id: Date.now(),
     date: new Date().toISOString(),
@@ -1690,7 +1700,7 @@ function newStu(){
   $('f-delete-btn').classList.add('hidden');
   populateVillageDropdown();
   // Clear form
-  ['f-name','f-nick','f-cls','f-village','f-busCode','f-note'].forEach(id => $(id).value = '');
+  ['f-name','f-nick','f-cls','f-village','f-busCode','f-note','f-referrerName','f-referrerNick'].forEach(id => $(id).value = '');
   $('f-useBus').value = 'ไม่ใช้';
   $('f-payTuition').value = 'รายเดือน';
   $('f-payBus').value = '-';
@@ -1719,6 +1729,8 @@ function editStu(id){
   $('f-discount').value = s.discount || 'ไม่มี';
   $('f-discountReason').value = s.discountReason || '';
   $('f-note').value = s.note || '';
+  $('f-referrerName').value = s.referrerName || '';
+  $('f-referrerNick').value = s.referrerNick || '';
   $('stu-modal').classList.add('active');
 }
 
@@ -1737,7 +1749,9 @@ function saveStu(){
     status: $('f-status').value,
     discount: $('f-discount').value,
     discountReason: $('f-discountReason').value,
-    note: $('f-note').value
+    note: $('f-note').value,
+    referrerName: $('f-referrerName').value.trim(),
+    referrerNick: $('f-referrerNick').value.trim()
   };
   // Validate
   if(!data.name || !data.nick || !data.cls){ toast('กรอก ชื่อ + ชื่อเล่น + ชั้น ก่อน', 'error'); return; }
@@ -2451,7 +2465,114 @@ function categorize(label){
   if(label.includes('ดนตรี')) return 'ค่าดนตรี';
   if(label.includes('อังกฤษ')) return 'ค่าภาษาอังกฤษ';
   if(label.includes('หนี้เก่า')) return 'หนี้เก่า';
+  if(label.includes('ส่วนลด')) return 'ส่วนลดโครงการแนะนำ';
   return 'ของขาย / อื่นๆ';
+}
+
+// ====== โครงการเพื่อนบ้านชวนเรียน ======
+function addDiscount(){
+  extraCount++;
+  const id = 'dc_' + extraCount;
+  const box = $('extra-items');
+  const row = document.createElement('div');
+  row.className = 'owed-row';
+  row.innerHTML = `
+    <select class="select" style="flex:1;max-width:240px" data-role="dlabel" oninput="updDiscount('${id}')">
+      <option value="ส่วนลดเพื่อนบ้านชวนเรียน">🤝 ส่วนลดเพื่อนบ้านชวนเรียน</option>
+      <option value="ส่วนลดอื่นๆ">ส่วนลดอื่นๆ</option>
+    </select>
+    <input class="input" type="number" min="0" style="width:110px" oninput="updDiscount('${id}')" data-role="damt" value="100">
+    <span style="font-weight:700;min-width:80px;text-align:right;color:#16A34A" data-role="sub">−฿100</span>
+    <button class="btn btn-sm btn-danger" onclick="rmExtra(this, '${id}')">×</button>
+  `;
+  row.id = 'row-' + id;
+  box.appendChild(row);
+  updDiscount(id);
+}
+function updDiscount(id){
+  const row = $('row-' + id);
+  if(!row) return;
+  const label = row.querySelector('[data-role=dlabel]').value;
+  const amt = Math.abs(+row.querySelector('[data-role=damt]').value || 0);
+  row.querySelector('[data-role=sub]').textContent = '−฿' + fmt(amt);
+  if(amt > 0){ owedSelected[id] = {amount: -amt, label: label, months: 0}; }
+  else { delete owedSelected[id]; }
+  updateTotal();
+}
+function renderReferral(){
+  const box = $('r-referral');
+  if(!box) return;
+  const refs = activeStudents().filter(s => s.referrerName);
+  if(refs.length === 0){
+    box.innerHTML = '<div style="color:#9CA3AF;font-size:13px;padding:8px">ยังไม่มีนักเรียนที่ระบุผู้แนะนำ · เพิ่มได้ที่ข้อมูลนักเรียน ช่อง "🤝 ผู้แนะนำ" · โครงการเริ่มนับ พ.ย. 2569</div>';
+    return;
+  }
+  const now = new Date();
+  const nowKey = now.getFullYear()*100 + (now.getMonth()+1);
+  const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevKey = prev.getFullYear()*100 + (prev.getMonth()+1);
+  const prevName = MONTHS[MONTH_NUMS.indexOf(prev.getMonth()+1)] || '';
+  const START = 202611;
+  const tdS = 'padding:6px 8px;border-bottom:1px solid #F3F4F6;font-size:13px';
+  let rows = '';
+  refs.forEach(s => {
+    let status;
+    if(nowKey <= START){
+      status = '<span class="b b-info">บันทึกชื่อแล้ว · เริ่มนับ พ.ย. 69</span>';
+    } else if(prevKey < START || !prevName){
+      status = '<span class="b b-info">รอประเมินเดือนแรก (ประเมิน พ.ย. ตอนต้น ธ.ค.)</span>';
+    } else {
+      const endPrev = new Date(prev.getFullYear(), prev.getMonth()+1, 0, 23, 59, 59);
+      const ontime = activeTX().some(t => t.studentId === s.id && new Date(t.date) <= endPrev &&
+        t.items.some(it => it.label && it.label.startsWith('ค่าเทอม') && (it.monthsList||[]).includes(prevName)));
+      if(!ontime){
+        status = '<span class="b" style="background:#FEE2E2;color:#991B1B">เดือน ' + prevName + ' ไม่เข้าเงื่อนไข</span>';
+      } else {
+        const refChild = activeStudents().find(x => x.nick === s.referrerNick);
+        const given = refChild && activeTX().some(t => t.studentId === refChild.id &&
+          new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
+          t.items.some(it => it.label && it.label.includes('ส่วนลดเพื่อนบ้านชวนเรียน')));
+        status = given ? '<span class="b b-paid">✓ ให้ส่วนลดเดือนนี้แล้ว</span>'
+          : '<span class="b" style="background:#FEF3C7;color:#92400E">⏳ ต้องลด 100 ในใบเสร็จของ ' + (s.referrerNick || '(ไม่ระบุลูกผู้แนะนำ)') + '</span>';
+      }
+    }
+    rows += '<tr><td style="' + tdS + '"><span class="lnk" onclick="openDetail(' + s.id + ')">' + s.nick + '</span> · ' + s.cls + '</td>' +
+      '<td style="' + tdS + '">' + s.referrerName + (s.referrerNick ? ' <span style="color:#6B7280">(ลูก: ' + s.referrerNick + ')</span>' : '') + '</td>' +
+      '<td style="' + tdS + '">' + status + '</td></tr>';
+  });
+  box.innerHTML = '<table style="width:100%;border-collapse:collapse">' +
+    '<tr><th style="' + tdS + ';text-align:left;color:#6B7280">เด็กใหม่ที่ถูกแนะนำ</th><th style="' + tdS + ';text-align:left;color:#6B7280">ผู้แนะนำ</th><th style="' + tdS + ';text-align:left;color:#6B7280">สถานะสิทธิ์' + (prevName ? ' (ประเมินเดือน ' + prevName + ')' : '') + '</th></tr>' + rows + '</table>' +
+    '<div style="font-size:11.5px;color:#9CA3AF;margin-top:8px">💡 วิธีให้ส่วนลด: บันทึกรับเงินของลูกผู้แนะนำ → กด "🤝 เพิ่มส่วนลด" → ระบบจะติ๊ก ✓ ให้เองที่นี่</div>';
+}
+function copyMonthSummary(){
+  const period = $('rpt-filter').value;
+  const list = TX.filter(t => !t.voidedAt && inPeriod(t.date, period));
+  const map = {'ค่าเทอม':'ค่าเทอม', 'ค่ารถ':'ค่ารถตู้นักเรียน', 'ค่าหนังสือ':'อื่นๆ', 'ค่าประกันอุบัติเหตุ':'ประกันอุบัติเหตุนักเรียน', 'ค่าสระว่ายน้ำ':'ค่ากิจกรรมเสริม ว่ายน้ำ ภาษา ดนตรี', 'ค่าดนตรี':'ค่ากิจกรรมเสริม ว่ายน้ำ ภาษา ดนตรี', 'ค่าภาษาอังกฤษ':'ค่ากิจกรรมเสริม ว่ายน้ำ ภาษา ดนตรี', 'หนี้เก่า':'ค่าเทอม', 'ของขาย / อื่นๆ':'ร้านสหกรณ์ธุรการ', 'ส่วนลดโครงการแนะนำ':'ส่วนลดโครงการแนะนำ'};
+  const agg = {};
+  list.forEach(t => t.items.forEach(it => {
+    const c = map[categorize(it.label)] || 'อื่นๆ';
+    agg[c] = (agg[c] || 0) + (it.amount || 0);
+  }));
+  const d = new Date();
+  const ds = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+  const ym = d.getFullYear() + '-' + (d.getMonth()+1);
+  let out = '';
+  Object.keys(agg).forEach(c => {
+    if(agg[c] !== 0) out += ds + '\t' + c + ' (จากระบบเก็บเงิน)\t' + agg[c] + '\t' + c + '\t' + ym + '\n';
+  });
+  if(!out){ toast('ไม่มีข้อมูลในช่วงนี้', 'error'); return; }
+  function fallback(){
+    const ta = document.createElement('textarea');
+    ta.value = out;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    toast('📋 คัดลอกแล้ว · ไปวางในชีต "ฟอร์มบันทึกข้อมูล" ฝั่งรายรับได้เลย');
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(out).then(() => toast('📋 คัดลอกแล้ว · ไปวางในชีต "ฟอร์มบันทึกข้อมูล" ฝั่งรายรับได้เลย')).catch(fallback);
+  } else fallback();
 }
 
 function inPeriod(dateStr, period){
@@ -2476,10 +2597,10 @@ function renderReport(){
   const list = listAll.filter(t => !t.voidedAt);
   const voidedCount = listAll.length - list.length;
   // หัวรายงานสำหรับพิมพ์
-  const periodNames = {day:'รายวัน', week:'รายสัปดาห์', month:'รายเดือน', year:'รายปี', all:'ทั้งหมด'};
+  const periodNames = {today:'รายวัน', week:'รายสัปดาห์', month:'รายเดือน', year:'รายปี', all:'ทั้งหมด'};
   const nw = new Date();
   let rangeTxt = '';
-  if(period === 'day') rangeTxt = nw.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
+  if(period === 'today') rangeTxt = nw.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
   else if(period === 'week') rangeTxt = 'สัปดาห์นี้ (ถึง ' + nw.toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'}) + ')';
   else if(period === 'month') rangeTxt = nw.toLocaleDateString('th-TH', {month:'long', year:'numeric'});
   else if(period === 'year') rangeTxt = 'ปี ' + (nw.getFullYear() + 543);
@@ -2488,6 +2609,7 @@ function renderReport(){
     '<div style="font-size:17px;font-weight:800">' + SCHOOL.name + ' · รายงานสรุปการเงิน</div>' +
     '<div style="font-size:13px;margin-top:2px">ช่วงรายงาน: <b>' + (periodNames[period] || period) + ' · ' + rangeTxt + '</b></div>' +
     '<div style="font-size:12px;color:#444">พิมพ์เมื่อ ' + nw.toLocaleString('th-TH', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'}) + ' น.' + (voidedCount > 0 ? ' · ไม่นับใบเสร็จที่ยกเลิก ' + voidedCount + ' รายการ' : '') + '</div>';
+  if($('r-referral')) renderReferral();
   const periodPayouts = PAYOUTS.filter(p => inPeriod(p.date, period));
   
   // === Top stats ===
@@ -2509,7 +2631,7 @@ function renderReport(){
     const cat = categorize(it.label);
     byCat[cat] = (byCat[cat] || 0) + (it.amount || 0);
   }));
-  const catOrder = ['ค่าเทอม','ค่ารถ','ค่าหนังสือ','ค่าประกันอุบัติเหตุ','ค่าสระว่ายน้ำ','ค่าดนตรี','ค่าภาษาอังกฤษ','หนี้เก่า','ของขาย / อื่นๆ'];
+  const catOrder = ['ค่าเทอม','ค่ารถ','ค่าหนังสือ','ค่าประกันอุบัติเหตุ','ค่าสระว่ายน้ำ','ค่าดนตรี','ค่าภาษาอังกฤษ','หนี้เก่า','ของขาย / อื่นๆ','ส่วนลดโครงการแนะนำ'];
   const ordered = catOrder.filter(c => byCat[c]).concat(Object.keys(byCat).filter(c => !catOrder.includes(c)));
   if(ordered.length === 0){
     $('r-breakdown').innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:20px;font-size:13px">ไม่มีรายรับในช่วงนี้</div>';
@@ -2518,7 +2640,7 @@ function renderReport(){
     $('r-breakdown').innerHTML = ordered.map(c => {
       const v = byCat[c];
       const pct = total > 0 ? (v / total * 100).toFixed(1) : 0;
-      const barW = maxVal > 0 ? (v / maxVal * 100) : 0;
+      const barW = Math.max(0, maxVal > 0 ? (v / maxVal * 100) : 0);
       return `<div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:14px">
           <span><strong>${c}</strong> <span style="color:#9CA3AF;font-size:12px">(${pct}%)</span></span>

@@ -411,22 +411,40 @@ details summary{cursor:pointer;outline:none}
 <div class="page" id="page-special">
   <div class="topbar">
     <div>
-      <div class="page-title">⭐ คอร์สเรียนพิเศษ (ต.ค. / เม.ย.)</div>
-      <div class="page-sub">เด็กจากโรงเรียนอื่นที่มาเรียนพิเศษ · แยกจากนักเรียนในโรงเรียน · <span id="ext-count">0</span> คน</div>
+      <div class="page-title">⭐ คอร์สเรียนพิเศษ</div>
+      <div class="page-sub">รอบนี้มี <span id="ext-count">0</span> คน · ค้างรวม <span id="course-owed-sum" style="color:#DC2626;font-weight:600">฿0</span> · เด็กใน+เด็กนอก รวมกัน</div>
     </div>
     <div class="tools">
-      <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:200px" oninput="renderSpecial()">
+      <select class="select" id="round-sel" onchange="changeRound(this.value)" style="max-width:150px"></select>
+      <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:170px" oninput="renderSpecial()">
+      <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
-    💡 ราคาคอร์สพิเศษ: เนอร์ส 1,500 · เตรียม 1,400 · อ.1–ป.6 = 1,000 ต่อรอบ · ค่ารถกรอกเอง · เด็กนอกเก็บเงินก่อนเริ่มเรียน
+    💡 ราคาคอร์ส/รอบ: เนอร์ส 1,500 · เตรียม 1,400 · อ.1–ป.6 = 1,000 · ค่ารถคิดเท่าปกติ · จ่ายทีหลัง/บางส่วนได้
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
-    <table class="tbl tbl-clickable">
-      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้นที่มาเรียน</th><th>รร.เดิม</th><th>เบอร์</th><th>รถ</th><th></th></tr></thead>
+    <table class="tbl">
+      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส</th><th style="text-align:right">ค่ารถ</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th></th></tr></thead>
       <tbody id="ext-tbody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Modal ลงทะเบียนเด็กในเข้าคอร์ส -->
+<div class="modal-back" id="enroll-modal">
+  <div class="modal" style="max-width:640px">
+    <h3>📋 ลงทะเบียนเด็กในเข้าคอร์ส · <span id="enroll-round-label"></span></h3>
+    <div class="page-sub" style="margin-bottom:10px">ติ๊กเลือกเด็กที่จะเข้าคอร์ส (ติ๊กออก = ถอนออกจากคอร์ส)</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <select class="select" id="enroll-class" onchange="renderEnrollList()" style="max-width:170px"><option value="">ทุกห้อง</option></select>
+      <input class="input" id="enroll-search" placeholder="🔍 ค้นชื่อ..." oninput="renderEnrollList()">
+    </div>
+    <div id="enroll-list" style="max-height:50vh;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeEnrollModal()">ปิด</button>
+    </div>
   </div>
 </div>
 
@@ -2004,29 +2022,95 @@ function delStu(){
 function activeStudents(){ return STUDENTS.filter(s => !s.deleted && !s.external); }
 function externalStudents(){ return STUDENTS.filter(s => !s.deleted && s.external); }
 
-// ===== คอร์สพิเศษ · เด็กนอก รร.อื่น (เฟส 1: ทะเบียนเด็กนอก) =====
+// ===== คอร์สพิเศษ · เด็กนอก รร.อื่น =====
 let editingExternalId = null;
+// รอบคอร์ส: ต.ค. (ปีนี้) และ เม.ย. (ปีถัดไป) อยู่ในปีการศึกษาเดียวกัน
+const COURSE_ROUNDS = [{key: AY+'-ต.ค.', label:'ต.ค. '+AY}, {key: AY+'-เม.ย.', label:'เม.ย. '+(AY+1)}];
+let curRound = COURSE_ROUNDS[0].key;
+function roundLabel(key){ const r = COURSE_ROUNDS.find(x=>x.key===key); return r ? r.label : key; }
+function courseFee(cls){ if(cls==='เนอร์เซอรี่') return 1500; if(cls==='เตรียมอนุบาล') return 1400; return 1000; }
+function courseBus(s){
+  if(!(s.useBus && s.useBus!=='ไม่ใช้')) return 0;
+  if(s.external) return s.extBusPrice || 0;
+  const bp = getBusPrice(s.village); if(!bp) return 0;
+  return s.useBus==='ไป-กลับ' ? bp : Math.round(bp/2);
+}
+function coursePaid(s, roundKey){
+  const lbl = roundLabel(roundKey);
+  return activeTX().filter(t => t.studentId===s.id && inCurrentAY(t.date))
+    .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('คอร์ส')>=0 && it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0), 0);
+}
+function courseTotal(s){ return courseFee(s.cls) + courseBus(s); }
+function courseOwed(s, roundKey){ return Math.max(0, courseTotal(s) - coursePaid(s, roundKey)); }
+function courseMembers(roundKey){ return STUDENTS.filter(s => !s.deleted && Array.isArray(s.specialEnroll) && s.specialEnroll.includes(roundKey)); }
 function renderSpecial(){
+  const rsel = $('round-sel');
+  if(rsel && rsel.options.length === 0){ rsel.innerHTML = COURSE_ROUNDS.map(r=>`<option value="${r.key}">${r.label}</option>`).join(''); rsel.value = curRound; }
   const q = ($('ext-filter').value||'').trim().toLowerCase();
-  let list = externalStudents();
-  if(q) list = list.filter(s => (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q));
-  $('ext-count').textContent = externalStudents().length;
+  const all = courseMembers(curRound);
+  let list = q ? all.filter(s => (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)) : all.slice();
+  $('ext-count').textContent = all.length;
+  $('course-owed-sum').textContent = '฿' + fmt(all.reduce((sum,s)=>sum+courseOwed(s,curRound),0));
   if(list.length === 0){
-    $('ext-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีเด็กนอก · กด "➕ เพิ่มเด็กนอก" เพื่อเริ่ม</td></tr>';
+    $('ext-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
+  list.sort((a,b)=> courseOwed(b,curRound)-courseOwed(a,curRound));
   $('ext-tbody').innerHTML = list.map(s => {
-    const bus = (s.useBus && s.useBus !== 'ไม่ใช้') ? ('🚐 ' + (s.village||'') + (s.extBusPrice?(' ฿'+fmt(s.extBusPrice)):'')) : '<span style="color:#9CA3AF">-</span>';
-    return `<tr onclick="editExternal(${s.id})" style="cursor:pointer">
+    const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+    const typeBadge = s.external ? '<span class="b b-info">เด็กนอก</span>' : '<span class="b" style="background:#EDE9FE;color:#5B21B6">เด็กใน</span>';
+    return `<tr>
       <td><strong>${s.nick}</strong></td>
-      <td>${s.name}</td>
+      <td>${s.name}${s.external&&s.extSchool?'<br><span style="font-size:11px;color:#9CA3AF">'+s.extSchool+'</span>':''}</td>
       <td>${s.cls}</td>
-      <td>${s.extSchool||'-'}</td>
-      <td>${s.phone||'-'}</td>
-      <td>${bus}</td>
-      <td><button class="btn btn-sm" onclick="event.stopPropagation();editExternal(${s.id})" title="แก้ไข">✏</button></td>
+      <td>${typeBadge}</td>
+      <td style="text-align:right">฿${fmt(fee)}</td>
+      <td style="text-align:right">${bus?('฿'+fmt(bus)):'-'}</td>
+      <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
+      <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
+      <td style="white-space:nowrap">${s.external?`<button class="btn btn-sm" onclick="editExternal(${s.id})" title="แก้ข้อมูล">✏</button> `:''}<button class="btn btn-sm btn-danger" onclick="unenroll(${s.id})" title="ถอนออกจากคอร์ส">✖</button></td>
     </tr>`;
   }).join('');
+}
+function changeRound(key){ curRound = key; renderSpecial(); }
+function unenroll(id){
+  const s = STUDENTS.find(x=>x.id===id); if(!s) return;
+  if(!confirm('ถอน ' + s.nick + ' ออกจากคอร์ส ' + roundLabel(curRound) + '?\n(ไม่ลบเด็ก แค่เอาออกจากรอบนี้)')) return;
+  s.specialEnroll = (s.specialEnroll||[]).filter(r=>r!==curRound);
+  saveStudents(); renderSpecial(); toast('ถอน ' + s.nick + ' ออกจากคอร์สแล้ว');
+}
+// ลงทะเบียนเด็กในเข้าคอร์ส (ติ๊กจากรายชื่อ)
+function openEnrollModal(){
+  $('enroll-round-label').textContent = roundLabel(curRound);
+  const csel = $('enroll-class');
+  if(csel.options.length <= 1){ csel.innerHTML = '<option value="">ทุกห้อง</option>' + CLASS_ORDER.map(c=>`<option>${c}</option>`).join(''); }
+  $('enroll-search').value = '';
+  renderEnrollList();
+  $('enroll-modal').classList.add('active');
+}
+function closeEnrollModal(){ $('enroll-modal').classList.remove('active'); renderSpecial(); }
+function renderEnrollList(){
+  const cls = $('enroll-class').value;
+  const q = ($('enroll-search').value||'').trim().toLowerCase();
+  let list = activeStudents();
+  if(cls) list = list.filter(s=>s.cls===cls);
+  if(q) list = list.filter(s=>(s.nick||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q));
+  list.sort((a,b)=> CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls));
+  $('enroll-list').innerHTML = list.map(s=>{
+    const on = (s.specialEnroll||[]).includes(curRound);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #F1F5F9;cursor:pointer">
+      <input type="checkbox" ${on?'checked':''} onchange="toggleEnroll(${s.id}, this.checked)">
+      <span style="flex:1"><strong>${s.nick}</strong> · ${s.name}</span>
+      <span style="color:#9CA3AF;font-size:13px">${s.cls}</span>
+    </label>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:#9CA3AF">ไม่พบเด็ก</div>';
+}
+function toggleEnroll(id, on){
+  const s = STUDENTS.find(x=>x.id===id); if(!s) return;
+  s.specialEnroll = s.specialEnroll || [];
+  if(on){ if(!s.specialEnroll.includes(curRound)) s.specialEnroll.push(curRound); }
+  else { s.specialEnroll = s.specialEnroll.filter(r=>r!==curRound); }
+  saveStudents();
 }
 function extBusToggle(){
   const on = $('ef-usebus').value !== 'ไม่ใช้';
@@ -2073,8 +2157,8 @@ function saveExternal(){
     if(idx >= 0){ STUDENTS[idx] = {...STUDENTS[idx], ...data}; toast('แก้ไข ' + data.nick + ' ✓'); }
   } else {
     const maxId = STUDENTS.length > 0 ? Math.max(...STUDENTS.map(s => s.id)) : 0;
-    STUDENTS.push({id: maxId + 1, ...data});
-    toast('เพิ่มเด็กนอก ' + data.nick + ' ✓');
+    STUDENTS.push({id: maxId + 1, ...data, specialEnroll: [curRound]});
+    toast('เพิ่มเด็กนอก ' + data.nick + ' เข้าคอร์ส ' + roundLabel(curRound) + ' ✓');
   }
   saveStudents();
   closeExtModal();

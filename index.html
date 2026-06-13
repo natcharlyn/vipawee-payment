@@ -804,6 +804,10 @@ details summary{cursor:pointer;outline:none}
       <div class="field"><label>รูปแบบจ่ายค่ารถ</label><select class="select" id="f-payBus">
         <option>-</option><option>รายเดือน</option><option>รายเทอม</option><option>รายปี</option>
       </select></div>
+      <div class="field"><label>เดือนเริ่มเรียน <span style="color:#9CA3AF;font-weight:400">(เนอร์ส/เตรียม เข้ากลางปี)</span></label><select class="select" id="f-startMonth">
+        <option value="">ต้นปี (พ.ค.)</option>
+        <option>พ.ค.</option><option>มิ.ย.</option><option>ก.ค.</option><option>ส.ค.</option><option>ก.ย.</option><option>พ.ย.</option><option>ธ.ค.</option><option>ม.ค.</option><option>ก.พ.</option><option>มี.ค.</option>
+      </select></div>
       <div class="field"><label>สถานะ</label><select class="select" id="f-status">
         <option>ปกติ</option><option>เด็กใหม่</option><option>ค้างหนี้เก่า</option><option>ย้ายออก</option>
       </select></div>
@@ -863,8 +867,8 @@ function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date,
 function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', cashier:r.cashier||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
-function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null}; }
-function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null}; }
+function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null, start_month:s.startMonth||null}; }
+function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null, startMonth:r.start_month||''}; }
 function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||null, driver:p.driver||null, months:p.months||[], year:p.year||null, amount:p.amount, entries:p.entries, date:p.date, receiver:p.receiver, method:p.method, note:p.note||null, payer:p.payer||null}; }
 function rowToPo(r){ const months = r.months||[]; return {id:Number(r.id), busCode:r.bus_code, busName:r.bus_name||'', driver:r.driver||'', months:months, month:months.join(', '), year:r.year, amount:Number(r.amount), entries:r.entries||[], date:r.date, receiver:r.receiver, method:r.method, note:r.note||'', payer:r.payer||''}; }
 function stockToRow(s){ return {id:s.id, item:s.item, price:s.price||'-', cat:s.cat||'', note:s.note||''}; }
@@ -1829,6 +1833,7 @@ function newStu(){
   $('f-status').value = 'เด็กใหม่';
   $('f-discount').value = 'ไม่มี';
   $('f-discountReason').value = '';
+  $('f-startMonth').value = '';
   $('stu-modal').classList.add('active');
 }
 
@@ -1854,6 +1859,7 @@ function editStu(id){
   $('f-referrerName').value = s.referrerName || '';
   $('f-referrerNick').value = s.referrerNick || '';
   $('f-referrerChildId').value = s.referrerChildId || '';
+  $('f-startMonth').value = s.startMonth || '';
   $('ref-results').classList.add('hidden');
   $('stu-modal').classList.add('active');
 }
@@ -1876,7 +1882,8 @@ function saveStu(){
     note: $('f-note').value,
     referrerName: $('f-referrerName').value.trim(),
     referrerNick: $('f-referrerNick').value.trim(),
-    referrerChildId: +$('f-referrerChildId').value || null
+    referrerChildId: +$('f-referrerChildId').value || null,
+    startMonth: $('f-startMonth').value
   };
   // Validate
   if(!data.name || !data.nick || !data.cls){ toast('กรอก ชื่อ + ชื่อเล่น + ชั้น ก่อน', 'error'); return; }
@@ -3187,10 +3194,17 @@ function getOverdueMonths(s){
     });
   }));
   
+  // เด็กเข้ากลางปี: เฉพาะเนอร์สเซอรี่/เตรียมอนุบาล + มี startMonth → เริ่มนับ overdue จากเดือนที่เข้าเรียน
+  // (ระดับอื่น อ.1-ป.6 เก็บเต็มเสมอ ไม่กระทบ)
+  let startI = 0;
+  if((s.cls === 'เนอร์เซอรี่' || s.cls === 'เตรียมอนุบาล') && s.startMonth){
+    const si = MONTHS.indexOf(s.startMonth);
+    if(si > 0) startI = si;
+  }
   // Overdue = past+current months that are NOT in paid set
   const tuitionOverdue = [];
   const busOverdue = [];
-  for(let i=0; i<=curMonthIdx; i++){
+  for(let i=startI; i<=curMonthIdx; i++){
     if(!tuitionPaid.has(MONTHS[i])) tuitionOverdue.push(MONTHS[i]);
     if(!busPaid.has(MONTHS[i])) busOverdue.push(MONTHS[i]);
   }

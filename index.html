@@ -1108,6 +1108,7 @@ async function afterLogin(){
     $('login-overlay').style.display = 'none';
     document.querySelectorAll('.ay-label').forEach(el => el.textContent = AY);
     renderHome();
+    autoBackupWeekly();
   } catch(err){
     $('login-err').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err.message||err);
     $('login-btn').disabled = false;
@@ -3486,6 +3487,19 @@ function downloadBackup(){
   a.download = 'vipawee_backup_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   toast('ดาวน์โหลด backup ✓');
+}
+// เซฟ backup อัตโนมัติเมื่อเปิดแอปครั้งแรกของแต่ละสัปดาห์ (ครูไม่ต้องกดเอง)
+function autoBackupWeekly(){
+  try{
+    const last = localStorage.getItem('vipawee_lastBackup');
+    const now = Date.now();
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+    if(!last || (now - parseInt(last, 10)) >= WEEK){
+      downloadBackup();
+      localStorage.setItem('vipawee_lastBackup', String(now));
+      toast('💾 เซฟ backup อัตโนมัติประจำสัปดาห์แล้ว · ดูไฟล์ในโฟลเดอร์ Downloads');
+    }
+  } catch(e){ console.error('autoBackup', e); }
 }
 function restoreBackup(input){
   const file = input.files[0];

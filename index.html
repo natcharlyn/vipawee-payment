@@ -1469,13 +1469,11 @@ function toggleMonthRow(id, el, baseAmt){
   if(el.checked){
     picker.classList.add('show');
     el.closest('.owed-row').classList.add('checked');
-    // auto-tick current month
+    // auto-tick เดือนปัจจุบัน · ถ้าถูกล็อก (เด็กเข้ากลางปี) ให้ติ๊กเดือนแรกที่กดได้แทน เพื่อไม่ให้ช่องเด้งปิด
     const monthIdx = MONTH_NUMS.indexOf(new Date().getMonth()+1);
-    if(monthIdx >= 0){
-      const currMonth = MONTHS[monthIdx];
-      const chk = picker.querySelector(`.mchk-${id}[value="${currMonth}"]`);
-      if(chk && !chk.disabled){ chk.checked = true; chk.closest('.mchip').classList.add('active'); }
-    }
+    let chk = monthIdx >= 0 ? picker.querySelector(`.mchk-${id}[value="${MONTHS[monthIdx]}"]`) : null;
+    if(!chk || chk.disabled){ chk = Array.from(picker.querySelectorAll('.mchk-'+id)).find(c => !c.disabled) || null; }
+    if(chk && !chk.disabled){ chk.checked = true; chk.closest('.mchip').classList.add('active'); }
     const label = id === 'tuition' ? 'ค่าเทอม' : el.closest('.owed-row').querySelector('strong').textContent;
     updMonths(id, baseAmt, label, null);
   } else {

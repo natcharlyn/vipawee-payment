@@ -1142,6 +1142,10 @@ function getCurrentTerm(){
 }
 const AY = getAcademicYear();
 const CUR_TERM = getCurrentTerm();
+// ช่วงปีการศึกษาปัจจุบัน (1 พ.ค. ปีนี้ → 30 เม.ย. ปีหน้า) · ใช้กรองธุรกรรมไม่ให้ค่าจ่ายของปีเก่าปนเข้าปีใหม่
+const AY_START = new Date(AY - 543, 4, 1);
+const AY_END = new Date(AY - 543 + 1, 3, 30, 23, 59, 59);
+function inCurrentAY(d){ const x = new Date(d); return x >= AY_START && x <= AY_END; }
 
 function toast(msg, type='success'){
   const t = $('toast'); t.textContent = msg; t.className = 'toast show ' + type;
@@ -1236,7 +1240,7 @@ function resetRec(){
 }
 
 function paidState(s){
-  const myTx = activeTX().filter(t => t.studentId === s.id);
+  const myTx = activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date));
   const tuition = new Set(), bus = new Set(), annual = new Set(), terms = {};
   const BASES = ['ค่าหนังสือ','ค่าประกันอุบัติเหตุ','ค่าสระว่ายน้ำ','ค่าดนตรี','ค่าภาษาอังกฤษ'];
   myTx.forEach(t => t.items.forEach(it => {
@@ -1322,6 +1326,10 @@ function renderOwed(){
   }
   html += '</div>';
   
+  // เตือนถ้าเด็กใช้รถแต่หาราคาค่ารถไม่เจอ (หมู่บ้านไม่ตรงตาราง/ยังไม่เลือก) → กันคิดเงินขาด
+  if(s.useBus && s.useBus !== 'ไม่ใช้' && !(busPrice > 0)){
+    html += `<div class="owed" style="border:1px solid #DC2626;background:#FEF2F2"><div style="color:#991B1B;font-size:13px;font-weight:600;padding:8px 10px">⚠ เด็กคนนี้ใช้รถ (${s.useBus}) แต่ระบบหาราคาค่ารถไม่เจอ${s.village?' · หมู่บ้าน "'+s.village+'" ไม่ตรงกับตารางราคา':' · ยังไม่ได้เลือกหมู่บ้าน'} → แก้ช่องหมู่บ้านในข้อมูลเด็ก โดยเลือกจากรายการ แล้วค่ารถจะขึ้นให้อัตโนมัติ</div></div>`;
+  }
   // ค่ารายเทอม / รายปี
   html += '<div class="owed"><div class="owed-cat">📚 ค่ารายเทอม / รายปี</div>';
   if(p && p.book) html += rowItem('book', 'ค่าหนังสือ', p.book, 'annual', _ps.annual.has('ค่าหนังสือ'), null);
@@ -2116,7 +2124,7 @@ function renderDetail(s){
   $('d-name').textContent = s.nick + ' · ' + s.name;
   $('d-meta').textContent = s.cls + ' · ' + (s.village||'-') + ' · ' + s.useBus + (s.busCode?' '+s.busCode:'') + (s.discount && s.discount!=='ไม่มี'?' · '+s.discount:'');
   
-  const myTx = TX.filter(t => t.studentId === s.id);
+  const myTx = activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date));
   $('d-paid').textContent = '฿' + fmt(myTx.reduce((sum,t)=>sum+t.total, 0));
   $('d-tx').textContent = myTx.length;
   
@@ -3174,7 +3182,7 @@ function startMonthIdx(s){
 }
 // Helper: count overdue months from timeline
 function getOverdueMonths(s){
-  const myTx = activeTX().filter(t => t.studentId === s.id);
+  const myTx = activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date));
   const curMonth = new Date().getMonth() + 1;
   const curMonthIdx = MONTH_NUMS.indexOf(curMonth);
   if(curMonthIdx < 0) return {tuition: [], bus: []};
@@ -3331,7 +3339,7 @@ function renderInvSlip(id){
   const invTotal = items.reduce((sum,it) => sum + it.amount, 0);
   
   // timeline · 2 rows (tuition + bus if useBus)
-  const myTx = TX.filter(t => t.studentId === s.id);
+  const myTx = activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date));
   const monthsTuition = [];
   const monthsBus = [];
   const now = new Date();

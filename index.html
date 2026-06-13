@@ -142,6 +142,7 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .months-picker-title{font-size:12px;color:#6B7280;margin-bottom:8px;font-weight:600}
 .months-picker-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .mchip{display:flex;align-items:center;justify-content:center;gap:4px;font-size:13px;padding:8px 6px;border:1.5px solid #E5E7EB;border-radius:6px;cursor:pointer;background:white;transition:all 0.15s;user-select:none;font-weight:600}
+.mchip-paid{background:#D1FAE5!important;border-color:#10B981!important;color:#065F46!important;cursor:not-allowed;opacity:0.85}
 .mchip:hover{border-color:#E8804B}
 .mchip input{display:none}
 .mchip.active{background:#E8804B;color:white;border-color:#E8804B}
@@ -1228,8 +1229,44 @@ function resetRec(){
   $('total-amt').textContent = '0';
 }
 
+function paidState(s){
+  const myTx = activeTX().filter(t => t.studentId === s.id);
+  const tuition = new Set(), bus = new Set(), annual = new Set(), terms = {};
+  const BASES = ['ค่าหนังสือ','ค่าประกันอุบัติเหตุ','ค่าสระว่ายน้ำ','ค่าดนตรี','ค่าภาษาอังกฤษ'];
+  myTx.forEach(t => t.items.forEach(it => {
+    const L = it.label || '';
+    if(L.startsWith('ค่าเทอม')){ (it.monthsList||[]).forEach(m=>tuition.add(m)); }
+    else if(L.startsWith('ค่ารถ')){ (it.monthsList||[]).forEach(m=>bus.add(m)); }
+    else {
+      BASES.forEach(base => {
+        if(L.indexOf(base)===0){
+          if(it.termsList && it.termsList.length){ terms[base]=terms[base]||new Set(); it.termsList.forEach(x=>terms[base].add(+x)); }
+          else { const tm=L.match(/เทอม\s*([12])/g); if(tm){ terms[base]=terms[base]||new Set(); tm.forEach(x=>terms[base].add(+x.match(/[12]/)[0])); } else annual.add(base); }
+        }
+      });
+    }
+  }));
+  return {tuition, bus, annual, terms};
+}
+function unpaidFeeItems(s){
+  const p = getPriceForClass(s.cls);
+  if(!p || s.discount==='ฟรี 100%') return [];
+  const ps = paidState(s);
+  const items = [];
+  if(p.book && !ps.annual.has('ค่าหนังสือ')) items.push({label:'ค่าหนังสือ (ปี '+AY+')', amount:p.book});
+  if(p.insurance && !ps.annual.has('ค่าประกันอุบัติเหตุ')) items.push({label:'ค่าประกันอุบัติเหตุ (ปี '+AY+')', amount:p.insurance});
+  [['ค่าสระว่ายน้ำ',p.pool],['ค่าดนตรี',p.music],['ค่าภาษาอังกฤษ',p.english]].forEach(pair => {
+    const base=pair[0], price=pair[1];
+    if(!price) return;
+    const paidT = ps.terms[base] ? ps.terms[base].size : 0;
+    const remain = 2 - paidT;
+    if(remain>0) items.push({label: base+' × '+remain+' เทอม (ปี '+AY+')', amount: price*remain});
+  });
+  return items;
+}
 function renderOwed(){
   const s = selStudent;
+  const _ps = paidState(s);
   const p = getPriceForClass(s.cls);
   const busPrice = getBusPrice(s.village);
   const monthIdx = Math.max(0, MONTH_NUMS.indexOf(new Date().getMonth()+1));
@@ -1250,7 +1287,7 @@ function renderOwed(){
     <div id="months-tuition" class="months-picker">
       <div class="months-picker-title">📅 ติ๊กเลือกเดือนที่จ่าย (เลือกได้หลายเดือน):</div>
       <div class="months-picker-grid">
-        ${MONTHS.map((m,i) => `<label class="mchip"><input type="checkbox" class="mchk-tuition" value="${m}" onchange="updMonths('tuition', ${amt}, 'ค่าเทอม', this)">${m}</label>`).join('')}
+        ${MONTHS.map((m,i) => { const pd=_ps.tuition.has(m); return `<label class="mchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="mchk-tuition" value="${m}" ${pd?'disabled':''} onchange="updMonths('tuition', ${amt}, 'ค่าเทอม', this)">${pd?'✓ ':''}${m}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -1270,7 +1307,7 @@ function renderOwed(){
     <div id="months-bus" class="months-picker">
       <div class="months-picker-title">📅 ติ๊กเลือกเดือนที่จ่าย:</div>
       <div class="months-picker-grid">
-        ${MONTHS.map((m,i) => `<label class="mchip"><input type="checkbox" class="mchk-bus" value="${m}" onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${m}</label>`).join('')}
+        ${MONTHS.map((m,i) => { const pd=_ps.bus.has(m); return `<label class="mchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="mchk-bus" value="${m}" ${pd?'disabled':''} onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${pd?'✓ ':''}${m}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -1278,11 +1315,11 @@ function renderOwed(){
   
   // ค่ารายเทอม / รายปี
   html += '<div class="owed"><div class="owed-cat">📚 ค่ารายเทอม / รายปี</div>';
-  if(p && p.book) html += rowItem('book', 'ค่าหนังสือ', p.book, 'annual');
-  if(p && p.insurance) html += rowItem('insurance', 'ค่าประกันอุบัติเหตุ', p.insurance, 'annual');
-  if(p && p.pool) html += rowItem('pool', 'ค่าสระว่ายน้ำ', p.pool, 'term');
-  if(p && p.music) html += rowItem('music', 'ค่าดนตรี', p.music, 'term');
-  if(p && p.english) html += rowItem('english', 'ค่าภาษาอังกฤษ', p.english, 'term');
+  if(p && p.book) html += rowItem('book', 'ค่าหนังสือ', p.book, 'annual', _ps.annual.has('ค่าหนังสือ'), null);
+  if(p && p.insurance) html += rowItem('insurance', 'ค่าประกันอุบัติเหตุ', p.insurance, 'annual', _ps.annual.has('ค่าประกันอุบัติเหตุ'), null);
+  if(p && p.pool) html += rowItem('pool', 'ค่าสระว่ายน้ำ', p.pool, 'term', false, _ps.terms['ค่าสระว่ายน้ำ']);
+  if(p && p.music) html += rowItem('music', 'ค่าดนตรี', p.music, 'term', false, _ps.terms['ค่าดนตรี']);
+  if(p && p.english) html += rowItem('english', 'ค่าภาษาอังกฤษ', p.english, 'term', false, _ps.terms['ค่าภาษาอังกฤษ']);
   html += '</div>';
   
   // Old debt
@@ -1366,7 +1403,7 @@ function toggleAutoDisc(el, amt){
   updateTotal();
 }
 
-function rowItem(id, label, amount, rateType){
+function rowItem(id, label, amount, rateType, paidAnnual, paidTerms){
   if(rateType === 'term'){
     return `<div class="owed-row" data-id="${id}">
       <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
@@ -1379,15 +1416,14 @@ function rowItem(id, label, amount, rateType){
     <div id="terms-${id}" class="months-picker">
       <div class="months-picker-title">📅 เลือกเทอม (ปีการศึกษา ${AY}):</div>
       <div class="terms-grid">
-        <label class="tchip"><input type="checkbox" class="tchk-${id}" value="1" onchange="updTerms('${id}', ${amount}, '${label}', this)">เทอม 1</label>
-        <label class="tchip"><input type="checkbox" class="tchk-${id}" value="2" onchange="updTerms('${id}', ${amount}, '${label}', this)">เทอม 2</label>
+${[1,2].map(tn => { const pd = paidTerms && paidTerms.has(tn); return `<label class="tchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="tchk-${id}" value="${tn}" ${pd?'disabled':''} onchange="updTerms('${id}', ${amount}, '${label}', this)">${pd?'✓ ':''}เทอม ${tn}</label>`; }).join('')}
       </div>
     </div>`;
   }
   // annual (default)
   const annualLabel = label + ' (ปี ' + AY + ')';
-  return `<label class="owed-row" data-id="${id}">
-    <span><input type="checkbox" class="chk-big" onchange="toggleOwed('${id}', this)" data-amt="${amount}" data-label="${annualLabel}"> ${label} <span style="color:#9CA3AF;font-size:12px;font-weight:400">(ปี ${AY})</span></span>
+  return `<label class="owed-row${paidAnnual?' mchip-paid':''}" data-id="${id}">
+    <span><input type="checkbox" class="chk-big" onchange="toggleOwed('${id}', this)" data-amt="${amount}" data-label="${annualLabel}" ${paidAnnual?'disabled':''}> ${label} <span style="color:#9CA3AF;font-size:12px;font-weight:400">(ปี ${AY})${paidAnnual?' · ✓ จ่ายแล้ว':''}</span></span>
     <span style="font-weight:700">฿${fmt(amount)}</span>
   </label>`;
 }
@@ -3187,6 +3223,9 @@ function estimateOwed(s){
     if(!paidOld) est += debt.amount;
   }
   
+  // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย (หนังสือ ประกัน สระ ดนตรี อังกฤษ)
+  unpaidFeeItems(s).forEach(it => est += it.amount);
+  
   return Math.round(est);
 }
 function toggleInv(id, el){
@@ -3265,6 +3304,9 @@ function renderInvSlip(id){
     const paidOld = TX.some(t => t.studentId === s.id && t.items.some(it => it.label && it.label.includes('หนี้เก่า')));
     if(!paidOld) items.push({label: 'หนี้เก่า '+debt.fromTerm, amount: debt.amount});
   }
+  // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย
+  unpaidFeeItems(s).forEach(it => items.push(it));
+  const invTotal = items.reduce((sum,it) => sum + it.amount, 0);
   
   // timeline · 2 rows (tuition + bus if useBus)
   const myTx = TX.filter(t => t.studentId === s.id);
@@ -3326,7 +3368,7 @@ function renderInvSlip(id){
     <div class="inv-school">${SCHOOL.name}<br><span style="font-weight:400;font-size:11px;color:#6B7280">${SCHOOL.addr}</span></div>
     <div class="inv-title">📄 ใบแจ้งหนี้</div>
     <div style="font-size:15px;margin-bottom:6px;line-height:1.3"><strong>${s.nick}</strong> <span style="font-size:13px;color:#374151">(${s.name})</span><br><span style="font-size:13px;color:#6B7280">${s.cls} · ${s.village || '-'}</span></div>
-    <div class="inv-debt"><div style="font-size:12px;color:#991B1B;font-weight:600">ยอดค้างจ่าย</div><strong>฿${fmt(owed)}</strong></div>
+    <div class="inv-debt"><div style="font-size:12px;color:#991B1B;font-weight:600">ยอดค้างจ่าย</div><strong>฿${fmt(invTotal)}</strong></div>
     <div style="font-size:13px;margin-bottom:5px;font-weight:600">📅 สถานะรายเดือน:</div>
     <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:3px">
       <div></div>

@@ -1255,11 +1255,13 @@ function unpaidFeeItems(s){
   const items = [];
   if(p.book && !ps.annual.has('ค่าหนังสือ')) items.push({label:'ค่าหนังสือ (ปี '+AY+')', amount:p.book});
   if(p.insurance && !ps.annual.has('ค่าประกันอุบัติเหตุ')) items.push({label:'ค่าประกันอุบัติเหตุ (ปี '+AY+')', amount:p.insurance});
+  // ค่ารายเทอม: ขึ้นค้างเฉพาะเทอมที่ถึงกำหนดแล้ว (เทอม 2 จะเริ่มขึ้นค้างตอนเข้าเทอม 2)
+  const dueTerms = CUR_TERM; // เทอม 1 = นับ 1 เทอม · เทอม 2 = นับ 2 เทอม (รวมเทอม 1 ที่อาจค้าง)
   [['ค่าสระว่ายน้ำ',p.pool],['ค่าดนตรี',p.music],['ค่าภาษาอังกฤษ',p.english]].forEach(pair => {
     const base=pair[0], price=pair[1];
     if(!price) return;
     const paidT = ps.terms[base] ? ps.terms[base].size : 0;
-    const remain = 2 - paidT;
+    const remain = Math.max(0, dueTerms - paidT);
     if(remain>0) items.push({label: base+' × '+remain+' เทอม (ปี '+AY+')', amount: price*remain});
   });
   return items;

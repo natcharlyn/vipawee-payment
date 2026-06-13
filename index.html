@@ -136,6 +136,7 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .tl-overdue{background:#FEE2E2;color:#991B1B;border:1px solid #DC2626}
 .tl-pending{background:#F1F5F9;color:#94A3B8}
 .tl-future{background:white;color:#CBD5E1;border:1px dashed #CBD5E1}
+.tl-before{background:#F3F4F6;color:#9CA3AF}
 
 .months-picker{display:none;margin-left:34px;margin-top:8px;padding:12px;background:#FFF7F0;border:1px dashed #E8804B;border-radius:8px}
 .months-picker.show{display:block}
@@ -2128,15 +2129,8 @@ function renderDetail(s){
   $('d-paid').textContent = '฿' + fmt(myTx.reduce((sum,t)=>sum+t.total, 0));
   $('d-tx').textContent = myTx.length;
   
-  // estimate owed
-  const p = getPriceForClass(s.cls);
-  const busPrice = getBusPrice(s.village);
-  let est = 0;
-  if(p) est += (s.discount==='ฟรี 100%' ? 0 : (s.discount==='ลด 50%' ? p.monthly*0.5 : p.monthly));
-  if(s.useBus && s.useBus!=='ไม่ใช้' && busPrice) est += s.useBus==='ไป-กลับ' ? busPrice : Math.round(busPrice/2);
-  const debt = DATA.oldDebts.find(d => d.nick === s.nick);
-  if(debt) est += debt.amount;
-  $('d-owed').textContent = '฿' + fmt(est);
+  // ยอดค้างจริง (ฟังก์ชันเดียวกับหน้าบันทึก/ใบแจ้งหนี้ · คิดค่าเทอม+ค่ารถ+รายปี+รายเทอม+หนี้เก่า ที่ค้างจริง)
+  $('d-owed').textContent = '฿' + fmt(estimateOwed(s));
   
   // Timeline
   $('d-timeline').innerHTML = renderTimeline(s, myTx);
@@ -2215,14 +2209,18 @@ function renderTimeline(s, myTx){
     });
   });
   
-  // mark current/past as overdue if not paid
+  // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม เข้ากลางปี) = "ก่อนเข้า" ไม่ใช่ค้าง · เดือนอดีต/ปัจจุบันที่ไม่จ่าย = ค้าง
+  const _si = startMonthIdx(s);
   MONTH_NUMS.forEach((m, i) => {
-    if(curMonthIdx !== -1 && i <= curMonthIdx){
+    if(i < _si){
+      if(monthsTuition[i] !== 'paid') monthsTuition[i] = 'before';
+      if(monthsBus[i] !== 'paid') monthsBus[i] = 'before';
+    } else if(curMonthIdx !== -1 && i <= curMonthIdx){
       if(monthsTuition[i] === 'pending') monthsTuition[i] = 'overdue';
       if(monthsBus[i] === 'pending') monthsBus[i] = 'overdue';
     }
   });
-  
+
   const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
   
   let html = `<div class="tl-months"><div></div>${MONTHS.map(m => `<div>${m}</div>`).join('')}</div>`;
@@ -2231,12 +2229,12 @@ function renderTimeline(s, myTx){
   html += `<div style="margin-top:10px;font-size:11px;color:#6B7280">
     <span class="b b-paid">✓ จ่ายแล้ว</span> ·
     <span class="b b-overdue">! ค้าง</span> ·
-    <span class="b b-pending" style="background:#F1F5F9;color:#94A3B8">· ยังไม่ถึง</span>
+    <span class="b b-pending" style="background:#F1F5F9;color:#94A3B8">· ยังไม่ถึง</span>${_si>0?' · <span class="b" style="background:#F3F4F6;color:#9CA3AF">– ก่อนเข้าเรียน</span>':''}
   </div>`;
   return html;
 }
 function cellHtml(status){
-  const symbol = {paid:'✓', overdue:'!', pending:'·', future:'·'}[status] || '·';
+  const symbol = {paid:'✓', overdue:'!', pending:'·', future:'·', before:'–'}[status] || '·';
   return `<div class="tl-cell tl-${status}">${symbol}</div>`;
 }
 
@@ -3385,12 +3383,15 @@ function renderInvSlip(id){
       }
     }
   }));
-  // Mark overdue for past/current months
+  // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม) = "ก่อนเข้า" · อดีต/ปัจจุบันที่ไม่จ่าย = ค้าง
+  const _siInv = startMonthIdx(s);
   monthsTuition.forEach((st, i) => {
-    if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsTuition[i] = 'overdue';
+    if(i < _siInv){ if(st !== 'paid') monthsTuition[i] = 'before'; }
+    else if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsTuition[i] = 'overdue';
   });
   monthsBus.forEach((st, i) => {
-    if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsBus[i] = 'overdue';
+    if(i < _siInv){ if(st !== 'paid') monthsBus[i] = 'before'; }
+    else if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsBus[i] = 'overdue';
   });
   const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
   
@@ -3407,18 +3408,18 @@ function renderInvSlip(id){
     <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:${useBus?'2px':'8px'}">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">เทอม</div>
       ${monthsTuition.map(st => {
-        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·'}[st];
-        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white'}[st];
-        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1'}[st];
+        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–'}[st];
+        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6'}[st];
+        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF'}[st];
         return `<div style="background:${bg};color:${col};text-align:center;font-size:12px;font-weight:700;padding:4px 2px;border-radius:3px;${st==='future'?'border:1px dashed '+col:''}">${sym}</div>`;
       }).join('')}
     </div>
     ${useBus ? `<div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">รถ</div>
       ${monthsBus.map(st => {
-        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·'}[st];
-        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white'}[st];
-        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1'}[st];
+        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–'}[st];
+        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6'}[st];
+        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF'}[st];
         return `<div style="background:${bg};color:${col};text-align:center;font-size:12px;font-weight:700;padding:4px 2px;border-radius:3px;${st==='future'?'border:1px dashed '+col:''}">${sym}</div>`;
       }).join('')}
     </div>` : ''}

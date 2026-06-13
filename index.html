@@ -374,7 +374,10 @@ details summary{cursor:pointer;outline:none}
       <div class="page-sub"><span id="stu-count">0</span> คน · คลิกแถวดูประวัติ · คลิก ✏ แก้ข้อมูล</div>
     </div>
     <div class="tools">
-      <input class="input" id="stu-filter" placeholder="🔍 ค้นชื่อ/ชั้น..." style="max-width:240px">
+      <select class="select" id="stu-class-filter" onchange="renderStudents()" style="max-width:170px">
+        <option value="">📋 ทุกห้อง</option>
+      </select>
+      <input class="input" id="stu-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:200px" oninput="renderStudents()">
       <button class="btn" onclick="openTrash()">🗑 ถังขยะ <span id="trash-btn-count" style="background:#DC2626;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
       <button class="btn btn-primary" onclick="newStu()">➕ เพิ่มเด็กใหม่</button>
     </div>
@@ -1286,6 +1289,67 @@ function renderOwed(){
   </div>`;
   
   $('owed-list').innerHTML = html;
+  renderAutoDiscount();
+  updateTotal();
+}
+
+// ====== หักส่วนลดเพื่อนบ้านชวนเรียนอัตโนมัติ ======
+function renderAutoDiscount(){
+  const s = selStudent;
+  if(!s) return;
+  // เด็กใหม่ที่ระบุ "ลูกผู้แนะนำ" = s (s เป็นผู้แนะนำ)
+  const referred = activeStudents().filter(x =>
+    (x.referrerChildId && x.referrerChildId === s.id) ||
+    (!x.referrerChildId && x.referrerNick && x.referrerNick === s.nick)
+  );
+  if(referred.length === 0) return;
+  const now = new Date();
+  const nowKey = now.getFullYear()*100 + (now.getMonth()+1);
+  const START = 202611; // เริ่มหักจริง พ.ย. 2569
+  const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevName = MONTHS[MONTH_NUMS.indexOf(prev.getMonth()+1)] || '';
+  const endPrev = new Date(prev.getFullYear(), prev.getMonth()+1, 0, 23, 59, 59);
+
+  let box = '<div class="owed" style="border:1px solid #16A34A;background:#F0FDF4"><div class="owed-cat" style="color:#16A34A">🤝 เพื่อนบ้านชวนเรียน (' + s.nick + ' เป็นผู้แนะนำ)</div>';
+  referred.forEach(c => {
+    let note, eligible = false, amt = 100;
+    if(nowKey <= START){
+      note = '⏳ น้อง ' + c.nick + ' (' + c.cls + ') · โครงการเริ่มหักส่วนลดเดือน พ.ย. 2569';
+    } else {
+      // ตรวจว่าน้องจ่ายค่าเทอมเดือนก่อน ภายในเดือนนั้นไหม
+      const ontime = activeTX().some(t => t.studentId === c.id && new Date(t.date) <= endPrev &&
+        t.items.some(it => it.label && it.label.startsWith('ค่าเทอม') && (it.monthsList||[]).includes(prevName)));
+      // เคยให้ส่วนลดของเดือนนี้ไปแล้วหรือยัง
+      const already = activeTX().some(t => t.studentId === s.id &&
+        new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
+        t.items.some(it => it.label && it.label.includes('ส่วนลดเพื่อนบ้านชวนเรียน') && it.label.includes(c.nick)));
+      if(already){
+        note = '✓ น้อง ' + c.nick + ' · ให้ส่วนลดเดือนนี้ไปแล้ว';
+      } else if(ontime){
+        eligible = true;
+        note = '✅ น้อง ' + c.nick + ' จ่ายค่าเทอมเดือน ' + prevName + ' ตรงเวลา · หักส่วนลด 100 บาท';
+      } else {
+        note = '❌ น้อง ' + c.nick + ' ยังไม่จ่าย/จ่ายช้าเดือน ' + prevName + ' · จึงยังไม่ได้ส่วนลดเดือนนี้';
+      }
+    }
+    if(eligible){
+      const did = 'refdc_' + c.id;
+      const dlabel = 'ส่วนลดเพื่อนบ้านชวนเรียน (น้อง ' + c.nick + ' จ่ายตรงเดือน ' + prevName + ')';
+      owedSelected[did] = {amount: -amt, label: dlabel, months: 0};
+      box += '<div class="owed-row" data-id="' + did + '" style="background:#DCFCE7">' +
+        '<label style="display:flex;align-items:center;gap:8px;flex:1"><input type="checkbox" class="chk-big" checked data-dlabel="' + dlabel.replace(/"/g,'&quot;') + '" onchange="toggleAutoDisc(this, ' + amt + ')"><span style="color:#15803D;font-weight:600">' + note + '</span></label>' +
+        '<span style="font-weight:700;color:#16A34A">−฿' + fmt(amt) + '</span></div>';
+    } else {
+      box += '<div style="padding:8px 10px;font-size:13px;color:#6B7280;border-bottom:1px solid #E5E7EB">' + note + '</div>';
+    }
+  });
+  box += '<div style="font-size:11px;color:#16A34A;margin-top:6px">💡 แอดมินติ๊กออกได้ถ้าไม่ต้องการหัก · แก้ไข/ลบบันทึกได้ภายหลังที่หน้ารายงาน</div></div>';
+  $('owed-list').insertAdjacentHTML('beforeend', box);
+}
+function toggleAutoDisc(el, amt){
+  const id = el.closest('.owed-row').dataset.id;
+  if(el.checked){ owedSelected[id] = {amount: -amt, label: el.dataset.dlabel, months: 0}; }
+  else { delete owedSelected[id]; }
   updateTotal();
 }
 
@@ -1934,14 +1998,23 @@ function delStock(){
 
 function renderStudents(){
   const active = activeStudents();
-  $('stu-count').textContent = active.length;
-  // update trash button count
+  // เติมรายการห้องใน dropdown (ครั้งเดียว)
+  const csel = $('stu-class-filter');
+  if(csel && csel.options.length <= 1){
+    CLASS_ORDER.forEach(c => {
+      const cnt = active.filter(s => s.cls === c).length;
+      if(cnt > 0){ const o = document.createElement('option'); o.value = c; o.textContent = c + ' (' + cnt + ' คน)'; csel.appendChild(o); }
+    });
+  }
+  const clsFilter = csel ? csel.value : '';
   const tc = $('trash-btn-count');
   if(tc) tc.textContent = deletedStudents().length;
   const q = ($('stu-filter').value || '').toLowerCase();
   const list = active.filter(s =>
-    !q || (s.name||'').toLowerCase().includes(q) || (s.nick||'').toLowerCase().includes(q) || (s.cls||'').toLowerCase().includes(q)
+    (!clsFilter || s.cls === clsFilter) &&
+    (!q || (s.name||'').toLowerCase().includes(q) || (s.nick||'').toLowerCase().includes(q))
   );
+  $('stu-count').textContent = clsFilter ? (list.length + ' คน · ห้อง ' + clsFilter) : (active.length + ' คน · ทุกห้อง');
   $('stu-tbody').innerHTML = list.map(s => `
     <tr>
       <td onclick="openDetail(${s.id})" style="cursor:pointer">${s.id}</td>
@@ -1952,8 +2025,16 @@ function renderStudents(){
       <td onclick="openDetail(${s.id})" style="cursor:pointer">${s.useBus==='ไม่ใช้'?'<span style="color:#9CA3AF">-</span>':(s.useBus+' '+(s.busCode||''))}</td>
       <td onclick="openDetail(${s.id})" style="cursor:pointer">${s.discount==='ไม่มี' || !s.discount ? '<span style="color:#D1D5DB">-</span>' : '<span class="b b-purple">'+s.discount+'</span>'}</td>
       <td onclick="openDetail(${s.id})" style="cursor:pointer"><span class="b ${s.status==='ปกติ'?'b-paid':'b-overdue'}">${s.status}</span></td>
-      <td><button class="btn btn-sm" onclick="editStu(${s.id}); event.stopPropagation();">✏</button></td>
+      <td>
+        <button class="btn btn-sm" onclick="editStu(${s.id}); event.stopPropagation();">✏</button>
+        <button class="btn btn-sm btn-primary" onclick="recordFor(${s.id}); event.stopPropagation();" title="บันทึกรับเงิน">💰</button>
+      </td>
     </tr>`).join('');
+  if(list.length === 0) $('stu-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:24px">ไม่มีเด็กในเงื่อนไขนี้</td></tr>';
+}
+function recordFor(id){
+  goto('record');
+  setTimeout(() => { selStu(id); }, 60);
 }
 $('stu-filter').oninput = renderStudents;
 

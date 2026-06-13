@@ -143,6 +143,8 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .months-picker-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .mchip{display:flex;align-items:center;justify-content:center;gap:4px;font-size:13px;padding:8px 6px;border:1.5px solid #E5E7EB;border-radius:6px;cursor:pointer;background:white;transition:all 0.15s;user-select:none;font-weight:600}
 .mchip-paid{background:#D1FAE5!important;border-color:#10B981!important;color:#065F46!important;cursor:not-allowed;opacity:0.85}
+.mchip-before{background:#F3F4F6!important;border-color:#E5E7EB!important;color:#9CA3AF!important;cursor:not-allowed;opacity:0.7}
+.mchip-before:hover{border-color:#E5E7EB!important}
 .mchip:hover{border-color:#E8804B}
 .mchip input{display:none}
 .mchip.active{background:#E8804B;color:white;border-color:#E8804B}
@@ -1277,7 +1279,8 @@ function renderOwed(){
   const busPrice = getBusPrice(s.village);
   const monthIdx = Math.max(0, MONTH_NUMS.indexOf(new Date().getMonth()+1));
   const monthName = MONTHS[monthIdx] || 'พ.ค.';
-  
+  const _si = startMonthIdx(s); // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม) ล็อกกดไม่ได้
+
   let html = '<div class="owed"><div class="owed-cat">💰 ค่าเทอม / ค่ารถ (รายเดือน)</div>';
   // ค่าเทอม
   if(p && s.discount !== 'ฟรี 100%'){
@@ -1293,7 +1296,7 @@ function renderOwed(){
     <div id="months-tuition" class="months-picker">
       <div class="months-picker-title">📅 ติ๊กเลือกเดือนที่จ่าย (เลือกได้หลายเดือน):</div>
       <div class="months-picker-grid">
-        ${MONTHS.map((m,i) => { const pd=_ps.tuition.has(m); return `<label class="mchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="mchk-tuition" value="${m}" ${pd?'disabled':''} onchange="updMonths('tuition', ${amt}, 'ค่าเทอม', this)">${pd?'✓ ':''}${m}</label>`; }).join('')}
+        ${MONTHS.map((m,i) => { const pd=_ps.tuition.has(m); const bf=!pd && i<_si; return `<label class="mchip${pd?' mchip-paid':''}${bf?' mchip-before':''}"${pd?' title=\"จ่ายแล้ว\"':bf?' title=\"ก่อนเข้าเรียน\"':''}><input type="checkbox" class="mchk-tuition" value="${m}" ${pd||bf?'disabled':''} onchange="updMonths('tuition', ${amt}, 'ค่าเทอม', this)">${pd?'✓ ':bf?'🔒 ':''}${m}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -1313,7 +1316,7 @@ function renderOwed(){
     <div id="months-bus" class="months-picker">
       <div class="months-picker-title">📅 ติ๊กเลือกเดือนที่จ่าย:</div>
       <div class="months-picker-grid">
-        ${MONTHS.map((m,i) => { const pd=_ps.bus.has(m); return `<label class="mchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="mchk-bus" value="${m}" ${pd?'disabled':''} onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${pd?'✓ ':''}${m}</label>`; }).join('')}
+        ${MONTHS.map((m,i) => { const pd=_ps.bus.has(m); const bf=!pd && i<_si; return `<label class="mchip${pd?' mchip-paid':''}${bf?' mchip-before':''}"${pd?' title=\"จ่ายแล้ว\"':bf?' title=\"ก่อนเข้าเรียน\"':''}><input type="checkbox" class="mchk-bus" value="${m}" ${pd||bf?'disabled':''} onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${pd?'✓ ':bf?'🔒 ':''}${m}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -1471,7 +1474,7 @@ function toggleMonthRow(id, el, baseAmt){
     if(monthIdx >= 0){
       const currMonth = MONTHS[monthIdx];
       const chk = picker.querySelector(`.mchk-${id}[value="${currMonth}"]`);
-      if(chk){ chk.checked = true; chk.closest('.mchip').classList.add('active'); }
+      if(chk && !chk.disabled){ chk.checked = true; chk.closest('.mchip').classList.add('active'); }
     }
     const label = id === 'tuition' ? 'ค่าเทอม' : el.closest('.owed-row').querySelector('strong').textContent;
     updMonths(id, baseAmt, label, null);
@@ -3162,6 +3165,15 @@ function renderInvoice(){
   renderInvPreview();
 }
 $('inv-filter') && ($('inv-filter').oninput = renderInvoice);
+// Helper: index ของเดือนเริ่มเรียน (เฉพาะเนอร์สเซอรี่/เตรียมอนุบาลที่เข้ากลางปี) · ระดับอื่นคืน 0 เสมอ
+function startMonthIdx(s){
+  if(!s) return 0;
+  if((s.cls === 'เนอร์เซอรี่' || s.cls === 'เตรียมอนุบาล') && s.startMonth){
+    const si = MONTHS.indexOf(s.startMonth);
+    if(si > 0) return si;
+  }
+  return 0;
+}
 // Helper: count overdue months from timeline
 function getOverdueMonths(s){
   const myTx = activeTX().filter(t => t.studentId === s.id);
@@ -3196,11 +3208,7 @@ function getOverdueMonths(s){
   
   // เด็กเข้ากลางปี: เฉพาะเนอร์สเซอรี่/เตรียมอนุบาล + มี startMonth → เริ่มนับ overdue จากเดือนที่เข้าเรียน
   // (ระดับอื่น อ.1-ป.6 เก็บเต็มเสมอ ไม่กระทบ)
-  let startI = 0;
-  if((s.cls === 'เนอร์เซอรี่' || s.cls === 'เตรียมอนุบาล') && s.startMonth){
-    const si = MONTHS.indexOf(s.startMonth);
-    if(si > 0) startI = si;
-  }
+  const startI = startMonthIdx(s);
   // Overdue = past+current months that are NOT in paid set
   const tuitionOverdue = [];
   const busOverdue = [];

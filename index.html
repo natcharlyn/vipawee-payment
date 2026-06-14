@@ -1339,6 +1339,7 @@ function paidState(s){
   const BASES = ['ค่าหนังสือ','ค่าประกันอุบัติเหตุ','ค่าสระว่ายน้ำ','ค่าดนตรี','ค่าภาษาอังกฤษ'];
   myTx.forEach(t => t.items.forEach(it => {
     const L = it.label || '';
+    if(L.indexOf('คอร์ส') >= 0) return; // ข้ามรายการคอร์สพิเศษ
     if(L.startsWith('ค่าเทอม')){ (it.monthsList||[]).forEach(m=>tuition.add(m)); }
     else if(L.startsWith('ค่ารถ')){ (it.monthsList||[]).forEach(m=>bus.add(m)); }
     else {
@@ -2474,6 +2475,7 @@ function renderTimeline(s, myTx){
   // check tx for tuition / bus
   myTx.filter(t => !t.voidedAt).forEach(t => {
     t.items.forEach(it => {
+      if(it.label && it.label.indexOf('คอร์ส') >= 0) return; // ข้ามรายการคอร์สพิเศษ
       // tuition: use monthsList if available, else fallback consecutive
       if(it.label && it.label.startsWith('ค่าเทอม')){
         if(it.monthsList && it.monthsList.length > 0){
@@ -2916,6 +2918,7 @@ function renderStock(){
 // Categorize item label into revenue category
 function categorize(label){
   if(!label) return 'อื่นๆ';
+  if(label.indexOf('คอร์ส') >= 0) return 'คอร์สพิเศษ';
   if(label.startsWith('ค่าเทอม')) return 'ค่าเทอม';
   if(label.startsWith('ค่ารถ')) return 'ค่ารถ';
   if(label.includes('หนังสือ')) return 'ค่าหนังสือ';
@@ -3492,6 +3495,7 @@ function getOverdueMonths(s){
   const busPaid = new Set();
   myTx.forEach(t => t.items.forEach(it => {
     if(!it.label) return;
+    if(it.label.indexOf('คอร์ส') >= 0) return; // ข้ามรายการคอร์สพิเศษ ไม่ปนค่าเทอม/ค่ารถปกติ
     const isTuition = it.label.startsWith('ค่าเทอม');
     const isBus = it.label.startsWith('ค่ารถ');
     if(!isTuition && !isBus) return;
@@ -3653,6 +3657,7 @@ function renderInvSlip(id){
   // Parse tuition + bus paid months
   myTx.forEach(t => t.items.forEach(it => {
     if(!it.label) return;
+    if(it.label.indexOf('คอร์ส') >= 0) return; // ข้ามรายการคอร์สพิเศษ
     if(it.label.startsWith('ค่าเทอม')){
       if(it.monthsList && it.monthsList.length > 0){
         it.monthsList.forEach(mName => {

@@ -3722,9 +3722,15 @@ function autoBackupWeekly(){
     const now = Date.now();
     const WEEK = 7 * 24 * 60 * 60 * 1000;
     if(!last || (now - parseInt(last, 10)) >= WEEK){
-      downloadBackup();
-      localStorage.setItem('vipawee_lastBackup', String(now));
-      toast('💾 เซฟ backup อัตโนมัติประจำสัปดาห์แล้ว · ดูไฟล์ในโฟลเดอร์ Downloads');
+      // เบราว์เซอร์บล็อกการดาวน์โหลดอัตโนมัติที่ไม่ได้เกิดจากการคลิก
+      // จึงรอให้ครูคลิกอะไรก็ได้ครั้งแรก แล้วค่อยเซฟ (ครูไม่ต้องกดปุ่มพิเศษ)
+      const fn = () => {
+        document.removeEventListener('click', fn, true);
+        downloadBackup();
+        localStorage.setItem('vipawee_lastBackup', String(Date.now()));
+        toast('💾 เซฟ backup อัตโนมัติประจำสัปดาห์แล้ว · ดูไฟล์ในโฟลเดอร์ Downloads');
+      };
+      document.addEventListener('click', fn, true);
     }
   } catch(e){ console.error('autoBackup', e); }
 }

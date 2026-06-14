@@ -3592,7 +3592,10 @@ function estimateOwed(s){
   
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย (หนังสือ ประกัน สระ ดนตรี อังกฤษ)
   unpaidFeeItems(s).forEach(it => est += it.amount);
-  
+
+  // ค่าคอร์สพิเศษที่ยังค้าง (รอบในปีการศึกษานี้) — รวมในยอดค้างด้วย
+  if(Array.isArray(s.specialEnroll)) COURSE_ROUNDS.forEach(r => { if(s.specialEnroll.includes(r.key)) est += courseOwed(s, r.key); });
+
   return Math.round(est);
 }
 function toggleInv(id, el){
@@ -3673,6 +3676,8 @@ function renderInvSlip(id){
   }
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย
   unpaidFeeItems(s).forEach(it => items.push(it));
+  // ค่าคอร์สพิเศษที่ยังค้าง (รอบในปีการศึกษานี้) → แสดงในใบแจ้งค่าเทอมด้วย ผู้ปกครองจะได้เห็นยอดรวม
+  if(Array.isArray(s.specialEnroll)) COURSE_ROUNDS.forEach(r => { if(s.specialEnroll.includes(r.key)){ const co = courseOwed(s, r.key); if(co > 0) items.push({label: 'ค้างคอร์สพิเศษ ('+r.label+')', amount: co}); } });
   const invTotal = items.reduce((sum,it) => sum + it.amount, 0);
   
   // timeline · 2 rows (tuition + bus if useBus)

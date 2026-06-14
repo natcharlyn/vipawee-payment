@@ -137,6 +137,7 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .tl-pending{background:#F1F5F9;color:#94A3B8}
 .tl-future{background:white;color:#CBD5E1;border:1px dashed #CBD5E1}
 .tl-before{background:#F3F4F6;color:#9CA3AF}
+.tl-free{background:#EDE9FE;color:#6D28D9}
 
 .months-picker{display:none;margin-left:34px;margin-top:8px;padding:12px;background:#FFF7F0;border:1px dashed #E8804B;border-radius:8px}
 .months-picker.show{display:block}
@@ -444,6 +445,23 @@ details summary{cursor:pointer;outline:none}
     <div id="enroll-list" style="max-height:50vh;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeEnrollModal()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal เก็บเงินคอร์ส -->
+<div class="modal-back" id="coursepay-modal">
+  <div class="modal" style="max-width:460px">
+    <h3>💰 เก็บเงินคอร์ส · <span id="cp-name"></span></h3>
+    <div id="cp-detail" style="font-size:14px;line-height:1.9;margin:6px 0 12px;background:#F8FAFC;border-radius:8px;padding:10px 12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>จำนวนเงินที่รับ (บาท)</label><input class="input" id="cp-amount" type="number"></div>
+      <div class="field"><label>วิธีจ่าย</label><select class="select" id="cp-method"><option>เงินสด</option><option>โอน</option></select></div>
+    </div>
+    <div style="font-size:12px;color:#6B7280;margin-top:4px">💡 จ่ายบางส่วนได้ · ใส่จำนวนน้อยกว่ายอดค้างแล้วระบบจะคิดยอดค้างที่เหลือให้</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeCoursePay()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveCoursePay()">บันทึก + ออกใบเสร็จ</button>
     </div>
   </div>
 </div>
@@ -2068,7 +2086,7 @@ function renderSpecial(){
       <td style="text-align:right">${bus?('฿'+fmt(bus)):'-'}</td>
       <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
       <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
-      <td style="white-space:nowrap">${s.external?`<button class="btn btn-sm" onclick="editExternal(${s.id})" title="แก้ข้อมูล">✏</button> `:''}<button class="btn btn-sm btn-danger" onclick="unenroll(${s.id})" title="ถอนออกจากคอร์ส">✖</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" onclick="openCoursePay(${s.id})" title="เก็บเงิน">💰</button> <button class="btn btn-sm" onclick="printCourseInvoice(${s.id})" title="ใบแจ้งค่าเรียน">📄</button> ${s.external?`<button class="btn btn-sm" onclick="editExternal(${s.id})" title="แก้ข้อมูล">✏</button> `:''}<button class="btn btn-sm btn-danger" onclick="unenroll(${s.id})" title="ถอนออกจากคอร์ส">✖</button></td>
     </tr>`;
   }).join('');
 }
@@ -2111,6 +2129,61 @@ function toggleEnroll(id, on){
   if(on){ if(!s.specialEnroll.includes(curRound)) s.specialEnroll.push(curRound); }
   else { s.specialEnroll = s.specialEnroll.filter(r=>r!==curRound); }
   saveStudents();
+}
+// เก็บเงินคอร์ส (จ่ายเต็ม/บางส่วน) + ออกใบเสร็จ
+let coursePayId = null;
+function openCoursePay(id){
+  const s = STUDENTS.find(x=>x.id===id); if(!s) return;
+  coursePayId = id;
+  const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+  $('cp-name').textContent = s.nick + ' (' + s.cls + ') · ' + roundLabel(curRound);
+  $('cp-detail').innerHTML = `ค่าคอร์ส ฿${fmt(fee)}${bus?(' · ค่ารถ ฿'+fmt(bus)):''} · รวม ฿${fmt(fee+bus)}<br>จ่ายแล้ว <span style="color:#10B981">฿${fmt(paid)}</span> · ค้าง <strong style="color:#DC2626">฿${fmt(owed)}</strong>`;
+  $('cp-amount').value = owed;
+  $('cp-method').value = 'เงินสด';
+  $('coursepay-modal').classList.add('active');
+}
+function closeCoursePay(){ $('coursepay-modal').classList.remove('active'); }
+function saveCoursePay(){
+  const s = STUDENTS.find(x=>x.id===coursePayId); if(!s) return;
+  const amt = +$('cp-amount').value || 0;
+  if(amt <= 0){ toast('ใส่จำนวนเงินมากกว่า 0 บาท', 'error'); return; }
+  const fee = courseFee(s.cls), bus = courseBus(s), total = fee + bus, owed = courseOwed(s,curRound);
+  const lbl = roundLabel(curRound);
+  let items;
+  if(amt >= total && coursePaid(s,curRound) === 0){
+    items = [{label:'ค่าคอร์สเรียนพิเศษ ('+lbl+')', amount: fee, months:0}];
+    if(bus>0) items.push({label:'ค่ารถคอร์ส ('+lbl+')', amount: bus, months:0});
+  } else {
+    items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')', amount: amt, months:0}];
+  }
+  const tx = {
+    id: Date.now(), date: new Date().toISOString(),
+    studentId: s.id, studentName: s.name, studentNick: s.nick, studentClass: s.cls,
+    payerName: s.nick, items: items, total: items.reduce((a,it)=>a+it.amount,0),
+    method: $('cp-method').value, style: 'F',
+    receiptNo: nextReceiptNo(), cashier: cashierName || 'วีรญา'
+  };
+  TX.unshift(tx); saveTX();
+  closeCoursePay(); renderSpecial(); showReceipt(tx);
+}
+function printCourseInvoice(id){
+  const s = STUDENTS.find(x=>x.id===id); if(!s) return;
+  const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+  const lbl = roundLabel(curRound);
+  let rows = `<tr><td>ค่าคอร์สเรียนพิเศษ</td><td style="text-align:right">฿${fmt(fee)}</td></tr>`;
+  if(bus>0) rows += `<tr><td>ค่ารถรับ-ส่ง</td><td style="text-align:right">฿${fmt(bus)}</td></tr>`;
+  if(paid>0) rows += `<tr><td style="color:#10B981">หัก จ่ายแล้ว</td><td style="text-align:right;color:#10B981">-฿${fmt(paid)}</td></tr>`;
+  const w = window.open('', '_blank');
+  w.document.write(`<html><head><title>ใบแจ้งค่าเรียนพิเศษ</title><meta charset="utf-8"><style>body{font-family:'Sarabun',sans-serif;padding:24px;max-width:420px;margin:0 auto;color:#1F2937}table{width:100%;border-collapse:collapse;margin:12px 0}td{padding:7px 0;border-bottom:1px dashed #E5E7EB;font-size:15px}.tot{font-size:21px;font-weight:700;color:#DC2626}</style></head><body>
+    <div style="text-align:center"><img src="${LOGO_SRC}" style="width:60px;height:60px;object-fit:contain"><h2 style="margin:4px 0">${SCHOOL.name}</h2><div style="font-size:12px;color:#6B7280">${SCHOOL.addr}</div></div>
+    <h3 style="text-align:center;background:#FEF3C7;padding:6px;border-radius:8px;margin:14px 0">📄 ใบแจ้งค่าเรียนพิเศษ · ${lbl}</h3>
+    <div style="font-size:15px"><strong>${s.nick}</strong> (${s.name})<br><span style="font-size:13px;color:#6B7280">${s.cls}${s.external?(' · เด็กนอก'+(s.extSchool?' '+s.extSchool:'')):''}</span></div>
+    <table>${rows}</table>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0"><span style="font-weight:600">ยอดค้างชำระ</span><span class="tot">฿${fmt(owed)}</span></div>
+    <div style="margin-top:16px;font-size:13px;background:#F0F9FF;padding:12px;border-radius:8px;line-height:1.7">💳 <strong>${SCHOOL.bank}</strong> ${SCHOOL.bankNo}<br>ชื่อบัญชี: ${SCHOOL.bankName}<br>📞 ${SCHOOL.phone}</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 500);
 }
 function extBusToggle(){
   const on = $('ef-usebus').value !== 'ไม่ใช้';
@@ -2448,6 +2521,8 @@ function renderTimeline(s, myTx){
       if(monthsBus[i] === 'pending') monthsBus[i] = 'overdue';
     }
   });
+  // เด็กฟรี 100% = ไม่เก็บค่าเทอม → เดือนค่าเทอมขึ้น "ฟรี" ไม่ใช่ค้าง (ค่ารถยังเก็บปกติ)
+  if(s.discount === 'ฟรี 100%'){ monthsTuition.forEach((st,i)=>{ if(st!=='paid') monthsTuition[i]='free'; }); }
 
   const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
   
@@ -2457,12 +2532,12 @@ function renderTimeline(s, myTx){
   html += `<div style="margin-top:10px;font-size:11px;color:#6B7280">
     <span class="b b-paid">✓ จ่ายแล้ว</span> ·
     <span class="b b-overdue">! ค้าง</span> ·
-    <span class="b b-pending" style="background:#F1F5F9;color:#94A3B8">· ยังไม่ถึง</span>${_si>0?' · <span class="b" style="background:#F3F4F6;color:#9CA3AF">– ก่อนเข้าเรียน</span>':''}
+    <span class="b b-pending" style="background:#F1F5F9;color:#94A3B8">· ยังไม่ถึง</span>${_si>0?' · <span class="b" style="background:#F3F4F6;color:#9CA3AF">– ก่อนเข้าเรียน</span>':''}${s.discount==='ฟรี 100%'?' · <span class="b" style="background:#EDE9FE;color:#6D28D9">ฟ ฟรี</span>':''}
   </div>`;
   return html;
 }
 function cellHtml(status){
-  const symbol = {paid:'✓', overdue:'!', pending:'·', future:'·', before:'–'}[status] || '·';
+  const symbol = {paid:'✓', overdue:'!', pending:'·', future:'·', before:'–', free:'ฟ'}[status] || '·';
   return `<div class="tl-cell tl-${status}">${symbol}</div>`;
 }
 
@@ -3621,6 +3696,8 @@ function renderInvSlip(id){
     if(i < _siInv){ if(st !== 'paid') monthsBus[i] = 'before'; }
     else if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsBus[i] = 'overdue';
   });
+  // เด็กฟรี 100% = ไม่เก็บค่าเทอม → เดือนค่าเทอมขึ้น "ฟรี" (ค่ารถยังเก็บ)
+  if(s.discount === 'ฟรี 100%'){ monthsTuition.forEach((st,i)=>{ if(st!=='paid') monthsTuition[i]='free'; }); }
   const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
   
   return `<div class="inv-slip">
@@ -3636,18 +3713,18 @@ function renderInvSlip(id){
     <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:${useBus?'2px':'8px'}">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">เทอม</div>
       ${monthsTuition.map(st => {
-        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–'}[st];
-        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6'}[st];
-        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF'}[st];
+        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–',free:'ฟ'}[st];
+        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6',free:'#EDE9FE'}[st];
+        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF',free:'#6D28D9'}[st];
         return `<div style="background:${bg};color:${col};text-align:center;font-size:12px;font-weight:700;padding:4px 2px;border-radius:3px;${st==='future'?'border:1px dashed '+col:''}">${sym}</div>`;
       }).join('')}
     </div>
     ${useBus ? `<div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">รถ</div>
       ${monthsBus.map(st => {
-        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–'}[st];
-        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6'}[st];
-        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF'}[st];
+        const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–',free:'ฟ'}[st];
+        const bg = {paid:'#D1FAE5',overdue:'#FEE2E2',pending:'#F1F5F9',future:'white',before:'#F3F4F6',free:'#EDE9FE'}[st];
+        const col = {paid:'#065F46',overdue:'#991B1B',pending:'#94A3B8',future:'#CBD5E1',before:'#9CA3AF',free:'#6D28D9'}[st];
         return `<div style="background:${bg};color:${col};text-align:center;font-size:12px;font-weight:700;padding:4px 2px;border-radius:3px;${st==='future'?'border:1px dashed '+col:''}">${sym}</div>`;
       }).join('')}
     </div>` : ''}
@@ -3718,7 +3795,7 @@ function downloadBackup(){
 // เซฟ backup อัตโนมัติเมื่อเปิดแอปครั้งแรกของแต่ละสัปดาห์ (ครูไม่ต้องกดเอง)
 function autoBackupWeekly(){
   try{
-    const last = localStorage.getItem('vipawee_lastBackup');
+    const last = localStorage.getItem('vipawee_lastBackup2');
     const now = Date.now();
     const WEEK = 7 * 24 * 60 * 60 * 1000;
     if(!last || (now - parseInt(last, 10)) >= WEEK){
@@ -3727,7 +3804,7 @@ function autoBackupWeekly(){
       const fn = () => {
         document.removeEventListener('click', fn, true);
         downloadBackup();
-        localStorage.setItem('vipawee_lastBackup', String(Date.now()));
+        localStorage.setItem('vipawee_lastBackup2', String(Date.now()));
         toast('💾 เซฟ backup อัตโนมัติประจำสัปดาห์แล้ว · ดูไฟล์ในโฟลเดอร์ Downloads');
       };
       document.addEventListener('click', fn, true);

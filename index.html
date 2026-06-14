@@ -1434,11 +1434,24 @@ function renderOwed(){
   if(p && p.english) html += rowItem('english', 'ค่าภาษาอังกฤษ', p.english, 'term', false, _ps.terms['ค่าภาษาอังกฤษ']);
   html += '</div>';
   
-  // Old debt
+  // Old debt — จ่ายบางส่วนได้ (กรอกจำนวนที่จ่ายงวดนี้ ระบบจำยอดที่เหลือ)
   const debt = DATA.oldDebts.find(d => d.nick === s.nick && (!d.name || (s.name||'').includes(d.name)));
   if(debt){
+    const odPaid = oldDebtPaid(s);
+    const odRemain = Math.max(0, debt.amount - odPaid);
     html += '<div class="owed" style="border:1px solid #DC2626"><div class="owed-cat" style="color:#DC2626">💀 หนี้เก่า</div>';
-    html += rowItem('olddebt', debt.desc + ' (' + debt.fromTerm + ')', debt.amount);
+    if(odRemain <= 0){
+      html += '<div style="padding:8px 10px;font-size:13px;color:#16A34A;font-weight:600">✓ ชำระหนี้เก่าครบแล้ว (฿'+fmt(debt.amount)+')</div>';
+    } else {
+      html += `<div class="owed-row" data-id="olddebt">
+        <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
+          <input type="checkbox" class="chk-big" onchange="toggleOldDebt(this)">
+          <span><strong>${debt.desc} (${debt.fromTerm})</strong><br><span style="font-size:12px;color:#991B1B">ค้าง ฿${fmt(odRemain)} จากทั้งหมด ฿${fmt(debt.amount)}${odPaid>0?' · จ่ายแล้ว ฿'+fmt(odPaid):''}</span></span>
+        </label>
+        <span style="display:flex;align-items:center;gap:3px;white-space:nowrap">฿<input type="number" id="olddebt-amt" value="${odRemain}" style="width:84px;padding:6px;border:1px solid #D1D5DB;border-radius:6px;text-align:right" oninput="updOldDebt()"></span>
+      </div>
+      <div style="font-size:11.5px;color:#9CA3AF;padding:0 10px 8px">💡 ติ๊กช่องซ้าย แล้วใส่จำนวนที่ผู้ปกครองจ่ายงวดนี้ (จ่ายบางส่วนได้ · ครั้งหน้าระบบจะโชว์ยอดที่เหลือ)</div>`;
+    }
     html += '</div>';
   }
   
@@ -1551,6 +1564,20 @@ function toggleOwed(id, el){
   updateTotal();
 }
 
+function toggleOldDebt(el){
+  if(el.checked){ el.closest('.owed-row').classList.add('checked'); updOldDebt(); }
+  else { delete owedSelected['olddebt']; el.closest('.owed-row').classList.remove('checked'); updateTotal(); }
+}
+function updOldDebt(){
+  const row = document.querySelector('.owed-row[data-id="olddebt"]');
+  const chk = row && row.querySelector('input[type=checkbox]');
+  if(!chk || !chk.checked){ return; }
+  const amt = +$('olddebt-amt').value || 0;
+  const debt = DATA.oldDebts.find(d => d.nick === selStudent.nick && (!d.name || (selStudent.name||'').includes(d.name)));
+  const label = 'หนี้เก่า: ' + (debt ? debt.desc + ' (' + debt.fromTerm + ')' : '');
+  if(amt <= 0){ delete owedSelected['olddebt']; } else { owedSelected['olddebt'] = {amount: amt, label: label, months: 0}; }
+  updateTotal();
+}
 function setMonths(id, n, baseAmt, label){
   n = parseInt(n);
   const newAmt = baseAmt * n;
@@ -3530,6 +3557,11 @@ function getOverdueMonths(s){
   return {tuition: tuitionOverdue, bus: busOverdue};
 }
 
+// หนี้เก่า: รวมยอดที่จ่ายมาแล้ว (จ่ายบางส่วนได้) · นับทุกใบเสร็จที่มีคำว่า "หนี้เก่า" (ไม่กรองปี เพราะเป็นหนี้ยกมา)
+function oldDebtPaid(s){
+  return activeTX().filter(t => t.studentId === s.id)
+    .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('หนี้เก่า') >= 0).reduce((a,it)=>a+(it.amount||0),0), 0);
+}
 function estimateOwed(s){
   const p = getPriceForClass(s.cls);
   if(!p) return 0;
@@ -3551,11 +3583,11 @@ function estimateOwed(s){
     est += perMonth * overdue.bus.length;
   }
   
-  // Old debts (if not paid yet)
+  // Old debts — จ่ายบางส่วนได้ บวกเฉพาะยอดที่เหลือ
   const debt = DATA.oldDebts.find(d => d.nick === s.nick && (!d.name || (s.name||'').includes(d.name)));
   if(debt){
-    const paidOld = TX.some(t => t.studentId === s.id && t.items.some(it => it.label && it.label.includes('หนี้เก่า')));
-    if(!paidOld) est += debt.amount;
+    const remain = Math.max(0, debt.amount - oldDebtPaid(s));
+    est += remain;
   }
   
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย (หนังสือ ประกัน สระ ดนตรี อังกฤษ)
@@ -3636,8 +3668,8 @@ function renderInvSlip(id){
   }
   const debt = DATA.oldDebts.find(d => d.nick === s.nick && (!d.name || (s.name||'').includes(d.name)));
   if(debt){
-    const paidOld = TX.some(t => t.studentId === s.id && t.items.some(it => it.label && it.label.includes('หนี้เก่า')));
-    if(!paidOld) items.push({label: 'หนี้เก่า '+debt.fromTerm, amount: debt.amount});
+    const remain = Math.max(0, debt.amount - oldDebtPaid(s));
+    if(remain > 0) items.push({label: 'หนี้เก่า '+debt.fromTerm+(remain<debt.amount?' (เหลือจาก ฿'+fmt(debt.amount)+')':''), amount: remain});
   }
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย
   unpaidFeeItems(s).forEach(it => items.push(it));

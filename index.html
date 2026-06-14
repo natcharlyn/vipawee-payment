@@ -2152,7 +2152,7 @@ function saveCoursePay(){
   let items;
   if(amt >= total && coursePaid(s,curRound) === 0){
     items = [{label:'ค่าคอร์สเรียนพิเศษ ('+lbl+')', amount: fee, months:0}];
-    if(bus>0) items.push({label:'ค่ารถคอร์ส ('+lbl+')', amount: bus, months:0});
+    if(bus>0) items.push({label:'ค่าคอร์ส-ค่ารถ ('+lbl+')', amount: bus, months:0});
   } else {
     items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')', amount: amt, months:0}];
   }

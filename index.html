@@ -3776,7 +3776,7 @@ function renderInvSlip(id){
     <div class="inv-foot">
       💳 <strong>${SCHOOL.bank}</strong> ${SCHOOL.bankNo}<br>
       ชื่อบัญชี: ${SCHOOL.bankName}<br>
-      📞 ${SCHOOL.phone} · ${SCHOOL.phoneNote || 'ธุรการ · โทรในเวลา 08.00-16.30 น. จันทร์-ศุกร์'}
+      📞 ${SCHOOL.phone} · ${SCHOOL.phoneNote || 'ธุรการ · โทรในเวลา 08.00‑16.30 น. จันทร์‑ศุกร์'}
     </div>
   </div>`;
 }
@@ -3810,7 +3810,7 @@ function toggleEditSchool(){
     $('e-phone').value = SCHOOL.phone; $('e-bank').value = SCHOOL.bank;
     $('e-bankno').value = SCHOOL.bankNo; $('e-bankname').value = SCHOOL.bankName;
     $('e-motto').value = SCHOOL.motto || '';
-    $('e-phonenote').value = SCHOOL.phoneNote || 'ธุรการ · โทรในเวลา 08.00-16.30 น. จันทร์-ศุกร์';
+    $('e-phonenote').value = SCHOOL.phoneNote || 'ธุรการ · โทรในเวลา 08.00‑16.30 น. จันทร์‑ศุกร์';
     v.classList.add('hidden'); e.classList.remove('hidden');
   }
 }

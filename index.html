@@ -3774,6 +3774,7 @@ function renderInvSlip(id){
     <div style="font-size:13px;margin-bottom:5px;font-weight:600">💰 รายการที่ค้าง:</div>
     ${items.map(it => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px dashed #E5E7EB;line-height:1.3"><span>${it.label}</span><span style="font-weight:700;white-space:nowrap;margin-left:8px">฿${fmt(it.amount)}</span></div>`).join('')}
     <div class="inv-foot">
+      <span style="color:#991B1B;font-weight:600">📤 โอนแล้ว กรุณาส่งสลิปให้คุณครู/ธุรการ เพื่อบันทึกการชำระ</span><br>
       💳 <strong>${SCHOOL.bank}</strong> ${SCHOOL.bankNo}<br>
       ชื่อบัญชี: ${SCHOOL.bankName}<br>
       📞 ${SCHOOL.phone} · ธุรการ<br>โทรในเวลา 08.00‑16.30 น. จันทร์‑ศุกร์

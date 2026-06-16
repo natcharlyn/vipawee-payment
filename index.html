@@ -218,6 +218,7 @@ details summary{cursor:pointer;outline:none}
 </head>
 <body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <div id="login-overlay" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#1A3A8F,#3B5998);display:flex;align-items:center;justify-content:center;font-family:'Sarabun',sans-serif">
   <div style="background:white;border-radius:16px;padding:36px 32px;width:360px;box-shadow:0 10px 40px rgba(0,0,0,0.3)">
     <div style="text-align:center;margin-bottom:20px">
@@ -726,6 +727,7 @@ details summary{cursor:pointer;outline:none}
     <div id="rcpt-content"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeRcpt()">ปิด</button>
+      <button class="btn" onclick="saveRcptImage()">📷 บันทึกเป็นรูป (ส่ง LINE)</button>
       <button class="btn btn-primary" onclick="printRcpt()">🖨 พิมพ์ใบเสร็จ</button>
     </div>
   </div>
@@ -1896,6 +1898,24 @@ function closeRcpt(){
   $('rcpt-modal').classList.remove('active');
   resetRec();
   goto('home');
+}
+function saveRcptImage(){
+  const el = document.getElementById('rcpt-print');
+  if(!el){ toast('ไม่พบใบเสร็จ ลองเปิดใหม่', 'error'); return; }
+  if(typeof html2canvas === 'undefined'){ toast('ยังโหลดเครื่องมือไม่เสร็จ · รออินเทอร์เน็ตสักครู่แล้วลองใหม่', 'error'); return; }
+  toast('กำลังสร้างรูป...');
+  html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+    canvas.toBlob(blob => {
+      if(!blob){ toast('สร้างรูปไม่สำเร็จ ลองใหม่', 'error'); return; }
+      const no = (currentRcptTx && currentRcptTx.receiptNo) || 'ใบเสร็จ';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ใบเสร็จ_' + no + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('📷 บันทึกรูปแล้ว · อยู่ในโฟลเดอร์ Downloads ส่งเข้า LINE ได้เลย');
+    }, 'image/png');
+  }).catch(() => toast('สร้างรูปไม่สำเร็จ ลองใหม่อีกครั้ง', 'error'));
 }
 function printRcpt(){
   const w = window.open('', '_blank');
@@ -3869,45 +3889,4 @@ function restoreBackup(input){
       SLIPS = data.slips || [];
       PAYOUTS = data.payouts || [];
       if(data.school) SCHOOL = data.school;
-      if(data.students && data.students.length > 0) STUDENTS = data.students;
-      if(data.stock && data.stock.length > 0) STOCK = data.stock;
-      (async () => {
-        try{
-          toast('⏳ กำลังอัปโหลดข้อมูลขึ้นคลาวด์...');
-          await cloudSync('students');
-          await cloudSync('stock');
-          await cloudSync('transactions');
-          await cloudSync('slips');
-          await cloudSync('payouts');
-          await cloudSaveSchool();
-          ensureReceiptNos();
-          toast('☁ อัปโหลดขึ้นคลาวด์ครบ ✓');
-          renderHome();
-        } catch(e){ toast('⚠ อัปโหลดไม่ครบ: '+(e.message||e), 'error'); }
-      })();
-      cloudSaveSchool();
-      toast('Restore สำเร็จ ✓');
-      renderHome();
-    } catch(err){ toast('Restore ไม่สำเร็จ: '+err.message, 'error'); }
-  };
-  reader.readAsText(file);
-}
-function clearAll(){
-  if(!confirm('ลบบันทึก '+TX.length+' รายการ + สลิป '+SLIPS.length+'? ไม่กู้คืนได้')) return;
-  if(!confirm('แน่ใจมั้ย? · ครูควรกด Backup ก่อน')) return;
-  TX = []; SLIPS = [];
-  saveTX(); saveSLIPS();
-  toast('ล้างข้อมูลแล้ว');
-  renderHome();
-}
-
-// === INIT (online): เช็ค session ก่อน ===
-(async () => {
-  try{
-    const { data } = await sb.auth.getSession();
-    if(data && data.session){ await afterLogin(); }
-  } catch(e){ console.error(e); }
-})();
-</script>
-</body>
-</html>
+      if(da

@@ -218,7 +218,7 @@ details summary{cursor:pointer;outline:none}
 </head>
 <body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <div id="login-overlay" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#1A3A8F,#3B5998);display:flex;align-items:center;justify-content:center;font-family:'Sarabun',sans-serif">
   <div style="background:white;border-radius:16px;padding:36px 32px;width:360px;box-shadow:0 10px 40px rgba(0,0,0,0.3)">
     <div style="text-align:center;margin-bottom:20px">
@@ -3889,4 +3889,4 @@ function restoreBackup(input){
       SLIPS = data.slips || [];
       PAYOUTS = data.payouts || [];
       if(data.school) SCHOOL = data.school;
-      if(da
+      if(d

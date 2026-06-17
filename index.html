@@ -3468,18 +3468,24 @@ function delSlip(id){
 function slipToRecord(id){
   const slip = SLIPS.find(s => s.id === id);
   if(!slip || !slip.studentNick){ toast('กรุณาระบุเด็กก่อน', 'error'); return; }
-  const stu = STUDENTS.find(s => s.nick === slip.studentNick);
-  if(!stu) return;
-  // mark as matched
+  const matches = STUDENTS.filter(s => s.nick === slip.studentNick);
+  if(matches.length === 0){ toast('ไม่พบเด็กชื่อนี้ในระบบ', 'error'); return; }
   slip.matched = true;
   saveSLIPS();
-  // navigate to record
   goto('record');
   setTimeout(()=>{
-    selStu(stu.id);
     payMethod = 'โอน';
     document.querySelectorAll('.pm-opt').forEach(x=>x.classList.remove('active'));
-    document.querySelector('.pm-opt[data-pm="โอน"]').classList.add('active');
+    const pm = document.querySelector('.pm-opt[data-pm="โอน"]');
+    if(pm) pm.classList.add('active');
+    if(matches.length === 1){
+      selStu(matches[0].id);
+    } else {
+      const inp = $('rec-search');
+      inp.value = slip.studentNick;
+      if(typeof inp.oninput === 'function') inp.oninput();
+      toast('มีเด็กชื่อเล่น "' + slip.studentNick + '" หลายคน กรุณาเลือกให้ถูกคน', 'error');
+    }
   }, 100);
 }
 

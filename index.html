@@ -2066,7 +2066,7 @@ function delStu(){
 }
 
 // ===== Active vs deleted helpers =====
-function activeStudents(){ return STUDENTS.filter(s => !s.deleted && !s.external); }
+function activeStudents(){ return STUDENTS.filter(s => !s.deleted && !s.external && s.status !== 'ย้ายออก'); }
 function externalStudents(){ return STUDENTS.filter(s => !s.deleted && s.external); }
 
 // ===== คอร์สพิเศษ · เด็กนอก รร.อื่น =====
@@ -2409,16 +2409,19 @@ function renderStudents(){
       const cnt = active.filter(s => s.cls === c).length;
       if(cnt > 0){ const o = document.createElement('option'); o.value = c; o.textContent = c + ' (' + cnt + ' คน)'; csel.appendChild(o); }
     });
+    const om = document.createElement('option'); om.value = '__moved__'; om.textContent = '🚪 เด็กย้ายออก'; csel.appendChild(om);
   }
   const clsFilter = csel ? csel.value : '';
   const tc = $('trash-btn-count');
   if(tc) tc.textContent = deletedStudents().length;
   const q = ($('stu-filter').value || '').toLowerCase();
-  const list = active.filter(s =>
-    (!clsFilter || s.cls === clsFilter) &&
+  const moved = clsFilter === '__moved__';
+  const base = moved ? STUDENTS.filter(s => !s.deleted && !s.external && s.status === 'ย้ายออก') : active;
+  const list = base.filter(s =>
+    (moved || !clsFilter || s.cls === clsFilter) &&
     (!q || (s.name||'').toLowerCase().includes(q) || (s.nick||'').toLowerCase().includes(q))
   );
-  $('stu-count').textContent = clsFilter ? (list.length + ' คน · ห้อง ' + clsFilter) : (active.length + ' คน · ทุกห้อง');
+  $('stu-count').textContent = moved ? (list.length + ' คน · เด็กย้ายออก') : (clsFilter ? (list.length + ' คน · ห้อง ' + clsFilter) : (active.length + ' คน · ทุกห้อง'));
   $('stu-tbody').innerHTML = list.map(s => `
     <tr>
       <td onclick="openDetail(${s.id})" style="cursor:pointer">${s.id}</td>

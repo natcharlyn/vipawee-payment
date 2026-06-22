@@ -396,6 +396,7 @@ details summary{cursor:pointer;outline:none}
         <option value="">📋 ทุกห้อง</option>
       </select>
       <input class="input" id="stu-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:200px" oninput="renderStudents()">
+      <button class="btn" onclick="openMoved()">🚪 ย้ายออก <span id="moved-btn-count" style="background:#F59E0B;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
       <button class="btn" onclick="openTrash()">🗑 ถังขยะ <span id="trash-btn-count" style="background:#DC2626;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
       <button class="btn btn-primary" onclick="newStu()">➕ เพิ่มเด็กใหม่</button>
     </div>
@@ -845,6 +846,18 @@ details summary{cursor:pointer;outline:none}
     <div class="modal-actions">
       <button class="btn btn-danger" onclick="emptyTrash()">🗑 ลบทั้งหมดถาวร</button>
       <button class="btn btn-primary" onclick="closeTrash()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Moved-out Modal -->
+<div class="modal-back" id="moved-modal">
+  <div class="modal" style="max-width:780px">
+    <h3>🚪 เด็กย้ายออก · <span id="moved-count-modal">0</span> คน</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:14px">เด็กที่ตั้งสถานะ "ย้ายออก" จะมาอยู่ที่นี่ · ไม่ถูกนับในจำนวนห้อง · กด "เอากลับเข้าห้อง" เพื่อให้กลับมาเป็นเด็กปกติ</p>
+    <div id="moved-list" style="max-height:400px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeMoved()">ปิด</button>
     </div>
   </div>
 </div>
@@ -2067,6 +2080,7 @@ function delStu(){
 
 // ===== Active vs deleted helpers =====
 function activeStudents(){ return STUDENTS.filter(s => !s.deleted && !s.external && s.status !== 'ย้ายออก'); }
+function movedStudents(){ return STUDENTS.filter(s => !s.deleted && !s.external && s.status === 'ย้ายออก'); }
 function externalStudents(){ return STUDENTS.filter(s => !s.deleted && s.external); }
 
 // ===== คอร์สพิเศษ · เด็กนอก รร.อื่น =====
@@ -2345,6 +2359,43 @@ function renderTrash(){
   if(bc) bc.textContent = trash.length;
 }
 
+function openMoved(){
+  $('moved-modal').classList.add('active');
+  renderMoved();
+}
+function closeMoved(){ $('moved-modal').classList.remove('active'); }
+function moveBackStu(id){
+  const s = STUDENTS.find(x => x.id === id);
+  if(!s) return;
+  if(!confirm('เอา ' + s.nick + ' กลับเข้าห้อง ' + s.cls + ' ?\n\nสถานะจะเปลี่ยนเป็น "ปกติ" และถูกนับในจำนวนห้องอีกครั้ง')) return;
+  s.status = 'ปกติ';
+  saveStudents();
+  toast('↩ เอา ' + s.nick + ' กลับเข้าห้องแล้ว');
+  renderMoved();
+  renderStudents();
+}
+function renderMoved(){
+  const moved = movedStudents().sort((a,b) => (a.cls||'').localeCompare(b.cls||'','th'));
+  $('moved-count-modal').textContent = moved.length;
+  if(moved.length === 0){
+    $('moved-list').innerHTML = '<div style="text-align:center;padding:40px;color:#9CA3AF">📭 ยังไม่มีเด็กย้ายออก<br><span style="font-size:13px">ตั้งสถานะเด็กเป็น "ย้ายออก" แล้วจะมาอยู่ที่นี่</span></div>';
+  } else {
+    $('moved-list').innerHTML = `<table class="tbl">
+      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th></th></tr></thead>
+      <tbody>
+        ${moved.map(s => `<tr>
+          <td><strong>${s.nick}</strong></td>
+          <td>${s.name}</td>
+          <td>${s.cls}</td>
+          <td><button class="btn btn-sm btn-primary" onclick="moveBackStu(${s.id})">↩ เอากลับเข้าห้อง</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+  const bc = $('moved-btn-count');
+  if(bc) bc.textContent = moved.length;
+}
+
 let editingStockIdx = -1;
 function newStock(){
   editingStockIdx = -1;
@@ -2409,19 +2460,18 @@ function renderStudents(){
       const cnt = active.filter(s => s.cls === c).length;
       if(cnt > 0){ const o = document.createElement('option'); o.value = c; o.textContent = c + ' (' + cnt + ' คน)'; csel.appendChild(o); }
     });
-    const om = document.createElement('option'); om.value = '__moved__'; om.textContent = '🚪 เด็กย้ายออก'; csel.appendChild(om);
   }
   const clsFilter = csel ? csel.value : '';
   const tc = $('trash-btn-count');
   if(tc) tc.textContent = deletedStudents().length;
+  const mc = $('moved-btn-count');
+  if(mc) mc.textContent = movedStudents().length;
   const q = ($('stu-filter').value || '').toLowerCase();
-  const moved = clsFilter === '__moved__';
-  const base = moved ? STUDENTS.filter(s => !s.deleted && !s.external && s.status === 'ย้ายออก') : active;
-  const list = base.filter(s =>
-    (moved || !clsFilter || s.cls === clsFilter) &&
+  const list = active.filter(s =>
+    (!clsFilter || s.cls === clsFilter) &&
     (!q || (s.name||'').toLowerCase().includes(q) || (s.nick||'').toLowerCase().includes(q))
   );
-  $('stu-count').textContent = moved ? (list.length + ' คน · เด็กย้ายออก') : (clsFilter ? (list.length + ' คน · ห้อง ' + clsFilter) : (active.length + ' คน · ทุกห้อง'));
+  $('stu-count').textContent = clsFilter ? (list.length + ' คน · ห้อง ' + clsFilter) : (active.length + ' คน · ทุกห้อง');
   $('stu-tbody').innerHTML = list.map(s => `
     <tr>
       <td onclick="openDetail(${s.id})" style="cursor:pointer">${s.id}</td>

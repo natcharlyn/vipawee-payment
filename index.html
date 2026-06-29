@@ -2058,6 +2058,7 @@ function saveStu(){
   closeStuModal();
   // Refresh views
   renderStudents();
+  if($('moved-list')) renderMoved();
   if(detailStudentId === editingStudentId){
     const s = STUDENTS.find(x => x.id === detailStudentId);
     if(s) renderDetail(s);
@@ -2381,13 +2382,17 @@ function renderMoved(){
     $('moved-list').innerHTML = '<div style="text-align:center;padding:40px;color:#9CA3AF">📭 ยังไม่มีเด็กย้ายออก<br><span style="font-size:13px">ตั้งสถานะเด็กเป็น "ย้ายออก" แล้วจะมาอยู่ที่นี่</span></div>';
   } else {
     $('moved-list').innerHTML = `<table class="tbl">
-      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th></th></tr></thead>
+      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>หมายเหตุ / ยอดค้าง</th><th></th></tr></thead>
       <tbody>
         ${moved.map(s => `<tr>
           <td><strong>${s.nick}</strong></td>
           <td>${s.name}</td>
           <td>${s.cls}</td>
-          <td><button class="btn btn-sm btn-primary" onclick="moveBackStu(${s.id})">↩ เอากลับเข้าห้อง</button></td>
+          <td style="font-size:12px;max-width:260px;color:${s.note?'#B45309':'#9CA3AF'};font-weight:${s.note?'600':'400'}">${s.note ? s.note : '— ยังไม่มีโน้ต —'}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-sm" onclick="editStu(${s.id})">✏ ดู / แก้ไข / โน้ต</button>
+            <button class="btn btn-sm btn-primary" onclick="moveBackStu(${s.id})">↩ เอากลับเข้าห้อง</button>
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
@@ -3953,20 +3958,4 @@ function restoreBackup(input){
 }
 function clearAll(){
   if(!confirm('ลบบันทึก '+TX.length+' รายการ + สลิป '+SLIPS.length+'? ไม่กู้คืนได้')) return;
-  if(!confirm('แน่ใจมั้ย? · ครูควรกด Backup ก่อน')) return;
-  TX = []; SLIPS = [];
-  saveTX(); saveSLIPS();
-  toast('ล้างข้อมูลแล้ว');
-  renderHome();
-}
-
-// === INIT (online): เช็ค session ก่อน ===
-(async () => {
-  try{
-    const { data } = await sb.auth.getSession();
-    if(data && data.session){ await afterLogin(); }
-  } catch(e){ console.error(e); }
-})();
-</script>
-</body>
-</html>
+  if(!confirm(

@@ -3958,4 +3958,20 @@ function restoreBackup(input){
 }
 function clearAll(){
   if(!confirm('ลบบันทึก '+TX.length+' รายการ + สลิป '+SLIPS.length+'? ไม่กู้คืนได้')) return;
-  if(!confirm(
+  if(!confirm('แน่ใจมั้ย? · ครูควรกด Backup ก่อน')) return;
+  TX = []; SLIPS = [];
+  saveTX(); saveSLIPS();
+  toast('ล้างข้อมูลแล้ว');
+  renderHome();
+}
+
+// === INIT (online): เช็ค session ก่อน ===
+(async () => {
+  try{
+    const { data } = await sb.auth.getSession();
+    if(data && data.session){ await afterLogin(); }
+  } catch(e){ console.error(e); }
+})();
+</script>
+</body>
+</html>

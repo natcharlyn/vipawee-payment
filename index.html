@@ -396,7 +396,7 @@ details summary{cursor:pointer;outline:none}
         <option value="">📋 ทุกห้อง</option>
       </select>
       <input class="input" id="stu-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:200px" oninput="renderStudents()">
-      <button class="btn" onclick="openMoved()">🚪 ย้ายออก <span id="moved-btn-count" style="background:#F59E0B;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
+      <button class="btn" onclick="openPromote()" style="background:#1D4ED8;color:#fff">🎓 เลื่อนชั้น</button> <button class="btn" onclick="openMoved()">🚪 ย้ายออก <span id="moved-btn-count" style="background:#F59E0B;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
       <button class="btn" onclick="openTrash()">🗑 ถังขยะ <span id="trash-btn-count" style="background:#DC2626;color:white;padding:1px 7px;border-radius:8px;font-size:11px;margin-left:4px">0</span></button>
       <button class="btn btn-primary" onclick="newStu()">➕ เพิ่มเด็กใหม่</button>
     </div>
@@ -886,6 +886,47 @@ details summary{cursor:pointer;outline:none}
 </div>
 
 <!-- Student Form Modal -->
+<div class="modal-back" id="promote-modal">
+  <div class="modal" style="max-width:760px">
+    <h3>🎓 เลื่อนชั้น / ย้ายห้อง (ขึ้นปีใหม่)</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:8px">① ย้ายชั้น/ห้องแบบกลุ่ม · ② ป.6 จบ → ย้ายออก · ③ จัดการห้อง · ⚠️ Backup ก่อนทุกครั้ง</p>
+    <div style="background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:0 8px 8px 0;padding:8px 12px;font-size:12.5px;margin-bottom:12px">📋 ลำดับขึ้นปีใหม่: 1) กด "ยกยอดค้าง" ที่หน้าตั้งค่าก่อน → 2) ค่อยเลื่อนชั้นตรงนี้</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn promo-tab" data-t="move" onclick="promoTab('move')" style="background:#1D4ED8;color:#fff">① ย้ายชั้น/ห้อง</button>
+      <button class="btn promo-tab" data-t="grad" onclick="promoTab('grad')">② ป.6 จบ</button>
+      <button class="btn promo-tab" data-t="rooms" onclick="promoTab('rooms')">③ จัดการห้อง</button>
+    </div>
+    <div id="pt-move">
+      <label style="font-size:13px;font-weight:600">เลือกชั้นปัจจุบัน (ต้นทาง)</label><br>
+      <select class="select" id="promo-fromCls" onchange="promoRenderFrom()" style="max-width:280px"></select>
+      <div id="promo-fromList" class="hidden" style="border:1px solid #E5E7EB;border-radius:10px;margin-top:8px;max-height:240px;overflow:auto"></div>
+      <label style="font-size:13px;font-weight:600;display:block;margin-top:12px">ย้ายไปชั้น/ห้องปลายทาง</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+        <select class="select" id="promo-toCls" style="max-width:260px"></select>
+        <button class="btn btn-sm" onclick="promoAddRoomQuick()">+ เพิ่มห้องใหม่</button>
+      </div>
+      <div style="margin-top:14px"><button class="btn" onclick="promoMovePreview()">🔍 ตรวจดูก่อน</button></div>
+      <div id="promo-prev" class="hidden" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:11px 13px;margin-top:12px;font-size:13.5px"></div>
+      <div id="promo-warn" class="hidden" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:9px 12px;font-size:13px;color:#991B1B;margin:12px 0">⚠️ ก่อนยืนยัน: กด Backup ที่หน้าตั้งค่าก่อนนะคะ (เลื่อนแล้วย้อนยาก)</div>
+      <button class="btn btn-danger hidden" id="promo-confirm" onclick="promoMoveConfirm()">✅ ยืนยันเลื่อนชั้น</button>
+    </div>
+    <div id="pt-grad" class="hidden">
+      <p style="font-size:13px;color:#6B7280">เด็ก ป.6 ที่จบ → ตั้ง "ย้ายออก" (ยังค้นเจอ/กู้คืนได้)</p>
+      <div id="promo-gradList" style="border:1px solid #E5E7EB;border-radius:10px;margin-top:8px;max-height:260px;overflow:auto"></div>
+      <button class="btn btn-danger" style="margin-top:12px" onclick="promoGrad()">🎓 ตั้งเด็กที่ติ๊กเป็น "ย้ายออก"</button>
+      <div id="promo-gradDone" style="margin-top:8px;color:#059669;font-weight:600;font-size:13px"></div>
+    </div>
+    <div id="pt-rooms" class="hidden">
+      <p style="font-size:13px;color:#6B7280">เพิ่ม/ลบห้องได้ · ราคาห้องใหม่มาเองจากชั้นฐาน (ลบได้เฉพาะห้องที่เพิ่มเอง + ไม่มีเด็ก)</p>
+      <div id="promo-roomList" style="margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <input class="input" type="text" id="promo-newRoom" placeholder="ชื่อห้องใหม่ เช่น อ.2/2" style="max-width:220px">
+        <button class="btn btn-primary btn-sm" onclick="promoAddRoom()">+ เพิ่มห้อง</button>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:18px"><button class="btn" onclick="closePromote()">ปิด</button></div>
+  </div>
+</div>
 <div class="modal-back" id="stu-modal">
   <div class="modal" style="max-width:600px">
     <h3 id="stu-modal-title">➕ เพิ่มเด็กใหม่</h3>
@@ -1262,13 +1303,13 @@ function saveTX(){ cloudSync('transactions'); }
 function saveSLIPS(){ cloudSync('slips'); }
 
 function getPriceForClass(cls){
+  const base = (cls||'').replace(/\/\d+$/,'');
   const map = {
     'เนอร์เซอรี่':'Nursery (เนอร์สเซอรี่)','เตรียมอนุบาล':'เตรียมอนุบาล',
-    'อ.1':'อนุบาล 1','อ.2':'อนุบาล 2','อ.3/1':'อนุบาล 3','อ.3/2':'อนุบาล 3',
-    'ป.1/1':'ประถม 1','ป.1/2':'ประถม 1','ป.2/1':'ประถม 2','ป.2/2':'ประถม 2',
-    'ป.3/1':'ประถม 3','ป.3/2':'ประถม 3','ป.4':'ประถม 4','ป.5':'ประถม 5','ป.6':'ประถม 6'
+    'อ.1':'อนุบาล 1','อ.2':'อนุบาล 2','อ.3':'อนุบาล 3',
+    'ป.1':'ประถม 1','ป.2':'ประถม 2','ป.3':'ประถม 3','ป.4':'ประถม 4','ป.5':'ประถม 5','ป.6':'ประถม 6'
   };
-  return DATA.pricing.find(p=>p.class === (map[cls]||cls));
+  return DATA.pricing.find(p=>p.class === (map[base]||map[cls]||cls));
 }
 function getBusPrice(village){
   if(!village) return 0;
@@ -1968,7 +2009,7 @@ function newStu(){
   editingStudentId = null;
   $('stu-modal-title').textContent = '➕ เพิ่มเด็กใหม่';
   $('f-delete-btn').classList.add('hidden');
-  populateVillageDropdown();
+  populateVillageDropdown(); populateClassDropdown();
   // Clear form
   ['f-name','f-nick','f-cls','f-village','f-busCode','f-note','f-referrerName','f-referrerNick','f-referrerChildId'].forEach(id => $(id).value = '');
   $('ref-results').classList.add('hidden');
@@ -1988,7 +2029,7 @@ function editStu(id){
   editingStudentId = id;
   $('stu-modal-title').textContent = '✏ แก้ไขข้อมูล · ' + s.nick;
   $('f-delete-btn').classList.remove('hidden');
-  populateVillageDropdown();
+  populateVillageDropdown(); populateClassDropdown();
   $('f-name').value = s.name || '';
   $('f-nick').value = s.nick || '';
   $('f-cls').value = s.cls || '';
@@ -2365,6 +2406,111 @@ function openMoved(){
   renderMoved();
 }
 function closeMoved(){ $('moved-modal').classList.remove('active'); }
+// ===== 🎓 เลื่อนชั้น / ย้ายห้อง =====
+let PROMO_ROOMS = [];
+function normalizeClass(cls){
+  const base=(cls||'').replace(/\/\d+$/,'');
+  const map={'เนอร์เซอรี่':'Nursery','เตรียมอนุบาล':'เตรียมอนุบาล','อ.1':'อนุบาล 1','อ.2':'อนุบาล 2','อ.3':'อนุบาล 3','ป.1':'ประถม 1','ป.2':'ประถม 2','ป.3':'ประถม 3','ป.4':'ประถม 4','ป.5':'ประถม 5','ป.6':'ประถม 6'};
+  return map[base]||base;
+}
+function promoClasses(){
+  const used=new Set(STUDENTS.filter(s=>!s.deleted&&s.cls).map(s=>s.cls));
+  const all=new Set([...CLASS_ORDER,...used,...PROMO_ROOMS]);
+  const ordered=CLASS_ORDER.filter(c=>all.has(c));
+  const extra=[...all].filter(c=>!CLASS_ORDER.includes(c)).sort();
+  return [...ordered,...extra];
+}
+function populateClassDropdown(){
+  const sel=$('f-cls'); if(!sel) return; const cur=sel.value;
+  sel.innerHTML='<option value="">-- เลือก --</option>'+promoClasses().map(c=>'<option>'+c+'</option>').join('');
+  if(cur) sel.value=cur;
+}
+function openPromote(){ $('promote-modal').classList.add('active'); promoTab('move'); }
+function closePromote(){ $('promote-modal').classList.remove('active'); }
+function promoTab(name){
+  ['move','grad','rooms'].forEach(n=>$('pt-'+n).classList.toggle('hidden', n!==name));
+  document.querySelectorAll('.promo-tab').forEach(el=>{ const on=el.dataset.t===name; el.style.background=on?'#1D4ED8':''; el.style.color=on?'#fff':''; });
+  if(name==='move') promoFillSelects();
+  if(name==='grad') promoRenderGrad();
+  if(name==='rooms') promoRenderRooms();
+}
+function promoFillSelects(){
+  const cs=promoClasses(), opts=cs.map(c=>'<option>'+c+'</option>').join('');
+  const fEl=$('promo-fromCls'), toEl=$('promo-toCls'); const fv=fEl.value, tv=toEl.value;
+  fEl.innerHTML='<option value="">— เลือกชั้น —</option>'+opts;
+  toEl.innerHTML='<option value="">— เลือกชั้น/ห้องปลายทาง —</option>'+opts;
+  if(fv) fEl.value=fv; if(tv) toEl.value=tv;
+  promoRenderFrom();
+}
+function promoRenderFrom(){
+  const cls=$('promo-fromCls').value, box=$('promo-fromList');
+  $('promo-prev').classList.add('hidden'); $('promo-confirm').classList.add('hidden'); $('promo-warn').classList.add('hidden');
+  if(!cls){ box.classList.add('hidden'); return; }
+  const kids=activeStudents().filter(s=>s.cls===cls);
+  if(!kids.length){ box.classList.remove('hidden'); box.innerHTML='<div style="padding:10px 12px;color:#9CA3AF;font-size:14px">ไม่มีเด็กในชั้นนี้</div>'; return; }
+  let h='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#F8FAFC;font-weight:600;font-size:13px"><input type="checkbox" id="promo-selall" onchange="document.querySelectorAll(\'.promo-mvchk\').forEach(c=>c.checked=this.checked)"><label for="promo-selall">เลือกทั้งหมด ('+kids.length+' คน)</label></div>';
+  kids.forEach(s=>{ h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #F3F4F6;font-size:14px"><input type="checkbox" class="promo-mvchk" value="'+s.id+'"><span><b>'+s.nick+'</b> <span style="color:#6B7280;font-size:13px">· '+s.name+'</span></span></div>'; });
+  box.innerHTML=h; box.classList.remove('hidden');
+}
+function promoSelectedIds(){ return Array.from(document.querySelectorAll('.promo-mvchk:checked')).map(c=>+c.value); }
+function promoMovePreview(){
+  const from=$('promo-fromCls').value, to=$('promo-toCls').value, ids=promoSelectedIds();
+  if(!from||!to||!ids.length){ toast('เลือกต้นทาง+ปลายทาง+ติ๊กเด็กก่อน','error'); return; }
+  if(from===to){ toast('ต้นทางกับปลายทางเหมือนกัน','error'); return; }
+  let rows=ids.map(id=>{ const s=STUDENTS.find(x=>x.id===id); return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #D1FAE5"><span>'+s.nick+'</span><span>'+s.cls+' <span style="color:#059669;font-weight:700">→</span> '+to+'</span></div>'; }).join('');
+  $('promo-prev').innerHTML='<b>จะย้าย '+ids.length+' คน ไป "'+to+'"</b> <span style="background:#E0E7FF;color:#3730A3;font-size:12px;padding:2px 9px;border-radius:8px">ราคาฐาน: '+normalizeClass(to)+'</span>'+rows+'<div style="color:#6B7280;font-size:12px;margin-top:6px">✓ ห้องปลายทางหาราคาเจออัตโนมัติ</div>';
+  $('promo-prev').classList.remove('hidden'); $('promo-warn').classList.remove('hidden'); $('promo-confirm').classList.remove('hidden');
+}
+function promoMoveConfirm(){
+  const to=$('promo-toCls').value, ids=promoSelectedIds();
+  if(!to||!ids.length) return;
+  if(!confirm('ยืนยันเลื่อน '+ids.length+' คน ไป "'+to+'" ?\n\n(กด Backup ก่อนแล้วใช่ไหม?)')) return;
+  ids.forEach(id=>{ const s=STUDENTS.find(x=>x.id===id); if(s) s.cls=to; });
+  saveStudents(); renderStudents();
+  toast('เลื่อนชั้น '+ids.length+' คน ไป '+to+' แล้ว ✓');
+  promoFillSelects();
+}
+function promoRenderGrad(){
+  const kids=activeStudents().filter(s=>s.cls==='ป.6'), box=$('promo-gradList');
+  $('promo-gradDone').textContent='';
+  if(!kids.length){ box.innerHTML='<div style="padding:10px 12px;color:#9CA3AF;font-size:14px">ไม่มีเด็ก ป.6 (อาจตั้งย้ายออกไปแล้ว)</div>'; return; }
+  let h='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#F8FAFC;font-weight:600;font-size:13px"><input type="checkbox" id="promo-gradall" onchange="document.querySelectorAll(\'.promo-gradchk\').forEach(c=>c.checked=this.checked)"><label for="promo-gradall">เลือกทั้งหมด ('+kids.length+' คน)</label></div>';
+  kids.forEach(s=>{ h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #F3F4F6;font-size:14px"><input type="checkbox" class="promo-gradchk" value="'+s.id+'"><span><b>'+s.nick+'</b> <span style="color:#6B7280;font-size:13px">· '+s.name+'</span></span></div>'; });
+  box.innerHTML=h;
+}
+function promoGrad(){
+  const ids=Array.from(document.querySelectorAll('.promo-gradchk:checked')).map(c=>+c.value);
+  if(!ids.length){ toast('ติ๊กเด็กที่จบก่อน','error'); return; }
+  if(!confirm('ตั้ง '+ids.length+' คน (ป.6) เป็น "ย้ายออก" ?')) return;
+  ids.forEach(id=>{ const s=STUDENTS.find(x=>x.id===id); if(s) s.status='ย้ายออก'; });
+  saveStudents(); renderStudents();
+  $('promo-gradDone').textContent='✅ ตั้ง '+ids.length+' คนเป็น "ย้ายออก" แล้ว · ยังค้นเจอ/กู้คืนได้';
+  promoRenderGrad();
+}
+function promoRenderRooms(){
+  const cs=promoClasses();
+  $('promo-roomList').innerHTML=cs.map(c=>{
+    const cnt=activeStudents().filter(s=>s.cls===c).length;
+    const canDel=cnt===0 && !CLASS_ORDER.includes(c);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #F3F4F6;font-size:14px"><span style="flex:1">'+c+' <span style="background:#E0E7FF;color:#3730A3;font-size:11px;padding:2px 8px;border-radius:8px">ราคา: '+normalizeClass(c)+'</span> <span style="color:#6B7280;font-size:12px">· '+cnt+' คน</span></span>'+(canDel?'<button class="btn btn-sm btn-danger" onclick="promoDelRoom(\''+c+'\')">ลบ</button>':'')+'</div>';
+  }).join('');
+}
+function promoAddRoom(){
+  const v=$('promo-newRoom').value.trim();
+  if(!v){ toast('พิมพ์ชื่อห้องก่อน','error'); return; }
+  if(promoClasses().includes(v)){ toast('มีห้องนี้แล้ว'); return; }
+  PROMO_ROOMS.push(v); $('promo-newRoom').value='';
+  promoRenderRooms(); promoFillSelects();
+  toast('เพิ่มห้อง '+v+' (ราคาฐาน '+normalizeClass(v)+')');
+}
+function promoDelRoom(c){ PROMO_ROOMS=PROMO_ROOMS.filter(x=>x!==c); promoRenderRooms(); promoFillSelects(); }
+function promoAddRoomQuick(){
+  const v=prompt('ชื่อห้องใหม่ เช่น อ.2/2'); if(!v) return; const tv=v.trim(); if(!tv) return;
+  if(!promoClasses().includes(tv)) PROMO_ROOMS.push(tv);
+  promoFillSelects(); $('promo-toCls').value=tv;
+  toast('เพิ่มห้อง '+tv);
+}
+
 function moveBackStu(id){
   const s = STUDENTS.find(x => x.id === id);
   if(!s) return;

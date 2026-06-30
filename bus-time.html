@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เวลารถรับ-ส่ง · กรอกในมือถือ</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sarabun','Segoe UI',Tahoma,sans-serif;background:linear-gradient(160deg,#EEF3FB,#F6F0FF);color:#1f2937;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .wrap{width:100%;max-width:430px}
+  .tip{background:#FFF7E6;border:1px solid #F4D98B;border-radius:12px;padding:11px 14px;font-size:13.5px;color:#7A5B00;line-height:1.5}
+  .rhead{margin:16px 0 8px;font-size:18px;font-weight:800;text-align:center;padding:8px;border-radius:12px;color:#fff}
+  .rhead.nu{background:#7C5BD0}.rhead.tom{background:#3B82F6}
+  .card{background:#fff;border-radius:18px;padding:0;margin-bottom:14px;box-shadow:0 4px 14px rgba(120,130,170,.18);overflow:hidden;border:1px solid #eee}
+  .ctop{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;font-size:13px;color:#fff}
+  .nu .ctop{background:#7C5BD0}.tom .ctop{background:#3B82F6}
+  .ctop .r{font-weight:800;font-size:15px}
+  .cbody{padding:13px 15px}
+  .vil{font-size:19px;font-weight:800;color:#1E3A8A}
+  .vil .cnt{font-size:13px;color:#94A3B8;font-weight:600}
+  .times{display:flex;gap:10px;margin:11px 0}
+  .tcell{flex:1;background:#F6F8FC;border:1.5px solid #E3E9F2;border-radius:13px;padding:9px;text-align:center}
+  .tcell .lb{font-size:13px;color:#64748B;font-weight:700;margin-bottom:5px}
+  .tcell input{width:100%;font-family:inherit;font-size:20px;font-weight:800;text-align:center;border:none;border-bottom:2px solid #7C5BD0;background:#FFFDF3;padding:5px 2px;color:#1E3A8A}
+  .tom .tcell input{border-bottom-color:#3B82F6}
+  .tcell .un{font-size:12px;color:#94A3B8;margin-top:3px}
+  .kids{font-size:14px;line-height:1.85;color:#374151;background:#FBFCFE;border-radius:11px;padding:9px 12px}
+  .kids .k b{font-weight:700;color:#111827}
+  .kids .tag{font-size:11px;color:#B45309}
+  .cfoot{font-size:11.5px;color:#9aa3b2;text-align:center;padding:8px 12px 12px}
+  .seqrow{font-size:12.5px;color:#64748B;margin-top:9px;display:flex;align-items:center;gap:6px}
+  .seqrow input{width:54px;font-family:inherit;font-size:15px;font-weight:800;text-align:center;border:none;border-bottom:1.5px solid #9CA3AF;background:#FFFDF3;color:#1E3A8A}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tip">📱 <b>สำหรับครูประจำสายรถ</b> — แตะกรอก ⏰ <b>เวลารับเช้า / ส่งเย็น</b> ของแต่ละหมู่บ้าน (และลำดับวิ่ง ถ้าต้องการ) → แล้ว <b>แคปหน้าจอการ์ดนั้น</b> ส่งให้ผู้ปกครองหมู่บ้านนั้นได้เลย<br>🏷️ [ขาไป] = มาเช้าอย่างเดียว · [ขากลับ] = กลับเย็นอย่างเดียว</div>
+  <div id="root"></div>
+</div>
+
+<script>
+const DATA={
+"นุ":{cls:"nu",label:"🟣 สายครูนุ (รถคนขับ)",r:"สายครูนุ",vills:[
+ ["ศรีวิไล",[["ปอร์เช่","ป.2/1",""],["มะลิ","ป.3/1",""],["ลีโอ","ป.5",""],["ใบบุญ","อ.1",""]]],
+ ["หนองจันทร์",[["นะโม","ป.1/1","ขาไป"],["เฟื่อง","ป.1/1","ขาไป"],["อันอัน","ป.1/1",""],["ณคุณ","ป.2/2",""],["แอนดา","ป.3/1","ขาไป"],["ไอเดียร์","ป.3/1","ขาไป"],["ทับทิม","ป.3/1","ขาไป"],["นิวเคลียร์","ป.3/2",""],["พอร์ช","ป.4","ขาไป"],["กัปตัน","ป.4",""],["ไข่มุก","ป.5",""],["แหม่ม","ป.6","ขาไป"],["เวียร์","ป.6",""],["อันปัน","ป.6",""],["ณภัทร","อ.2",""]]],
+ ["ชุมภูทอง",[["ต้นหนาว","ป.1/1","ขากลับ"],["อินเตอร์","ป.2/2",""],["พ๊อตเตอร์","ป.3/2",""],["มิรินด้า","อ.2",""],["เดมี่","อ.3/1",""]]],
+ ["คำนาดี",[["อันนา","ป.1/2",""],["ไพลิน","ป.2/2",""],["ข้าวทิพย์","ป.5",""],["โมจิ","อ.2",""]]],
+ ["บ้านโนนม่วง",[["ข้าวตัง","ป.3/2",""]]],
+ ["นาทราย",[["ปอเช่","ป.5",""]]]
+]},
+"ต้อม":{cls:"tom",label:"🔵 สายครูต้อม (รถโรงเรียน)",r:"สายครูต้อม",vills:[
+ ["โคกสำราญ-พรสวรรค์",[["มิวนิค","ป.1/1",""],["อุ่นใจ","ป.2/1",""],["อชิ","ป.4",""],["บอล","ป.6",""],["เธียเตอร์","อ.2","ขากลับ"],["อังเปา","อ.2",""],["อคิณ","อ.2",""],["อลัน","อ.2",""],["มิเกล","อ.2",""],["มินแจ","อ.3/2",""],["ไทเกอร์","เตรียมอนุบาล","ขากลับ"],["ไทก้า","เตรียมอนุบาล","ขากลับ"]]],
+ ["บ้านผาสุก",[["สไปร์ท","ป.1/1",""],["ปริม","ป.4",""],["ปาล์ม","ป.6",""],["กวาง","ป.6",""],["ชินจัง","อ.1",""],["กุ๋งกิ๋ง","อ.2",""],["คิรินทร์","อ.3/1",""],["องษา","อ.3/2",""]]],
+ ["ศรีวิไล",[["มาวิน","ป.1/2",""],["โลโก้","ป.4",""],["ไออุ่น","อ.2","ขากลับ"],["พีค","อ.3/2",""]]],
+ ["บ้านใหม่พัฒนา",[["ตุณ","อ.2","ขากลับ"]]],
+ ["ชุมภูพร",[["โบตั๋น","ป.2/2",""]]]
+]}};
+
+function card(cls,route,vil,kids){
+  const chips=kids.map(k=>`<span class="k"><b>${k[0]}</b> (${k[1]})${k[2]?'<span class="tag"> ['+k[2]+']</span>':''}</span>`).join(' · ');
+  return `<div class="card ${cls}">
+    <div class="ctop"><span class="r">🚌 ${route}</span><span>🏫 อนุบาลวิภาวี</span></div>
+    <div class="cbody">
+      <div class="vil">📍 หมู่บ้าน${vil} <span class="cnt">(${kids.length} คน)</span></div>
+      <div class="times">
+        <div class="tcell"><div class="lb">🌅 รับเช้า</div><input type="text" inputmode="numeric" placeholder="06:40"><div class="un">น.</div></div>
+        <div class="tcell"><div class="lb">🌆 ส่งเย็น</div><input type="text" inputmode="numeric" placeholder="15:30"><div class="un">น.</div></div>
+      </div>
+      <div class="seqrow">ลำดับการวิ่งของหมู่บ้านนี้: <input type="text" inputmode="numeric" placeholder="-"></div>
+      <div class="kids" style="margin-top:10px">👧👦 ${chips}</div>
+    </div>
+    <div class="cfoot">เริ่มใช้ 1 ก.ค. 2569 · สอบถาม โทร. 081-700-9616</div>
+  </div>`;
+}
+let html='';
+for(const key of ['นุ','ต้อม']){
+  const d=DATA[key];
+  const n=d.vills.reduce((a,v)=>a+v[1].length,0);
+  html+=`<div class="rhead ${d.cls}">${d.label} · ${n} คน</div>`;
+  html+=d.vills.map(([v,kids])=>card(d.cls,d.r,v,kids)).join('');
+}
+document.getElementById('root').innerHTML=html;
+</script>
+</body>
+</html>

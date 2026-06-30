@@ -716,6 +716,11 @@ details summary{cursor:pointer;outline:none}
      <div style="overflow-x:auto;border:1px solid #E5E7EB;border-radius:10px;padding:6px" id="pricing-list"></div>
      <button class="btn btn-primary" style="margin-top:12px" onclick="savePricing()">💾 บันทึกราคา</button>
    </div>
+   <div class="card" style="border-left:4px solid #B45309">
+    <div class="card-title" style="color:#B45309">🗓️ ปิดปีการศึกษา / ยกยอดค้างขึ้นปีใหม่</div>
+    <p style="color:#6B7280;margin-bottom:10px;font-size:14px">ใช้ตอน<strong>สิ้นปีการศึกษา</strong> (มี.ค.–เม.ย.) ก่อนเลื่อนชั้น · ระบบจะคำนวณยอดค้างทั้งปีของนักเรียนทุกคน แล้วยกไปเป็น "ยอดยกมา" ในปีใหม่ เพื่อตามเก็บต่อ<br>⚠ <strong>ทำครั้งเดียวต่อปี</strong> · แนะนำกด Backup ก่อนทุกครั้ง · ควรยกยอดก่อนเลื่อนชั้นเสมอ</p>
+    <button class="btn" style="background:#B45309;color:#fff" onclick="previewCarryForward()">📥 ดูตัวอย่าง + ยกยอดค้างขึ้นปีใหม่</button>
+  </div>
    <div class="card" style="border-left:4px solid #DC2626">
     <div class="card-title" style="color:#DC2626">⚠ ล้างบันทึกการรับเงินทั้งหมด</div>
     <p style="color:#6B7280;margin-bottom:14px;font-size:14px">ลบเฉพาะบันทึกการรับเงิน · ข้อมูลนักเรียนไม่ลบ</p>
@@ -1022,8 +1027,8 @@ function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date,
 function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', cashier:r.cashier||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
-function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null, start_month:s.startMonth||null, external:!!s.external, ext_school:s.extSchool||null, phone:s.phone||null, ext_bus_price:s.extBusPrice||null, special_enroll:s.specialEnroll||[]}; }
-function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null, startMonth:r.start_month||'', external:!!r.external, extSchool:r.ext_school||'', phone:r.phone||'', extBusPrice:r.ext_bus_price?Number(r.ext_bus_price):null, specialEnroll:r.special_enroll||[]}; }
+function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null, start_month:s.startMonth||null, external:!!s.external, ext_school:s.extSchool||null, phone:s.phone||null, ext_bus_price:s.extBusPrice||null, special_enroll:s.specialEnroll||[], carried:s.carried||[]}; }
+function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null, startMonth:r.start_month||'', external:!!r.external, extSchool:r.ext_school||'', phone:r.phone||'', extBusPrice:r.ext_bus_price?Number(r.ext_bus_price):null, specialEnroll:r.special_enroll||[], carried:r.carried||[]}; }
 function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||null, driver:p.driver||null, months:p.months||[], year:p.year||null, amount:p.amount, entries:p.entries, date:p.date, receiver:p.receiver, method:p.method, note:p.note||null, payer:p.payer||null}; }
 function rowToPo(r){ const months = r.months||[]; return {id:Number(r.id), busCode:r.bus_code, busName:r.bus_name||'', driver:r.driver||'', months:months, month:months.join(', '), year:r.year, amount:Number(r.amount), entries:r.entries||[], date:r.date, receiver:r.receiver, method:r.method, note:r.note||'', payer:r.payer||''}; }
 function stockToRow(s){ return {id:s.id, item:s.item, price:s.price||'-', cat:s.cat||'', note:s.note||''}; }
@@ -1516,6 +1521,26 @@ function renderOwed(){
     html += '</div>';
   }
   
+  // ยอดยกมาจากปีก่อน (ยกยอดค้าง) — จ่ายบางส่วนได้
+  const cTotal = carriedTotal(s);
+  if(cTotal > 0){
+    const cPaid = carriedPaid(s);
+    const cRem = Math.max(0, cTotal - cPaid);
+    html += '<div class="owed" style="border:1px solid #B45309"><div class="owed-cat" style="color:#B45309">📥 ยอดยกมาจากปีก่อน</div>';
+    if(cRem <= 0){
+      html += '<div style="padding:8px 10px;font-size:13px;color:#16A34A;font-weight:600">✓ ชำระยอดยกมาครบแล้ว (฿'+fmt(cTotal)+')</div>';
+    } else {
+      html += `<div class="owed-row" data-id="carried">
+        <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
+          <input type="checkbox" class="chk-big" onchange="toggleCarried(this)">
+          <span><strong>${carriedLabel(s)}</strong><br><span style="font-size:12px;color:#92400E">ค้าง ฿${fmt(cRem)} จากทั้งหมด ฿${fmt(cTotal)}${cPaid>0?' · จ่ายแล้ว ฿'+fmt(cPaid):''}</span></span>
+        </label>
+        <span style="display:flex;align-items:center;gap:3px;white-space:nowrap">฿<input type="number" id="carried-amt" value="${cRem}" style="width:84px;padding:6px;border:1px solid #D1D5DB;border-radius:6px;text-align:right" oninput="updCarried()"></span>
+      </div>
+      <div style="font-size:11.5px;color:#9CA3AF;padding:0 10px 8px">💡 ติ๊กช่องซ้าย แล้วใส่จำนวนที่ผู้ปกครองจ่ายงวดนี้ (จ่ายบางส่วนได้ · ครั้งหน้าระบบจะโชว์ยอดที่เหลือ)</div>`;
+    }
+    html += '</div>';
+  }
   // Stock / extra
   html += `<div class="owed">
     <div class="owed-cat">🛍 ของขาย / รายการอื่นๆ</div>
@@ -1637,6 +1662,19 @@ function updOldDebt(){
   const debt = DATA.oldDebts.find(d => d.nick === selStudent.nick && (!d.name || (selStudent.name||'').includes(d.name)));
   const label = 'หนี้เก่า: ' + (debt ? debt.desc + ' (' + debt.fromTerm + ')' : '');
   if(amt <= 0){ delete owedSelected['olddebt']; } else { owedSelected['olddebt'] = {amount: amt, label: label, months: 0}; }
+  updateTotal();
+}
+function toggleCarried(el){
+  if(el.checked){ el.closest('.owed-row').classList.add('checked'); updCarried(); }
+  else { delete owedSelected['carried']; el.closest('.owed-row').classList.remove('checked'); updateTotal(); }
+}
+function updCarried(){
+  const row = document.querySelector('.owed-row[data-id="carried"]');
+  const chk = row && row.querySelector('input[type=checkbox]');
+  if(!chk || !chk.checked){ return; }
+  const amt = +$('carried-amt').value || 0;
+  const label = carriedLabel(selStudent);
+  if(amt <= 0){ delete owedSelected['carried']; } else { owedSelected['carried'] = {amount: amt, label: label, months: 0}; }
   updateTotal();
 }
 function setMonths(id, n, baseAmt, label){
@@ -3781,6 +3819,46 @@ function oldDebtPaid(s){
   return activeTX().filter(t => t.studentId === s.id)
     .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('หนี้เก่า') >= 0).reduce((a,it)=>a+(it.amount||0),0), 0);
 }
+// ===== 13.1 ยกยอดค้างขึ้นปีใหม่ (carry-forward) =====
+function carriedTotal(s){ return (Array.isArray(s.carried)?s.carried:[]).reduce((a,c)=>a+(c.amount||0),0); }
+function carriedPaid(s){
+  return activeTX().filter(t => t.studentId === s.id)
+    .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('ยอดยกมา') >= 0).reduce((a,it)=>a+(it.amount||0),0), 0);
+}
+function carriedRemain(s){ return Math.max(0, carriedTotal(s) - carriedPaid(s)); }
+function carriedLabel(s){ const c=(Array.isArray(s.carried)?s.carried:[]); if(!c.length) return 'ยอดยกมา'; return 'ยอดยกมาปี '+c.map(x=>x.ay).join('+'); }
+// คิดยอดค้างเต็มปี (ใช้ตอนปิดปี — นับครบ 10 เดือน + ค่าธรรมเนียมครบทั้งปี)
+function fullYearOwed(s){
+  const p = getPriceForClass(s.cls);
+  if(!p) return 0;
+  const busPrice = getBusPrice(s.village);
+  const ps = paidState(s);
+  const startI = startMonthIdx(s);
+  let est = 0;
+  if(s.discount !== 'ฟรี 100%'){
+    const perMonth = s.discount === 'ลด 50%' ? p.monthly * 0.5 : p.monthly;
+    let due = 0; for(let i=startI; i<10; i++){ if(!ps.tuition.has(MONTHS[i])) due++; }
+    est += perMonth * due;
+  }
+  const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
+  if(useBus && busPrice > 0){
+    const perMonth = s.useBus === 'ไป-กลับ' ? busPrice : Math.round(busPrice/2);
+    const cap = (s.busCode==='A3') ? 1 : 9;
+    let due = 0; for(let i=startI; i<=cap; i++){ if(!ps.bus.has(MONTHS[i])) due++; }
+    est += perMonth * due;
+  }
+  if(s.discount !== 'ฟรี 100%'){
+    if(p.book && !ps.annual.has('ค่าหนังสือ')) est += p.book;
+    if(p.insurance && !ps.annual.has('ค่าประกันอุบัติเหตุ')) est += p.insurance;
+    [['ค่าสระว่ายน้ำ',p.pool],['ค่าดนตรี',p.music],['ค่าภาษาอังกฤษ',p.english]].forEach(pair => {
+      const base=pair[0], price=pair[1]; if(!price) return;
+      const paidT = ps.terms[base] ? ps.terms[base].size : 0;
+      const remain = Math.max(0, 2 - paidT);
+      est += price * remain;
+    });
+  }
+  return Math.round(est);
+}
 function estimateOwed(s){
   const p = getPriceForClass(s.cls);
   if(!p) return 0;
@@ -3808,6 +3886,8 @@ function estimateOwed(s){
     const remain = Math.max(0, debt.amount - oldDebtPaid(s));
     est += remain;
   }
+  // ยอดยกมาจากปีก่อน (ยกยอดค้าง) — จ่ายบางส่วนได้
+  est += carriedRemain(s);
   
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย (หนังสือ ประกัน สระ ดนตรี อังกฤษ)
   unpaidFeeItems(s).forEach(it => est += it.amount);
@@ -3893,6 +3973,9 @@ function renderInvSlip(id){
     const remain = Math.max(0, debt.amount - oldDebtPaid(s));
     if(remain > 0) items.push({label: 'หนี้เก่า '+debt.fromTerm+(remain<debt.amount?' (เหลือจาก ฿'+fmt(debt.amount)+')':''), amount: remain});
   }
+  // ยอดยกมาจากปีก่อน
+  const cRemainInv = carriedRemain(s);
+  if(cRemainInv > 0) items.push({label: carriedLabel(s), amount: cRemainInv});
   // ค่ารายปี/รายเทอม ที่ยังไม่จ่าย
   unpaidFeeItems(s).forEach(it => items.push(it));
   // ค่าคอร์สพิเศษที่ยังค้าง (รอบในปีการศึกษานี้) → แสดงในใบแจ้งค่าเทอมด้วย ผู้ปกครองจะได้เห็นยอดรวม
@@ -4009,6 +4092,37 @@ function printInvoices(){
 }
 
 // === SETTINGS ===
+function previewCarryForward(){
+  const already = activeStudents().some(s => Array.isArray(s.carried) && s.carried.some(c => c.ay === AY));
+  let lines = [], total = 0, cnt = 0;
+  activeStudents().forEach(s => {
+    const owed = fullYearOwed(s);
+    if(owed > 0){ cnt++; total += owed; if(lines.length < 12) lines.push('• '+s.nick+' ('+s.cls+') ฿'+fmt(owed)); }
+  });
+  if(cnt === 0){ alert('✅ ไม่มีนักเรียนค้างชำระในปี '+AY+' — ไม่มียอดต้องยก'); return; }
+  const _m = new Date().getMonth()+1;
+  const _sw = (_m<2||_m>5) ? '⚠ ตอนนี้ยังไม่ใช่ช่วงสิ้นปีการศึกษา (ควรทำ ก.พ.–เม.ย.) — ยอดที่คำนวณจะคิดค่าเทอมครบทั้งปีล่วงหน้า อาจไม่ใช่ยอดจริง ณ ตอนนี้'+String.fromCharCode(10,10) : '';
+  let msg = _sw + '📥 ยกยอดค้างปีการศึกษา '+AY+' → ปี '+(AY+1)+'\n\n';
+  if(already) msg += '⚠ ปีนี้เคยยกยอดไปแล้ว! ระบบจะข้ามคนที่ยกแล้ว ไม่บวกซ้ำ\n\n';
+  msg += 'นักเรียนที่มียอดค้าง: '+cnt+' คน · รวม ฿'+fmt(total)+'\n\n';
+  msg += lines.join('\n') + (cnt>lines.length ? '\n... และอีก '+(cnt-lines.length)+' คน' : '');
+  msg += '\n\nกด OK เพื่อบันทึกยอดยกมาให้นักเรียนเหล่านี้\n(แนะนำ Backup ก่อนแล้วใช่ไหม?)';
+  if(!confirm(msg)) return;
+  doCarryForward();
+}
+function doCarryForward(){
+  let cnt = 0;
+  activeStudents().forEach(s => {
+    const owed = fullYearOwed(s);
+    if(owed <= 0) return;
+    if(!Array.isArray(s.carried)) s.carried = [];
+    if(s.carried.some(c => c.ay === AY)) return;
+    s.carried.push({ay: AY, amount: owed, date: new Date().toISOString().slice(0,10)});
+    cnt++;
+  });
+  saveStudents();
+  toast('ยกยอดค้างปี '+AY+' เรียบร้อย ✓ · '+cnt+' คน');
+}
 function renderSettings(){
   renderPricing();
   $('sc-view').innerHTML = `

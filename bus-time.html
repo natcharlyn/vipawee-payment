@@ -40,7 +40,7 @@
 
 <script>
 const DATA={
-"นุ":{cls:"nu",label:"🟣 สายครูนุ (รถคนขับ)",r:"สายครูนุ",vills:[
+"นุ":{cls:"nu",label:"🟣 สายครูนุ (รถคนขับ)",r:"สายครูนุ",phone:"091-048-4291",vills:[
  ["ศรีวิไล",[["ปอร์เช่","ป.2/1",""],["มะลิ","ป.3/1",""],["ลีโอ","ป.5",""],["ใบบุญ","อ.1",""]]],
  ["หนองจันทร์",[["นะโม","ป.1/1","ขาไป"],["เฟื่อง","ป.1/1","ขาไป"],["อันอัน","ป.1/1",""],["ณคุณ","ป.2/2",""],["แอนดา","ป.3/1","ขาไป"],["ไอเดียร์","ป.3/1","ขาไป"],["ทับทิม","ป.3/1","ขาไป"],["นิวเคลียร์","ป.3/2",""],["พอร์ช","ป.4","ขาไป"],["กัปตัน","ป.4",""],["ไข่มุก","ป.5",""],["แหม่ม","ป.6","ขาไป"],["เวียร์","ป.6",""],["อันปัน","ป.6",""],["ณภัทร","อ.2",""]]],
  ["ชุมภูทอง",[["ต้นหนาว","ป.1/1","ขากลับ"],["อินเตอร์","ป.2/2",""],["พ๊อตเตอร์","ป.3/2",""],["มิรินด้า","อ.2",""],["เดมี่","อ.3/1",""]]],
@@ -48,7 +48,7 @@ const DATA={
  ["บ้านโนนม่วง",[["ข้าวตัง","ป.3/2",""]]],
  ["นาทราย",[["ปอเช่","ป.5",""]]]
 ]},
-"ต้อม":{cls:"tom",label:"🔵 สายครูต้อม (รถโรงเรียน)",r:"สายครูต้อม",vills:[
+"ต้อม":{cls:"tom",label:"🔵 สายครูต้อม (รถโรงเรียน)",r:"สายครูต้อม",phone:"087-006-0152",vills:[
  ["โคกสำราญ-พรสวรรค์",[["มิวนิค","ป.1/1",""],["อุ่นใจ","ป.2/1",""],["อชิ","ป.4",""],["บอล","ป.6",""],["เธียเตอร์","อ.2","ขากลับ"],["อังเปา","อ.2",""],["อคิณ","อ.2",""],["อลัน","อ.2",""],["มิเกล","อ.2",""],["มินแจ","อ.3/2",""],["ไทเกอร์","เตรียมอนุบาล","ขากลับ"],["ไทก้า","เตรียมอนุบาล","ขากลับ"]]],
  ["บ้านผาสุก",[["สไปร์ท","ป.1/1",""],["ปริม","ป.4",""],["ปาล์ม","ป.6",""],["กวาง","ป.6",""],["ชินจัง","อ.1",""],["กุ๋งกิ๋ง","อ.2",""],["คิรินทร์","อ.3/1",""],["องษา","อ.3/2",""]]],
  ["ศรีวิไล",[["มาวิน","ป.1/2",""],["โลโก้","ป.4",""],["ไออุ่น","อ.2","ขากลับ"],["พีค","อ.3/2",""]]],
@@ -56,20 +56,20 @@ const DATA={
  ["ชุมภูพร",[["โบตั๋น","ป.2/2",""]]]
 ]}};
 
-function card(cls,route,vil,kids){
+function card(cls,route,vil,kids,phone){
   const chips=kids.map(k=>`<span class="k"><b>${k[0]}</b> (${k[1]})${k[2]?'<span class="tag"> ['+k[2]+']</span>':''}</span>`).join(' · ');
   return `<div class="card ${cls}">
     <div class="ctop"><span class="r">🚌 ${route}</span><span>🏫 อนุบาลวิภาวี</span></div>
     <div class="cbody">
       <div class="vil">📍 หมู่บ้าน${vil} <span class="cnt">(${kids.length} คน)</span></div>
       <div class="times">
-        <div class="tcell"><div class="lb">🌅 รับเช้า</div><input type="text" inputmode="numeric" placeholder="06:40"><div class="un">น.</div></div>
-        <div class="tcell"><div class="lb">🌆 ส่งเย็น</div><input type="text" inputmode="numeric" placeholder="15:30"><div class="un">น.</div></div>
+        <div class="tcell"><div class="lb">🌅 รับเช้า</div><input type="text" inputmode="decimal" placeholder="6.40"><div class="un">น.</div></div>
+        <div class="tcell"><div class="lb">🌆 ส่งเย็น</div><input type="text" inputmode="decimal" placeholder="15.30"><div class="un">น.</div></div>
       </div>
       <div class="seqrow">ลำดับการวิ่งของหมู่บ้านนี้: <input type="text" inputmode="numeric" placeholder="-"></div>
       <div class="kids" style="margin-top:10px">👧👦 ${chips}</div>
     </div>
-    <div class="cfoot">เริ่มใช้ 1 ก.ค. 2569 · สอบถาม โทร. 081-700-9616</div>
+    <div class="cfoot">เริ่มใช้ 1 ก.ค. 2569 · สอบถาม โทร. ${phone}</div>
   </div>`;
 }
 let html='';
@@ -77,7 +77,7 @@ for(const key of ['นุ','ต้อม']){
   const d=DATA[key];
   const n=d.vills.reduce((a,v)=>a+v[1].length,0);
   html+=`<div class="rhead ${d.cls}">${d.label} · ${n} คน</div>`;
-  html+=d.vills.map(([v,kids])=>card(d.cls,d.r,v,kids)).join('');
+  html+=d.vills.map(([v,kids])=>card(d.cls,d.r,v,kids,d.phone)).join('');
 }
 document.getElementById('root').innerHTML=html;
 </script>

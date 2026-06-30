@@ -611,13 +611,16 @@ details summary{cursor:pointer;outline:none}
       <div class="page-sub">สรุปการเงิน · เลือกช่วงเวลาด้านขวา</div>
     </div>
     <div class="tools">
-      <select class="select" id="rpt-filter" onchange="renderReport()" style="max-width:200px">
+      <select class="select" id="rpt-filter" onchange="onRptFilter()" style="max-width:200px">
         <option value="today">📅 วันนี้</option>
+        <option value="yesterday">📅 เมื่อวาน</option>
         <option value="week">📅 สัปดาห์นี้</option>
         <option value="month" selected>📅 เดือนนี้</option>
         <option value="year">📅 ปีนี้</option>
         <option value="all">📊 ทั้งหมด</option>
+        <option value="day">📅 เลือกวันเจาะจง…</option>
       </select>
+      <input type="date" id="rpt-date" class="select" style="max-width:170px;display:none" onchange="renderReport()">
       <button class="btn" onclick="copyMonthSummary()">📋 คัดลอกยอดลงชีต</button>
       <button class="btn" onclick="window.print()">🖨 พิมพ์รายงาน</button>
     </div>
@@ -3333,7 +3336,9 @@ function copyMonthSummary(){
     const c = map[categorize(it.label)] || 'อื่นๆ';
     agg[c] = (agg[c] || 0) + (it.amount || 0);
   }));
-  const d = new Date();
+  let d = new Date();
+  if(period === 'day' && $('rpt-date').value){ d = new Date($('rpt-date').value); }
+  else if(period === 'yesterday'){ d = new Date(); d.setDate(d.getDate()-1); }
   const ds = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
   const ym = d.getFullYear() + '-' + (d.getMonth()+1);
   let out = '';
@@ -3355,11 +3360,20 @@ function copyMonthSummary(){
   } else fallback();
 }
 
+function onRptFilter(){
+  const p = document.getElementById('rpt-filter').value;
+  const di = document.getElementById('rpt-date');
+  if(p === 'day'){ di.style.display=''; if(!di.value) di.value = new Date().toISOString().slice(0,10); }
+  else { di.style.display='none'; }
+  renderReport();
+}
 function inPeriod(dateStr, period){
   if(period === 'all') return true;
   const now = new Date();
   const d = new Date(dateStr);
   if(period === 'today') return d.toDateString() === now.toDateString();
+  if(period === 'yesterday'){ const y=new Date(now); y.setDate(y.getDate()-1); return d.toDateString() === y.toDateString(); }
+  if(period === 'day'){ const sel=document.getElementById('rpt-date'); if(!sel||!sel.value) return false; return d.toDateString() === new Date(sel.value).toDateString(); }
   if(period === 'week'){
     const wk = new Date(now); wk.setDate(wk.getDate()-7);
     return d >= wk;
@@ -3377,10 +3391,12 @@ function renderReport(){
   const list = listAll.filter(t => !t.voidedAt);
   const voidedCount = listAll.length - list.length;
   // หัวรายงานสำหรับพิมพ์
-  const periodNames = {today:'รายวัน', week:'รายสัปดาห์', month:'รายเดือน', year:'รายปี', all:'ทั้งหมด'};
+  const periodNames = {today:'รายวัน', yesterday:'เมื่อวาน', day:'รายวัน', week:'รายสัปดาห์', month:'รายเดือน', year:'รายปี', all:'ทั้งหมด'};
   const nw = new Date();
   let rangeTxt = '';
   if(period === 'today') rangeTxt = nw.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
+  else if(period === 'yesterday'){ const _y=new Date(nw); _y.setDate(_y.getDate()-1); rangeTxt = _y.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'}); }
+  else if(period === 'day'){ const _s=$('rpt-date').value; rangeTxt = _s ? new Date(_s).toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'}) : 'ยังไม่เลือกวัน'; }
   else if(period === 'week') rangeTxt = 'สัปดาห์นี้ (ถึง ' + nw.toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'}) + ')';
   else if(period === 'month') rangeTxt = nw.toLocaleDateString('th-TH', {month:'long', year:'numeric'});
   else if(period === 'year') rangeTxt = 'ปี ' + (nw.getFullYear() + 543);

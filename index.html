@@ -1414,7 +1414,7 @@ function renderOwed(){
     </div>`;
   }
   // ค่ารถ
-  if(s.useBus && s.useBus !== 'ไม่ใช้' && busPrice > 0 && s.busCode!=='A3'){
+  if(s.useBus && s.useBus !== 'ไม่ใช้' && busPrice > 0 && !(s.busCode==='A3' && _ps.bus.has('พ.ค.') && _ps.bus.has('มิ.ย.'))){
     let amt = busPrice;
     if(s.useBus !== 'ไป-กลับ') amt = Math.round(busPrice / 2);
     const busLabel = `ค่ารถ (${s.useBus}${s.busCode?' '+s.busCode:''})`;
@@ -1429,7 +1429,7 @@ function renderOwed(){
     <div id="months-bus" class="months-picker">
       <div class="months-picker-title">📅 ติ๊กเลือกเดือนที่จ่าย:</div>
       <div class="months-picker-grid">
-        ${MONTHS.map((m,i) => { const pd=_ps.bus.has(m); const bf=!pd && i<_si; return `<label class="mchip${pd?' mchip-paid':''}${bf?' mchip-before':''}"${pd?' title=\"จ่ายแล้ว\"':bf?' title=\"ก่อนเข้าเรียน\"':''}><input type="checkbox" class="mchk-bus" value="${m}" ${pd||bf?'disabled':''} onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${pd?'✓ ':bf?'🔒 ':''}${m}</label>`; }).join('')}
+        ${MONTHS.map((m,i) => { if(s.busCode==='A3' && i>1) return ''; const pd=_ps.bus.has(m); const bf=!pd && i<_si; return `<label class="mchip${pd?' mchip-paid':''}${bf?' mchip-before':''}"${pd?' title=\"จ่ายแล้ว\"':bf?' title=\"ก่อนเข้าเรียน\"':''}><input type="checkbox" class="mchk-bus" value="${m}" ${pd||bf?'disabled':''} onchange="updMonths('bus', ${amt}, '${busLabel}', this)">${pd?'✓ ':bf?'🔒 ':''}${m}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -2556,6 +2556,7 @@ function renderTimeline(s, myTx){
       monthsTuition[i] = 'future';
       monthsBus[i] = 'future';
     }
+    if(s.busCode==='A3' && i > 1) monthsBus[i] = 'future';
   });
   
   // check tx for tuition / bus
@@ -3615,9 +3616,10 @@ function getOverdueMonths(s){
   // Overdue = past+current months that are NOT in paid set
   const tuitionOverdue = [];
   const busOverdue = [];
+  const busCapIdx = (s.busCode==='A3') ? 1 : curMonthIdx;
   for(let i=startI; i<=curMonthIdx; i++){
     if(!tuitionPaid.has(MONTHS[i])) tuitionOverdue.push(MONTHS[i]);
-    if(!busPaid.has(MONTHS[i])) busOverdue.push(MONTHS[i]);
+    if(i<=busCapIdx && !busPaid.has(MONTHS[i])) busOverdue.push(MONTHS[i]);
   }
   return {tuition: tuitionOverdue, bus: busOverdue};
 }
@@ -3729,7 +3731,7 @@ function renderInvSlip(id){
     const n = overdueMonths.tuition.length;
     items.push({label: 'ค่าเทอม × '+n+' เดือน ('+overdueMonths.tuition.join(', ')+')', amount: perMonth * n});
   }
-  if(s.useBus && s.useBus!=='ไม่ใช้' && busPrice && overdueMonths.bus.length > 0 && s.busCode!=='A3'){
+  if(s.useBus && s.useBus!=='ไม่ใช้' && busPrice && overdueMonths.bus.length > 0){
     let perMonth = s.useBus==='ไป-กลับ' ? busPrice : Math.round(busPrice/2);
     const n = overdueMonths.bus.length;
     items.push({label: 'ค่ารถ ('+s.useBus+') × '+n+' เดือน ('+overdueMonths.bus.join(', ')+')', amount: perMonth * n});

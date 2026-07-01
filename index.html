@@ -4077,7 +4077,8 @@ function renderInvSlip(id){
     else if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsTuition[i] = 'overdue';
   });
   monthsBus.forEach((st, i) => {
-    if(i < _siInv){ if(st !== 'paid') monthsBus[i] = 'before'; }
+    if(s.busCode==='A3' && i>1){ if(st !== 'paid') monthsBus[i] = 'future'; }
+    else if(i < _siInv){ if(st !== 'paid') monthsBus[i] = 'before'; }
     else if(curMonthIdx !== -1 && i <= curMonthIdx && st === 'pending') monthsBus[i] = 'overdue';
   });
   // เด็กฟรี 100% = ไม่เก็บค่าเทอม → เดือนค่าเทอมขึ้น "ฟรี" (ค่ารถยังเก็บ)

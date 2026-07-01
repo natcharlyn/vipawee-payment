@@ -4084,7 +4084,9 @@ function renderInvSlip(id){
   // เด็กฟรี 100% = ไม่เก็บค่าเทอม → เดือนค่าเทอมขึ้น "ฟรี" (ค่ารถยังเก็บ)
   if(s.discount === 'ฟรี 100%'){ monthsTuition.forEach((st,i)=>{ if(st!=='paid') monthsTuition[i]='free'; }); }
   const useBus = s.useBus && s.useBus !== 'ไม่ใช้';
-  
+  // สายคุณยุทธ (A3): ไม่เก็บค่ารถผ่านใบแจ้งหนี้ตั้งแต่ ก.ค. — ซ่อนแถวรถถ้าไม่มีค่ารถค้าง (พ.ค./มิ.ย.)
+  const showBusRow = useBus && !(s.busCode==='A3' && getOverdueMonths(s).bus.length===0);
+
   return `<div class="inv-slip">
     <div class="inv-school">${SCHOOL.name}<br><span style="font-weight:400;font-size:11px;color:#374151">${SCHOOL.addr}</span></div>
     <div class="inv-title">📄 ใบแจ้งหนี้</div>
@@ -4095,7 +4097,7 @@ function renderInvSlip(id){
       <div></div>
       ${MONTHS.map(m => '<div style="font-size:9.5px;text-align:center;color:#374151;font-weight:600">'+m+'</div>').join('')}
     </div>
-    <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:${useBus?'2px':'8px'}">
+    <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:${showBusRow?'2px':'8px'}">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">เทอม</div>
       ${monthsTuition.map(st => {
         const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–',free:'ฟ'}[st];
@@ -4104,7 +4106,7 @@ function renderInvSlip(id){
         return `<div style="background:${bg};color:${col};text-align:center;font-size:12px;font-weight:700;padding:4px 2px;border-radius:3px;${st==='future'?'border:1px dashed '+col:''}">${sym}</div>`;
       }).join('')}
     </div>
-    ${useBus ? `<div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:8px">
+    ${showBusRow ? `<div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">รถ</div>
       ${monthsBus.map(st => {
         const sym = {paid:'✓',overdue:'!',pending:'·',future:'·',before:'–',free:'ฟ'}[st];

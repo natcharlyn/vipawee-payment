@@ -3841,10 +3841,11 @@ function getOverdueMonths(s){
   // Overdue = past+current months that are NOT in paid set
   const tuitionOverdue = [];
   const busOverdue = [];
+  const busUsed = s.useBus && s.useBus!=='ไม่ใช้';
   const busCapIdx = (s.busCode==='A3') ? 1 : curMonthIdx;
   for(let i=startI; i<=curMonthIdx; i++){
     if(!tuitionPaid.has(MONTHS[i])) tuitionOverdue.push(MONTHS[i]);
-    if(i<=busCapIdx && !busPaid.has(MONTHS[i])) busOverdue.push(MONTHS[i]);
+    if(busUsed && i<=busCapIdx && !busPaid.has(MONTHS[i])) busOverdue.push(MONTHS[i]);
   }
   return {tuition: tuitionOverdue, bus: busOverdue};
 }

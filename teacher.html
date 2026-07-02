@@ -102,7 +102,7 @@ function drawSlip(d,m){
   const items=d.items||{};const amt=c=>c.special==='leave'?Number(items[c.key]||0)*100:Number(items[c.key]||0);
   let inc='',ded='',g=0,dd=0;
   cols.filter(c=>c.type==='add').forEach(c=>{const v=Number(items[c.key]||0);g+=v;if(v)inc+=`<div class="row"><span>${esc(c.name)}</span><span>฿${f(v)}</span></div>`;});
-  cols.filter(c=>c.type==='deduct').forEach(c=>{const v=amt(c);dd+=v;if(v)ded+=`<div class="row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(items[c.key]||0)+' วัน':''}</span><span>−฿${f(v)}</span></div>`;});
+  cols.filter(c=>c.type==='deduct').forEach(c=>{const v=amt(c);dd+=v;if(v)ded+=`<div class="row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(items[c.key]||0)+' วัน'+(items.leaveNote?' · '+esc(items.leaveNote):''):''}</span><span>−฿${f(v)}</span></div>`;});
   if(!ded)ded=`<div class="row" style="color:#16A34A">— เดือนนี้ไม่มีรายการหัก —</div>`;
   const net=d.has_entry?(g-dd):0;
   const acc=d.acc?('🏦 โอนเข้าบัญชี ••••••'+String(d.acc).slice(-4)):'💵 เงินสด';
@@ -152,19 +152,20 @@ async function dLoad(){
   dState={p,m};const prev={};(cur.data||[]).forEach(r=>prev[r.staff_id]=r);
   let h=`<button class="back" onclick="renderDLogin()">← กลับ / เปลี่ยนเดือน</button>
     <div class="sec" style="margin-top:0">📝 ลา/มาสาย · ${mLabel(m)}</div>
-    <div style="font-size:12.5px;color:var(--mute)">ลาไม่มีใบรับรองแพทย์ = หักวันละ 100 · มาสายกรอกเป็นบาท · กรอกเฉพาะคนที่มีรายการ</div>
-    <table><thead><tr><th>ชื่อ</th><th style="text-align:right">สาย (บาท)</th><th style="text-align:right">ลา (วัน)</th></tr></thead><tbody>`;
+    <div style="font-size:12.5px;color:var(--mute)">ลาเต็มวัน = 1 (หัก 100) · <b>ครึ่งวัน = 0.5 (หัก 50)</b> · มาสายกรอกเป็นบาท · จดวันที่ลาในช่องขวา · กรอกเฉพาะคนที่มีรายการ</div>
+    <table><thead><tr><th>ชื่อ</th><th style="text-align:right">สาย (บาท)</th><th style="text-align:right">ลา (วัน)</th><th>วันที่ลา</th></tr></thead><tbody>`;
   names.data.forEach(s=>{const pv=prev[s.id]||{};
     h+=`<tr><td class="nm">${esc(s.name)}<small>${esc(s.p||'')} · ${esc(s.g||'')}</small></td>
       <td><input type="number" min="0" id="l_${s.id}" value="${Number(pv.late||0)||''}" placeholder="0"></td>
-      <td><input type="number" min="0" id="v_${s.id}" value="${Number(pv.leave_days||0)||''}" placeholder="0"></td></tr>`;});
+      <td><input type="number" min="0" step="0.5" id="v_${s.id}" value="${Number(pv.leave_days||0)||''}" placeholder="0"></td>
+      <td><input type="text" id="n_${s.id}" value="${esc(pv.note||'')}" placeholder="เช่น 3, 15 ครึ่งวัน" style="width:110px;text-align:left"></td></tr>`;});
   h+=`</tbody></table><div class="err" id="derr2"></div>
     <button class="btn green" id="dsend" onclick="dSend(${JSON.stringify(names.data.map(s=>s.id))})">📤 ส่งให้ฝ่ายการเงิน</button>
     <div class="note">ส่งซ้ำได้ — ระบบใช้ตัวเลขล่าสุดที่ส่ง</div>`;
   document.getElementById('card').innerHTML=h;
 }
 async function dSend(ids){
-  const rows=ids.map(id=>({id,late:Number((document.getElementById('l_'+id)||{}).value||0),leave:Number((document.getElementById('v_'+id)||{}).value||0)}));
+  const rows=ids.map(id=>({id,late:Number((document.getElementById('l_'+id)||{}).value||0),leave:Number((document.getElementById('v_'+id)||{}).value||0),note:String((document.getElementById('n_'+id)||{}).value||'')}));
   const b=document.getElementById('dsend');b.disabled=true;b.textContent='กำลังส่ง…';
   const {data,error}=await sb.rpc('duty_submit',{p_pin:dState.p,p_month:dState.m,p_rows:rows});
   b.disabled=false;b.textContent='📤 ส่งให้ฝ่ายการเงิน';
@@ -173,6 +174,6 @@ async function dSend(ids){
 }
 setMode('t');
 </script>
-<!-- หน้าสำหรับครู v1.0 · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- หน้าสำหรับครู v1.1 (วันที่ลา + ลาครึ่งวัน 0.5) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

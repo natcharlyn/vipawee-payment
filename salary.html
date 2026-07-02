@@ -419,24 +419,26 @@ function renderHome(){
 function renderCheck(){
   if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
   const chk=colsG(curGroup).filter(c=>c.src==='chk');const dis=canEdit()?'':'disabled';
-  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 <b>ครูเวรกรอกเองได้แล้ว</b> ที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> แท็บ "ครูเวรเช็กเวลา" (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) → ครูแนทกดปุ่ม <b>📥 ดึงข้อมูลจากครูเวร</b> ด้านล่าง · หรือกรอกในตารางนี้เองก็ได้ (ลาไม่มีใบรับรอง = หักวันละ 100)</div>`;
+  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 <b>ครูเวรกรอกเองได้แล้ว</b> ที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> แท็บ "ครูเวรเช็กเวลา" (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) → ครูแนทกดปุ่ม <b>📥 ดึงข้อมูลจากครูเวร</b> ด้านล่าง · หรือกรอกในตารางนี้เองก็ได้ · ลาไม่มีใบรับรอง: เต็มวัน = 1 (หัก 100) · <b>ครึ่งวัน = 0.5 (หัก 50)</b> · จดวันที่ลาไว้ในช่องขวากันลืม</div>`;
   h+=`<div class="tabs">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupC('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
-  h+=`<div class="etable-wrap"><table class="entry" style="min-width:560px"><thead><tr><th>ชื่อ-สกุล</th>`+
-    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th class="num">รวมหัก</th></tr></thead><tbody>`;
+  h+=`<div class="etable-wrap"><table class="entry" style="min-width:700px"><thead><tr><th>ชื่อ-สกุล</th>`+
+    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>วันที่ลา (จดไว้กันลืม)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
   act(curGroup).forEach(s=>{const e=ent(s);
     h+=`<tr><td class="nm">${s.n}<small>${s.p}</small></td>`+
-      chk.map(c=>`<td class="num"><input class="cell m" type="number" min="0" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`).join('')+
+      chk.map(c=>`<td class="num"><input class="cell m" type="number" min="0" step="0.5" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`).join('')+
+      `<td><input class="cell m" type="text" style="width:180px;text-align:left" ${dis} value="${esc(e.items.leaveNote||'')}" placeholder="เช่น 3, 15 (ครึ่งวัน)" oninput="setNote(${s.id},this.value)"></td>`+
       `<td class="num" id="ck_${s.id}" style="font-weight:800;color:var(--red)">฿${f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0))}</td></tr>`;});
   h+=`</tbody></table></div><div class="save-bar"><button class="btn btn-ghost" ${dis} onclick="importAttendance()">📥 ดึงข้อมูลจากครูเวร</button><div class="grouptotal">กดบันทึก ตัวเลขถึงหน้ากรอกเงินเดือนทันที</div>
     <button class="btn btn-primary" ${dis} onclick="saveEntries()">💾 บันทึกขึ้นคลาวด์</button></div>`;
   document.getElementById('content').innerHTML=h;
 }
 function setGroupC(g){curGroup=g;renderCheck();}
+function setNote(id,v){ENTRIES[id].items.leaveNote=String(v||'');}
 async function importAttendance(){
   if(!canEdit()){toast('เดือนนี้ปิดงวดแล้ว');return;}
   const rows=await q(sb.from('attendance').select('*').eq('month',MONTH));
   if(!rows.length){toast('ยังไม่มีข้อมูลจากครูเวรเดือนนี้');return;}
-  let n=0;rows.forEach(r=>{const e=ENTRIES[r.staff_id];if(e){e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);n++;}});
+  let n=0;rows.forEach(r=>{const e=ENTRIES[r.staff_id];if(e){e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);if(r.note)e.items.leaveNote=r.note;n++;}});
   await saveEntries();renderCheck();toast('ดึงข้อมูลครูเวรแล้ว '+n+' คน ✓');}
 
 // ===== กรอกเงินเดือน =====
@@ -457,7 +459,7 @@ function renderEntry(){
       <td><select class="paysel ${payOf(s)==='เงินสด'?'cash':'bank'}" ${dis} onchange="setPay(${s.id},this)">
         <option value="โอน" ${payOf(s)==='โอน'?'selected':''}>🏦 โอน</option><option value="เงินสด" ${payOf(s)==='เงินสด'?'selected':''}>💵 เงินสด</option></select></td>`;
     colsG(curGroup).forEach(c=>{const cls=c.src==='chk'?'m':(c.src==='term'?'b':'y');
-      h+=`<td class="num"><input class="cell ${cls}" type="number" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`;});
+      h+=`<td class="num"><input class="cell ${cls}" type="number" step="any" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`;});
     h+=`<td class="rownet" id="rn_${s.id}">฿${f(net(s))}</td></tr>`;});
   h+=`</tbody></table></div>
     <div class="save-bar"><button class="btn btn-add" ${dis} onclick="addColumn()">➕ เพิ่มคอลัมน์</button>
@@ -511,7 +513,7 @@ function renderSlipTable(){
     <th style="width:160px">ลงชื่อรับเงิน</th><th>หมายเหตุ</th></tr></thead><tbody>`;
   const arr=act(curGroup);let tG=0,tD=0,tN=0;
   arr.forEach((s,i)=>{const e=ent(s);const G=gross(s),D=deduct(s),N=net(s);tG+=G;tD+=D;tN+=N;
-    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays);
+    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));
     h+=`<tr><td>${i+1}</td><td class="nm">${s.n}</td><td>${s.p}</td><td>${acc4(s.acc)}</td>
       <td class="num">฿${f(G)}</td><td class="num">฿${f(D)}</td><td class="num net">฿${f(N)}</td>
       <td style="height:34px"></td><td>${notes.join(' · ')}</td></tr>`;});
@@ -534,7 +536,7 @@ function drawSlipCard(){const s=STAFF.find(x=>x.id==+document.getElementById('sl
   let rows='';
   addColsG(e.g).forEach(c=>{const v=e.items[c.key]||0;if(v)rows+=`<div class="slip-row"><span>${esc(c.name)}</span><span>฿${f(v)}</span></div>`;});
   rows+=`<div class="slip-row"><span><b>รวมรับ</b></span><span><b>฿${f(gross(s))}</b></span></div>`;
-  dedColsG(e.g).forEach(c=>{const v=itemAmt(e.items,c);if(v)rows+=`<div class="slip-row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(e.items[c.key]||0)+' วัน':''}</span><span>−฿${f(v)}</span></div>`;});
+  dedColsG(e.g).forEach(c=>{const v=itemAmt(e.items,c);if(v)rows+=`<div class="slip-row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(e.items[c.key]||0)+' วัน'+(e.items.leaveNote?' · '+esc(e.items.leaveNote):''):''}</span><span>−฿${f(v)}</span></div>`;});
   document.getElementById('slipCardArea').innerHTML=`<div class="slip">
     <div class="slip-h"><div class="sn">สลิปเงินเดือน</div><div class="ss">โรงเรียนอนุบาลวิภาวี · ${monthLabel(MONTH)}</div></div>
     <div class="slip-b">
@@ -790,6 +792,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.3 (มุมมองครู PIN + ครูเวรกรอกเอง + มัดจำในฟอร์ม) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.4 (วันที่ลา + ลาครึ่งวัน 0.5 = หัก 50) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

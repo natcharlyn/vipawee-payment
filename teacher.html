@@ -45,6 +45,16 @@
   .nm{font-weight:700;font-size:13px}.nm small{display:block;font-weight:500;color:var(--mute);font-size:11px}
   .ok-banner{background:#E5F6EE;border:1px solid #7FC9A6;color:#0a5d3c;border-radius:10px;padding:11px 14px;font-weight:700;font-size:14px;margin-top:12px;text-align:center}
   .back{background:none;border:none;color:var(--teal);font-weight:700;font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:8px;padding:0}
+  /* โหมดจอกว้าง (โน้ตบุ๊ก) */
+  @media(min-width:760px){
+    .wrap{max-width:920px}
+    .card{padding:26px 32px}
+    table{font-size:14.5px}
+    th,td{padding:9px 10px}
+    td input{width:120px;font-size:15px}
+    td input[type=text]{width:200px}
+    .btn{max-width:420px;margin-left:auto;margin-right:auto;display:block}
+  }
 </style>
 </head>
 <body>
@@ -172,6 +182,6 @@ async function dSend(ids){
 }
 setMode('d');
 </script>
-<!-- หน้าสำหรับครู v1.3 (ปิดสลิปออนไลน์ตามนโยบาย ผจก. — เหลือครูเวรเช็กเวลา) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- หน้าสำหรับครู v1.4 (รองรับจอโน้ตบุ๊ก) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

@@ -158,6 +158,7 @@
       <a data-page="refund" onclick="go('refund')"><span class="i">🔁</span> เงินโอนคืน <span class="lockmini">🔒</span></a>
       <a data-page="line" onclick="go('line')"><span class="i">💬</span> ข้อความ LINE</a>
       <a data-page="summary" onclick="go('summary')"><span class="i">📊</span> สรุปรวม</a>
+      <a data-page="deposit" onclick="go('deposit')"><span class="i">💰</span> เงินมัดจำ</a>
       <a data-page="staff" onclick="go('staff')"><span class="i">🗂️</span> ทะเบียนบุคลากร</a>
     </nav>
     <div class="side-foot"><div style="margin-bottom:8px" id="whoami">👤 …</div><button onclick="logout()">🚪 ออกจากระบบ</button></div>
@@ -184,6 +185,8 @@ const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
 function curThaiMonth(){const d=new Date();return (d.getFullYear()+543)+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function monthLabel(m){if(!m)return '';const [y,mm]=m.split('-');return THM[+mm-1]+' '+y;}
 function prevMonthKey(m){let [y,mm]=m.split('-').map(Number);mm--;if(mm<1){mm=12;y--;}return y+'-'+String(mm).padStart(2,'0');}
+function nextMonthKey(m){let [y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++;}return y+'-'+String(mm).padStart(2,'0');}
+const AY_START='2569-05'; // เดือนแรกของปีการศึกษานี้
 
 // ---------- state ----------
 let STAFF=[];            // ทะเบียนบุคลากร (ทุกสถานะ)
@@ -204,6 +207,7 @@ function defaultCols(){return [
  {key:'add',name:'เพิ่ม(อื่นๆ)',type:'add',src:'fin'},
  {key:'bonus',name:'โบนัสชวนเรียน',type:'add',src:'term'},
  {key:'sso',name:'ประกันสังคม',type:'deduct',src:'fin',carry:true},
+ {key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true},
  {key:'late',name:'หักมาสาย',type:'deduct',src:'chk'},
  {key:'leaveDays',name:'หักลา (วัน)',type:'deduct',src:'chk',special:'leave'},
  {key:'otherDeduct',name:'หักอื่นๆ',type:'deduct',src:'fin'},
@@ -218,9 +222,11 @@ async function loadAll(){
   STAFF=staff.map(r=>({id:r.id,n:r.name,p:r.position||'',g:r.pay_group||'ครู',acc:r.bank_account||'',
     base:Number(r.base_salary||0),rule:r.refund_rule||'normal',ramt:Number(r.refund_amount||0),
     resigned:r.status==='ลาออก',resignDate:r.resign_date||'',deg:r.education||'',emp:r.job_type||'',
-    start:r.appoint_date||'',lic:r.license_no||'',exp:r.license_expire||'',note:r.note||'',idcard:r.id_card||''}));
+    start:r.appoint_date||'',lic:r.license_no||'',exp:r.license_expire||'',note:r.note||'',idcard:r.id_card||'',
+    depT:r.deposit_target==null?null:Number(r.deposit_target),depUp:Number(r.deposit_upfront||0),depRet:r.deposit_returned||'',depNote:r.deposit_note||''}));
   CONFIG={};cfg.forEach(r=>CONFIG[r.key]=r.value);
-  COLS=CONFIG.cols||{};GROUPS.forEach(g=>{if(!COLS[g])COLS[g]=defaultCols();});
+  COLS=CONFIG.cols||{};GROUPS.forEach(g=>{if(!COLS[g])COLS[g]=defaultCols();
+    if(!COLS[g].find(c=>c.key==='deposit'))COLS[g].splice(Math.min(4,COLS[g].length),0,{key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true});});
   const em=await q(sb.from('payroll_entries').select('month'));
   MONTHS=[...new Set(em.map(r=>r.month))].sort();
   if(!MONTHS.includes(MONTH)&&MONTHS.length) MONTH=MONTHS[MONTHS.length-1];
@@ -234,12 +240,15 @@ async function loadMonth(m){
   ]);
   ENTRIES={};ent.forEach(r=>ENTRIES[r.staff_id]={id:r.id,g:r.pay_group,items:r.items||{},net:Number(r.net||0),note:r.note||''});
   REFUNDS={};ref.forEach(r=>REFUNDS[r.staff_id]={id:r.id,rate:Number(r.state_amount||0),due:Number(r.refund_due||0),
-    ok:!!r.refund_received,date:r.received_date||'',note:r.note||''});
+    st:(r.status||(r.refund_received?'โอนแล้ว':'ยังไม่โอน')),date:r.received_date||'',note:r.note||''});
   renderMonthSel();
 }
 function renderMonthSel(){
-  const sel=document.getElementById('monthSel');const opts=[...MONTHS];if(!opts.includes(curThaiMonth()))opts.push(curThaiMonth());
-  opts.sort();sel.innerHTML=opts.map(m=>`<option value="${m}" ${m===MONTH?'selected':''}>📅 ${monthLabel(m)}${isClosed(m)?' 🔒':''}${hasMonth(m)?'':' (ยังไม่เปิด)'}</option>`).join('');
+  const sel=document.getElementById('monthSel');
+  const set=new Set(MONTHS);const cur=curThaiMonth();
+  let m=AY_START,guard=0;while(m<=cur&&guard<60){set.add(m);m=nextMonthKey(m);guard++;}
+  const opts=[...set].sort();
+  sel.innerHTML=opts.map(m=>`<option value="${m}" ${m===MONTH?'selected':''}>📅 ${monthLabel(m)}${isClosed(m)?' 🔒':''}${hasMonth(m)?'':' (ยังไม่เปิด)'}</option>`).join('');
 }
 async function switchMonth(m){await loadMonth(m);go(curPage);}
 
@@ -252,10 +261,15 @@ async function openMonth(){
   const prev=MONTHS.filter(x=>x<MONTH).sort().pop();
   let prevEnt={};
   if(prev){(await q(sb.from('payroll_entries').select('*').eq('month',prev))).forEach(r=>prevEnt[r.staff_id]=r);}
+  // ยอดมัดจำที่หักไปแล้วทุกเดือน (ใช้คิดยอดหักอัตโนมัติ)
+  const depSum={};(await q(sb.from('payroll_entries').select('staff_id,items'))).forEach(r=>{depSum[r.staff_id]=(depSum[r.staff_id]||0)+Number((r.items||{}).deposit||0);});
   const active=STAFF.filter(s=>!s.resigned);
   const rows=active.map(s=>{
     const pe=prevEnt[s.id];const items={};
     colsG(s.g).forEach(c=>{items[c.key]= c.key==='base'? s.base : (c.carry&&pe&&pe.items?Number(pe.items[c.key]||0):0);});
+    // หักมัดจำอัตโนมัติ: เดือนแรก 5,000 → เดือนละ 500 จนครบเป้า (หยุดเมื่อครบ/คืนแล้ว)
+    if(s.depT&&!s.depRet){const ded=depSum[s.id]||0;const rem=Math.max(0,s.depT-(s.depUp||0)-ded);
+      items.deposit=rem<=0?0:((ded===0&&(s.depUp||0)===0)?Math.min(5000,rem):Math.min(500,rem));}
     return {month:MONTH,staff_id:s.id,pay_group:s.g,base_salary:s.base,items,net:0,note:s.g==='ครู-เงินสด'?'เงินสด':''};
   });
   // net เริ่มต้น
@@ -264,7 +278,7 @@ async function openMonth(){
   // โอนคืน: เฉพาะคนกลุ่มมีโอนคืน
   const rate=Number(CONFIG.state_rate||17605);
   const refRows=active.filter(s=>s.rule!=='none'&&['ครู-ผบร','ครู'].includes(s.g)).map(s=>({
-    month:MONTH,staff_id:s.id,state_amount:s.rule==='fixed'?null:rate,net:0,refund_due:s.rule==='fixed'?s.ramt:0,refund_received:false}));
+    month:MONTH,staff_id:s.id,state_amount:s.rule==='fixed'?null:rate,net:0,refund_due:s.rule==='fixed'?s.ramt:0,refund_received:false,status:'ยังไม่โอน'}));
   if(refRows.length) await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
   if(!MONTHS.includes(MONTH))MONTHS.push(MONTH);MONTHS.sort();
   await loadMonth(MONTH);toast('เปิดเดือน '+monthLabel(MONTH)+' แล้ว ✓ (คัดลอกฐาน+หักตายตัวจากเดือนก่อน)');go('entry');
@@ -312,14 +326,14 @@ async function saveEntries(groupOnly){
   await q(sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'}));
   // sync net เข้าตารางโอนคืน
   const refRows=Object.keys(REFUNDS).map(sid=>{const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];
-    return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:r.ok,received_date:r.date||null,note:r.note||''};});
+    return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''};});
   if(refRows.length)await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
   toast('บันทึกขึ้นคลาวด์แล้ว ✓');
 }
 async function saveRefund(sid){
   const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];if(!r)return;
   await q(sb.from('payroll_refunds').upsert({month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,
-    refund_due:s?refundAmt(s):0,refund_received:r.ok,received_date:r.date||null,note:r.note||''},{onConflict:'month,staff_id'}));
+    refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''},{onConflict:'month,staff_id'}));
 }
 async function saveCols(){await saveConfig('cols',COLS);}
 
@@ -357,11 +371,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
 <script>
 // ============ หน้าจอ ============
 let curPage='home';
-const TITLES={home:'หน้าหลัก',check:'บันทึกลา/ขาด/มาสาย',entry:'กรอกเงินเดือน',slip:'สลิปเงินเดือน',refund:'เงินโอนคืน (ข้อมูลลับ)',line:'ข้อความแจ้งทาง LINE',summary:'สรุปยอดรวม',staff:'ทะเบียนบุคลากร'};
+const TITLES={home:'หน้าหลัก',check:'บันทึกลา/ขาด/มาสาย',entry:'กรอกเงินเดือน',slip:'สลิปเงินเดือน',refund:'เงินโอนคืน (ข้อมูลลับ)',line:'ข้อความแจ้งทาง LINE',summary:'สรุปยอดรวม',deposit:'เงินมัดจำ',staff:'ทะเบียนบุคลากร'};
 function go(p){curPage=p;if(p!=='refund')refundUnlocked=false;
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));
   document.getElementById('ptitle').textContent=TITLES[p]||'';document.getElementById('side').classList.remove('open');
-  ({home:renderHome,check:renderCheck,entry:renderEntry,slip:renderSlip,refund:renderRefund,line:renderLine,summary:renderSummary,staff:renderStaff}[p])();window.scrollTo(0,0);}
+  ({home:renderHome,check:renderCheck,entry:renderEntry,slip:renderSlip,refund:renderRefund,line:renderLine,summary:renderSummary,deposit:renderDeposit,staff:renderStaff}[p])();window.scrollTo(0,0);}
 function printHead(t){return `<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · ${t}</div><div class="ph2">ประจำเดือน ${monthLabel(MONTH)}</div></div>`;}
 function gateHTML(){return `<div class="panel"><div class="conf-gate"><div class="clock">🗓️</div>
   <h3 style="color:var(--navy)">เดือน ${monthLabel(MONTH)} ยังไม่เปิดงวด</h3>
@@ -549,15 +563,17 @@ function renderRefund(){
     <button class="btn btn-primary" onclick="checkPin2()">🔓 ยืนยัน · เข้าดู</button></div></div>`;
     setTimeout(()=>{const p=document.getElementById('pin2');if(p)p.focus();},60);return;}
   const A=refAcct();const owe=refPeople().filter(s=>refundAmt(s)>0);
-  const paidArr=owe.filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok), waitArr=owe.filter(s=>!(REFUNDS[s.id]&&REFUNDS[s.id].ok));
-  const paidAmt=paidArr.reduce((a,s)=>a+refundAmt(s),0), waitAmt=waitArr.reduce((a,s)=>a+refundAmt(s),0);
+  const stOf=s=>(REFUNDS[s.id]&&REFUNDS[s.id].st)||'ยังไม่โอน';
+  const paidArr=owe.filter(s=>stOf(s)==='โอนแล้ว'), pendArr=owe.filter(s=>stOf(s)==='รอตรวจ'), waitArr=owe.filter(s=>stOf(s)!=='โอนแล้ว'&&stOf(s)!=='รอตรวจ');
+  const paidAmt=paidArr.reduce((a,s)=>a+refundAmt(s),0), pendAmt=pendArr.reduce((a,s)=>a+refundAmt(s),0), waitAmt=waitArr.reduce((a,s)=>a+refundAmt(s),0);
   const dis=canEdit()?'':'disabled';
-  let h=printHead('เงินโอนคืนจากครู (ลับ)')+closedTip()+`<div class="tip" style="background:#F3EEFF;border-color:#DDD0FB;color:#5b21b6">🔒 <b>ข้อมูลลับ</b> · ครูโอนคืนแล้วครูแนทเช็กสลิปใน LINE → กดเปลี่ยนสถานะที่นี่ · <b>ล็อกอัตโนมัติเมื่อออกจากหน้านี้</b></div>
+  let h=printHead('เงินโอนคืนจากครู (ลับ)')+closedTip()+`<div class="tip" style="background:#F3EEFF;border-color:#DDD0FB;color:#5b21b6">🔒 <b>ข้อมูลลับ</b> · กดปุ่มสถานะเพื่อสลับ: <b>✗ ยังไม่โอน → ⏳ รอตรวจ (ได้สลิปใน LINE แล้ว) → ✓ โอนแล้ว (เช็คเงินเข้าบัญชีแล้ว)</b> · ล็อกอัตโนมัติเมื่อออกจากหน้านี้</div>
     <div class="panel" style="border:1px solid #0F9D58;background:#F0FDF4;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">🏦</span><div><div style="font-weight:800;color:#166534">บัญชีกลางรับเงินโอนคืน</div><div style="font-size:14px">${A.bank} · <b>${A.no}</b> · ${A.name}</div></div></div><button class="btn btn-sm" onclick="editRefundAcct()">✏️ แก้บัญชี</button></div></div>
-    <div class="cards print-hide" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">
+    <div class="cards print-hide" style="grid-template-columns:repeat(4,1fr);margin-bottom:8px">
       <div class="stat" style="border-left:4px solid #0F9D58"><div class="lab">✓ โอนคืนแล้ว</div><div class="val">${paidArr.length} <small>คน · ฿${f(paidAmt)}</small></div></div>
+      <div class="stat" style="border-left:4px solid #B45309"><div class="lab">⏳ รอตรวจ</div><div class="val">${pendArr.length} <small>คน · ฿${f(pendAmt)}</small></div></div>
       <div class="stat" style="border-left:4px solid #C0392B"><div class="lab">✗ ยังไม่โอน</div><div class="val">${waitArr.length} <small>คน · ฿${f(waitAmt)}</small></div></div>
-      <div class="stat refund"><div class="lab">รวมรอรับคืนเดือนนี้</div><div class="val">฿${f(paidAmt+waitAmt)}</div></div></div>
+      <div class="stat refund"><div class="lab">รวมรอรับคืนเดือนนี้</div><div class="val">฿${f(paidAmt+pendAmt+waitAmt)}</div></div></div>
     <div class="panel"><table><thead><tr><th>ชื่อ</th><th>กฎ</th><th class="num">รับสุทธิ</th><th class="num">โอนตามรัฐ<span class="yellow-tag">กรอก</span></th><th class="num">ต้องโอนคืน</th><th>สถานะ</th></tr></thead><tbody>`;
   refPeople().forEach(s=>{const r=REFUNDS[s.id]||{};const amt=refundAmt(s);
     const ruleTag=s.rule==='fixed'?`<span class="blue-tag">ตายตัว ฿${f(s.ramt)}</span>`:(s.rule==='none'?'<span style="color:#9CA3AF">ไม่มี</span>':'<span class="mint-tag">17,605−สุทธิ</span>');
@@ -565,20 +581,22 @@ function renderRefund(){
       <td class="num">${s.rule==='fixed'?'<span style="color:#9CA3AF">—</span>':`<input type="number" ${dis} value="${r.rate||0}" style="width:110px;text-align:right;padding:6px 8px;border:2px solid var(--yellowbd);background:var(--yellow);border-radius:8px;font-family:inherit;font-weight:600" onchange="setRate(${s.id},this.value)">`}</td>
       <td class="num" id="rf_${s.id}" style="color:var(--purple);font-weight:800">฿${f(amt)}</td>
       <td id="stc_${s.id}">${amt>0?stPill(s):'<span style="color:#9CA3AF">—</span>'}</td></tr>`;});
-  h+=`</tbody></table><div class="refund-total"><div><div style="font-size:13px;color:#e2d4fb">รวมเงินที่โรงเรียนรอรับคืนจากครูเดือนนี้</div></div><b id="refTotal">฿${f(paidAmt+waitAmt)}</b></div></div>`;
+  h+=`</tbody></table><div class="refund-total"><div><div style="font-size:13px;color:#e2d4fb">รวมเงินที่โรงเรียนรอรับคืนจากครูเดือนนี้</div></div><b id="refTotal">฿${f(paidAmt+pendAmt+waitAmt)}</b></div></div>`;
   document.getElementById('content').innerHTML=h;
 }
 function checkPin2(){const v=(document.getElementById('pin2').value||'').trim();
   if(v===(CONFIG.pin2||'5678')){refundUnlocked=true;renderRefund();}
   else{document.getElementById('pin2err').textContent='รหัสไม่ถูกต้อง ลองใหม่';document.getElementById('pin2').value='';document.getElementById('pin2').focus();}}
-function stPill(s){const r=REFUNDS[s.id]||{};
-  return r.ok?`<button class="stpill st-ok" onclick="toggleSt(${s.id})">✓ โอนแล้ว ${r.date?'· '+r.date:''}</button>`
-    :`<button class="stpill st-no" onclick="toggleSt(${s.id})">✗ ยังไม่โอน</button>`;}
+function stPill(s){const r=REFUNDS[s.id]||{};const st=r.st||'ยังไม่โอน';
+  if(st==='โอนแล้ว')return `<button class="stpill st-ok" onclick="toggleSt(${s.id})">✓ โอนแล้ว ${r.date?'· '+r.date:''}</button>`;
+  if(st==='รอตรวจ')return `<button class="stpill st-wait" onclick="toggleSt(${s.id})">⏳ รอตรวจ</button>`;
+  return `<button class="stpill st-no" onclick="toggleSt(${s.id})">✗ ยังไม่โอน</button>`;}
 async function toggleSt(id){if(!canEdit()){toast('เดือนนี้ปิดงวดแล้ว');return;}
-  if(!REFUNDS[id])REFUNDS[id]={rate:0,ok:false,date:'',note:''};
-  const r=REFUNDS[id];r.ok=!r.ok;r.date=r.ok?thToday():'';
+  if(!REFUNDS[id])REFUNDS[id]={rate:0,st:'ยังไม่โอน',date:'',note:''};
+  const r=REFUNDS[id];const o=['ยังไม่โอน','รอตรวจ','โอนแล้ว'];
+  r.st=o[(o.indexOf(r.st||'ยังไม่โอน')+1)%3];r.date=r.st==='โอนแล้ว'?thToday():'';
   await saveRefund(id);renderRefund();}
-async function setRate(id,v){if(!REFUNDS[id])REFUNDS[id]={rate:0,ok:false,date:'',note:''};
+async function setRate(id,v){if(!REFUNDS[id])REFUNDS[id]={rate:0,st:'ยังไม่โอน',date:'',note:''};
   REFUNDS[id].rate=Number(v||0);await saveRefund(id);
   const s=STAFF.find(x=>x.id==id);const c=document.getElementById('rf_'+id);if(c)c.textContent='฿'+f(refundAmt(s));
   renderRefund();}
@@ -620,7 +638,7 @@ function copyGroup(){navigator.clipboard.writeText(window._groupMsg||'').then(()
 
 // ===== สรุปรวม =====
 function govFundOf(){const g=CONFIG.govfund||{};return Number(g[MONTH]||0);}
-function confirmedRefund(){return refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok).reduce((a,s)=>a+refundAmt(s),0);}
+function confirmedRefund(){return refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].st==='โอนแล้ว').reduce((a,s)=>a+refundAmt(s),0);}
 let _gfTimer=null;
 function setTopup(v){const g=CONFIG.govfund||{};g[MONTH]=Number(v||0);CONFIG.govfund=g;
   const tN=allIn().reduce((a,s)=>a+net(s),0);
@@ -641,7 +659,7 @@ function renderSummary(){
       <div style="flex:1;min-width:240px;background:linear-gradient(140deg,var(--navy),var(--teal));color:#fff;border-radius:14px;padding:18px 22px"><div style="font-size:13px;color:#cfe0f1">ต้นทุนเงินเดือนจริง (รับสุทธิรวม)</div><div style="font-size:28px;font-weight:800">฿${f(tN)}</div></div>
       <div style="flex:1;min-width:240px;background:linear-gradient(140deg,#5B21B6,#7C3AED);color:#fff;border-radius:14px;padding:18px 22px"><div style="font-size:13px;color:#e2d4fb">🔁 เงินรอรับคืนจากครูรวม</div><div style="font-size:28px;font-weight:800">฿${f(tR)}</div></div>
     </div></div>`;
-  const cRefund=confirmedRefund(), cCount=refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok).length, gf=govFundOf(), topup=Math.max(0,tN-gf-cRefund);
+  const cRefund=confirmedRefund(), cCount=refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].st==='โอนแล้ว').length, gf=govFundOf(), topup=Math.max(0,tN-gf-cRefund);
   h+=`<div class="panel"><h3>💵 เงินที่โรงเรียนต้องเติมเข้าบัญชีกลางเงินเดือน</h3>
     <div class="ph-sub">กรอกเฉพาะ "เงินอุดหนุนรัฐ" · "เงินครูโอนคืน" ดึงจากสถานะโอนแล้วอัตโนมัติ</div>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:540px">
@@ -718,10 +736,49 @@ async function restoreStaff(id){const s=STAFF.find(x=>x.id==id);
   await q(sb.from('staff').update({status:'ทำงาน',resign_date:null}).eq('id',id));
   await loadAll();renderStaff();toast('กู้คืน '+s.n+' กลับมาทำงานแล้ว');}
 
+// ===== เงินมัดจำ =====
+async function _depSums(){const rows=await q(sb.from('payroll_entries').select('staff_id,items,month'));
+  const m={};rows.forEach(r=>{const v=Number((r.items||{}).deposit||0);if(v>0){if(!m[r.staff_id])m[r.staff_id]={sum:0,ms:[]};m[r.staff_id].sum+=v;m[r.staff_id].ms.push(monthLabel(r.month)+': ฿'+f(v));}});return m;}
+function renderDeposit(){document.getElementById('content').innerHTML='<div class="panel">⏳ กำลังโหลดข้อมูลเงินมัดจำ…</div>';_renderDeposit();}
+async function _renderDeposit(){
+  const dep=await _depSums();
+  let h=printHead('เงินมัดจำ')+`<div class="tip check">💰 <b>กติกา:</b> ครูใหม่วางมัดจำ 10,000 — วางสดทีเดียว หรือให้หักจากเงินเดือน (เดือนแรก 5,000 → เดือนละ 500 จนครบ) · ระบบ<b>หักให้อัตโนมัติตอนเปิดเดือนใหม่</b> · ทำงานครบ 1 ปีการศึกษาแล้วลาออก ได้รับคืนเต็มจำนวน</div>`;
+  const list=STAFF.filter(s=>s.depT||(s.depUp||0)>0||dep[s.id]||!s.resigned);
+  h+=`<div class="etable-wrap"><table class="entry"><thead><tr><th>ชื่อ-สกุล</th><th class="num">เป้าหมาย</th><th class="num">วางสด/ยกยอด</th><th class="num">หักจากเงินเดือนแล้ว</th><th class="num">รวมวางแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>`;
+  let cnt=0;
+  list.forEach(s=>{
+    const d=dep[s.id]||{sum:0,ms:[]};const up=s.depUp||0;
+    if(!s.depT&&!up&&!d.sum){
+      h+=`<tr style="opacity:.75"><td class="nm">${s.n}<small>${s.g}</small></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td><span style="color:#9CA3AF">ไม่ได้เก็บ</span></td><td><button class="btn btn-sm" onclick="depStart(${s.id})">▶ เริ่มเก็บ 10,000</button></td></tr>`;return;}
+    cnt++;
+    const target=s.depT||10000;const total=up+d.sum;const rem=Math.max(0,target-total);
+    const st=s.depRet?`<span class="stpill st-ok" style="cursor:default">↩ คืนแล้ว · ${s.depRet}</span>`:(rem<=0?'<span class="stpill st-ok" style="cursor:default">✓ ครบ</span>':'<span class="stpill st-wait" style="cursor:default">⏳ กำลังหัก</span>');
+    h+=`<tr><td class="nm">${s.n}<small>${s.g}${s.resigned?' · ลาออกแล้ว':''}${s.depNote?' · '+esc(s.depNote):''}</small></td>
+      <td class="num">฿${f(target)}</td>
+      <td class="num">฿${f(up)}</td>
+      <td class="num" title="${esc(d.ms.join(' · '))}">฿${f(d.sum)}</td>
+      <td class="num" style="font-weight:800">฿${f(total)}</td>
+      <td class="num" style="color:${rem>0?'var(--red)':'var(--green)'};font-weight:800">฿${f(rem)}</td>
+      <td>${st}</td>
+      <td style="white-space:nowrap">${s.depRet?'':`<button class="btn btn-sm" onclick="depUpfront(${s.id})">✏️ วางสด</button> <button class="btn btn-sm" onclick="depReturn(${s.id})">↩ คืนเงิน</button>`}</td></tr>`;
+  });
+  h+=`</tbody></table></div><div style="margin-top:8px;color:#475569">อยู่ในโครงการมัดจำ <b>${cnt}</b> คน · แถว "ไม่ได้เก็บ" กดปุ่ม ▶ เมื่อมีครูใหม่เข้าโครงการ · ยอด "หักจากเงินเดือนแล้ว" ชี้เมาส์ค้างเพื่อดูรายเดือน</div>`;
+  document.getElementById('content').innerHTML=h;
+}
+async function depStart(id){const s=STAFF.find(x=>x.id==id);
+  if(!confirm('เริ่มเก็บเงินมัดจำ 10,000 ของ '+s.n+'?\nระบบจะหักอัตโนมัติตอนเปิดเดือนใหม่ (เดือนแรก 5,000 → เดือนละ 500)'))return;
+  await q(sb.from('staff').update({deposit_target:10000}).eq('id',id));await loadAll();renderDeposit();toast('เริ่มเก็บมัดจำ '+s.n+' แล้ว ✓');}
+async function depUpfront(id){const s=STAFF.find(x=>x.id==id);
+  const v=prompt('ยอดที่วางสด/ยกยอดมาแล้ว (บาท):',s.depUp||0);if(v===null)return;
+  await q(sb.from('staff').update({deposit_upfront:Number(v||0),deposit_target:s.depT||10000}).eq('id',id));await loadAll();renderDeposit();toast('บันทึกแล้ว ✓');}
+async function depReturn(id){const s=STAFF.find(x=>x.id==id);
+  if(!confirm('บันทึกว่า "คืนเงินมัดจำแล้ว" ให้ '+s.n+'?\n(ระบบจะหยุดหักตั้งแต่เดือนที่เปิดใหม่ถัดไป)'))return;
+  await q(sb.from('staff').update({deposit_returned:thToday()}).eq('id',id));await loadAll();renderDeposit();toast('บันทึกคืนเงินแล้ว ✓');}
+
 function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.0 · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.2 (รอตรวจ + ปฏิทิน พ.ค.69 + เงินมัดจำ) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเงินเดือนบุคลากร · โรงเรียนอนุบาลวิภาวี</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--navy:#13294B;--navy2:#1E3A5F;--teal:#0E7C86;--gold:#C9A24B;--bg:#EEF2F7;--line:#E2E8F0;--ink:#1f2937;--mute:#64748B;
+    --yellow:#FFF7DC;--yellowbd:#E7C84B;--blue:#E8F1FC;--bluebd:#93C0EE;--mint:#E5F6EE;--mintbd:#7FC9A6;
+    --green:#0F9D58;--red:#C0392B;--purple:#6D28D9;--amber:#B45309;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sarabun','Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+  .hidden{display:none!important}
+  button{font-family:inherit;cursor:pointer}
+  #login{position:fixed;inset:0;background:linear-gradient(150deg,#13294B,#1E3A5F 60%,#0E7C86);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .login-card{background:#fff;border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.35);width:100%;max-width:390px;padding:38px 32px;text-align:center}
+  .login-logo{width:74px;height:74px;border-radius:50%;background:linear-gradient(140deg,#13294B,#0E7C86);margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff}
+  .login-card h1{font-size:20px;color:var(--navy);font-weight:800}
+  .login-card .sub{font-size:13px;color:var(--mute);margin:4px 0 22px}
+  .lock-note{font-size:12px;color:var(--teal);background:#E6F4F1;border-radius:8px;padding:7px 10px;margin-bottom:18px;font-weight:600}
+  .pin-label{text-align:left;font-size:13px;font-weight:700;color:#374151;margin-bottom:6px;margin-top:12px}
+  .txt-input{width:100%;font-size:15px;padding:12px 14px;border:2px solid var(--line);border-radius:12px;font-family:inherit;color:var(--navy);font-weight:600}
+  .txt-input:focus{outline:none;border-color:var(--teal)}
+  .btn-login{width:100%;margin-top:18px;background:var(--navy);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700}
+  .btn-login:hover{background:#0c1d38}.btn-login:disabled{opacity:.6}
+  .login-hint{font-size:11.5px;color:#94A3B8;margin-top:14px}.login-err{color:var(--red);font-size:13px;font-weight:600;margin-top:10px;min-height:18px}
+  .shell{display:flex;min-height:100vh}
+  .side{width:240px;background:var(--navy);color:#cdd7e6;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{padding:18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:11px;align-items:center}
+  .brand .b-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(140deg,#0E7C86,#C9A24B);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff}
+  .brand .b-t{font-size:15px;font-weight:800;color:#fff;line-height:1.2}.brand .b-s{font-size:11px;color:#9fb2cc}
+  .nav{padding:10px;flex:1;overflow:auto}
+  .nav a{display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:11px;color:#cdd7e6;text-decoration:none;font-size:14px;font-weight:600;margin-bottom:2px;cursor:pointer}
+  .nav a .i{font-size:17px;width:22px;text-align:center}.nav a:hover{background:rgba(255,255,255,.07);color:#fff}
+  .nav a.active{background:linear-gradient(90deg,var(--teal),#0a5d65);color:#fff}.nav .lockmini{margin-left:auto;font-size:11px;opacity:.8}
+  .side-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#9fb2cc}
+  .side-foot button{background:transparent;border:1px solid rgba(255,255,255,.25);color:#cdd7e6;border-radius:8px;padding:7px 10px;font-size:12.5px;width:100%;font-weight:600}
+  .side-foot button:hover{background:rgba(255,255,255,.1)}
+  .main{flex:1;min-width:0}
+  .topbar{background:#fff;border-bottom:1px solid var(--line);padding:13px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+  .topbar h2{font-size:18px;color:var(--navy);font-weight:800}
+  .month-sel{margin-left:auto;font-family:inherit;background:#EEF4FB;color:var(--navy);border:1px solid #D5E3F2;border-radius:999px;padding:7px 14px;font-weight:700;font-size:13.5px;cursor:pointer}
+  .btn-print{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-weight:700;font-size:13.5px}.btn-print:hover{background:#0c1d38}
+  .content{padding:22px 24px 70px;max-width:1200px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+  .stat .lab{font-size:13px;color:var(--mute);font-weight:600}.stat .val{font-size:23px;font-weight:800;color:var(--navy);margin-top:3px}
+  .stat .val small{font-size:14px;color:var(--mute);font-weight:600}
+  .stat.accent{background:linear-gradient(140deg,var(--navy),var(--navy2));border:none;color:#fff}.stat.accent .lab{color:#bcd0ea}.stat.accent .val{color:#fff}
+  .stat.refund{background:linear-gradient(140deg,#5B21B6,#7C3AED);border:none;color:#fff}.stat.refund .lab{color:#e2d4fb}.stat.refund .val{color:#fff}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:18px}
+  .panel h3{font-size:16px;color:var(--navy);font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}.panel .ph-sub{font-size:13px;color:var(--mute);margin-bottom:14px}
+  .guide{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .guide .step{flex:1;min-width:150px;background:#F8FAFD;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:13px;color:#475569}
+  .guide .step b{display:block;color:var(--teal);font-size:12px;margin-bottom:2px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#F4F7FB;color:#475569;font-weight:700;font-size:12.5px;white-space:nowrap}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.totalrow td{font-weight:800;color:var(--navy);background:#F8FAFD;border-top:2px solid var(--navy)}
+  .net{color:var(--green);font-weight:800}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .tab{background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:700;font-size:13.5px;color:#475569}
+  .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}.tab .cnt{opacity:.7;font-weight:600;margin-left:4px}
+  .tip{background:#FFF7E6;border:1px solid #F4D98B;border-radius:10px;padding:11px 14px;font-size:13px;color:#7A5B00;margin-bottom:14px}
+  .tip.link{background:#EAF3FF;border-color:#B9D6F2;color:#1e497d}.tip.check{background:var(--mint);border-color:var(--mintbd);color:#0a5d3c}
+  .tip.closed{background:#FDECEA;border-color:#F5B7B1;color:#922B21;font-weight:700}
+  .yellow-tag{display:inline-block;background:var(--yellowbd);color:#5b4708;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-left:4px}
+  .blue-tag{display:inline-block;background:var(--bluebd);color:#0b3a63;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-left:4px}
+  .mint-tag{display:inline-block;background:var(--mintbd);color:#08543a;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;margin-left:4px}
+  .etable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table.entry{font-size:13.5px}
+  table.entry td{padding:6px 8px;border-bottom:1px solid var(--line)}
+  table.entry th{vertical-align:top;padding:8px}
+  table.entry input.cell{width:82px;padding:7px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;text-align:right;color:var(--ink)}
+  table.entry input.cell:focus{outline:none;border-color:var(--teal)}
+  table.entry input.cell.y{background:var(--yellow);border-color:var(--yellowbd)}
+  table.entry input.cell.b{background:var(--blue);border-color:var(--bluebd)}
+  table.entry input.cell.m{background:var(--mint);border-color:var(--mintbd)}
+  table.entry input.cell:disabled{background:#F1F5F9;color:#94A3B8;border-color:#E2E8F0}
+  table.entry .nm{font-weight:700;white-space:nowrap}.table.entry .nm small,table.entry .nm small{display:block;font-weight:500;color:var(--mute);font-size:11px}
+  .colname{width:96px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:4px 6px;text-align:center;background:#fff}
+  .colname:focus{outline:none;border-color:var(--teal)}
+  .colmeta{font-size:10px;margin-top:4px;display:flex;gap:7px;justify-content:center;align-items:center}
+  .cadd{color:var(--green);font-weight:700}.cded{color:var(--red);font-weight:700}
+  .delcol{color:var(--red);cursor:pointer;font-weight:700}.delcol:hover{text-decoration:underline}
+  .paysel{font-family:inherit;font-size:12.5px;font-weight:700;border:1.5px solid var(--line);border-radius:999px;padding:5px 8px;background:#fff;color:#334155}
+  .paysel.cash{background:#FFF3E0;border-color:#F0C27A;color:#92590a}.paysel.bank{background:#E6F4F1;border-color:#9AD3CC;color:#0a5d65}
+  td.rownet{font-weight:800;color:var(--green);text-align:right;font-size:15px;white-space:nowrap}
+  .save-bar{display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px}
+  .btn{border:none;border-radius:10px;padding:11px 20px;font-weight:700;font-size:14.5px}
+  .btn-sm{padding:6px 12px;font-size:13px;border-radius:8px;background:#EEF2F7;border:1px solid #cbd5e1;color:#334155}
+  .btn-danger{background:#FDECEA;border:1px solid #F5B7B1;color:#922B21}
+  .btn-primary{background:var(--teal);color:#fff}.btn-primary:hover{background:#0a5d65}
+  .btn-ghost{background:#fff;border:1.5px solid var(--purple);color:var(--purple)}
+  .btn-add{background:#fff;border:1.5px dashed var(--teal);color:var(--teal)}
+  .grouptotal{font-size:14px;color:var(--mute)}.grouptotal b{color:var(--green);font-size:18px}
+  .conf-gate{text-align:center;padding:46px 20px}.conf-gate .clock{font-size:54px}
+  .conf-gate h3{color:var(--purple);font-size:19px;margin:10px 0 4px}.conf-gate p{color:var(--mute);font-size:14px;max-width:430px;margin:0 auto 18px}
+  .badge-conf{display:inline-flex;align-items:center;gap:6px;background:#F3EEFF;color:var(--purple);border:1px solid #DDD0FB;border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px}
+  .refund-total{margin-top:14px;background:linear-gradient(140deg,#5B21B6,#7C3AED);color:#fff;border-radius:14px;padding:16px 22px;display:flex;justify-content:space-between;align-items:center}.refund-total b{font-size:24px;font-weight:800}
+  .stpill{border:none;border-radius:999px;padding:5px 11px;font-weight:700;font-size:12.5px;cursor:pointer}
+  .st-no{background:#FDECEA;color:#b3271a}.st-wait{background:#FFF3DC;color:#92590a}.st-ok{background:#E5F6EE;color:#0a7c4a}
+  .slip{background:#fff;border:1px solid var(--line);border-radius:14px;max-width:460px;margin:0 auto;overflow:hidden}
+  .slip-h{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;padding:18px 22px;text-align:center}
+  .slip-h .sn{font-size:16px;font-weight:800}.slip-h .ss{font-size:12px;color:#d6e3f2}
+  .slip-b{padding:18px 22px}.slip-row{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;border-bottom:1px dashed #E2E8F0}
+  .slip-row.minus span:last-child{color:var(--red)}
+  .slip-net{background:#EAF7EF;border-radius:10px;padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}.slip-net b{color:var(--green);font-size:22px;font-weight:800}
+  .slip-sign{margin-top:16px;font-size:12px;color:var(--mute);text-align:center;border-top:1px solid var(--line);padding-top:12px}
+  .row-sel{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  select.big{font-family:inherit;font-size:15px;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font-weight:600;background:#fff;min-width:240px}
+  .linebox{background:#F4F7FB;border:1px solid var(--line);border-radius:12px;padding:16px;font-size:14.5px;white-space:pre-wrap;line-height:1.7;color:#1f2937}
+  .copybtn{background:#06C755;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;margin-top:12px}
+  .online-flag{position:fixed;right:14px;bottom:14px;background:var(--green);color:#fff;font-weight:800;font-size:12px;padding:7px 14px;border-radius:999px;z-index:50;opacity:.92}
+  .online-flag.err{background:var(--red)}
+  .menu-btn{display:none;background:var(--navy);color:#fff;border:none;border-radius:9px;width:38px;height:38px;font-size:18px;align-items:center;justify-content:center}
+  .sv-bg{position:fixed;inset:0;background:rgba(19,41,75,.55);display:flex;align-items:center;justify-content:center;z-index:70;padding:18px}
+  .sv-card{background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+  .sv-h{background:linear-gradient(140deg,#5B21B6,#7C3AED);color:#fff;padding:18px 20px}.sv-h .t{font-size:16px;font-weight:800}.sv-h .s{font-size:12px;color:#e2d4fb}
+  .sv-b{padding:20px}.sv-amt{background:#F3EEFF;border-radius:12px;padding:16px;text-align:center;margin-bottom:14px}
+  .sv-amt .l{font-size:13px;color:var(--purple);font-weight:600}.sv-amt .v{font-size:30px;font-weight:800;color:var(--purple)}
+  .sv-priv{font-size:12px;color:var(--mute);background:#F4F7FB;border-radius:8px;padding:8px 11px;margin-top:12px;text-align:center}
+  @page{margin:12mm}
+  @media print{.side,.topbar,.tabs,.row-sel,.copybtn,.online-flag,.print-hide,.save-bar,.sv-bg,.colmeta,.menu-btn,.btn-print,.month-sel{display:none!important}
+    html,body{margin:0!important}.main{margin:0!important;width:100%!important}.content{padding:0;max-width:none}.panel{border:none;box-shadow:none;padding:6px 0;margin-top:10px}
+    .etable-wrap{overflow:visible!important}.etable-wrap table{min-width:0!important;width:100%!important}
+    table.entry input.cell{border:none!important;background:transparent!important;width:auto;font-weight:600}.colname{border:none;background:transparent}
+    .paysel{border:none;background:transparent;padding:0}body{background:#fff}.print-head{display:block!important}}
+  .print-head{display:none;text-align:center;margin-bottom:10px}.print-head .ph1{font-size:18px;font-weight:800;color:#000}.print-head .ph2{font-size:13px;color:#333}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <div class="login-logo">🏫</div><h1>ระบบเงินเดือนบุคลากร</h1>
+    <div class="sub">โรงเรียนอนุบาลวิภาวี · อ.ศรีวิไล จ.บึงกาฬ</div>
+    <div class="lock-note">🔒 ระบบภายใน — เฉพาะเจ้าหน้าที่การเงินเท่านั้น</div>
+    <div class="pin-label">อีเมล</div>
+    <input type="email" class="txt-input" id="email" value="natcharlyn@gmail.com" autocomplete="username">
+    <div class="pin-label">รหัสผ่าน</div>
+    <input type="password" class="txt-input" id="pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="login-hint">ปิดหน้าต่าง = ออกจากระบบอัตโนมัติ</div>
+  </div>
+</div>
+<div class="shell hidden" id="app">
+  <aside class="side" id="side">
+    <div class="brand"><div class="b-logo">🏫</div><div><div class="b-t">วิภาวี</div><div class="b-s">ระบบเงินเดือน · ออนไลน์</div></div></div>
+    <nav class="nav" id="nav">
+      <a data-page="home" class="active" onclick="go('home')"><span class="i">🏠</span> หน้าหลัก</a>
+      <a data-page="check" onclick="go('check')"><span class="i">📝</span> บันทึกลา/มาสาย</a>
+      <a data-page="entry" onclick="go('entry')"><span class="i">✍️</span> กรอกเงินเดือน</a>
+      <a data-page="slip" onclick="go('slip')"><span class="i">🧾</span> สลิปเงินเดือน</a>
+      <a data-page="refund" onclick="go('refund')"><span class="i">🔁</span> เงินโอนคืน <span class="lockmini">🔒</span></a>
+      <a data-page="line" onclick="go('line')"><span class="i">💬</span> ข้อความ LINE</a>
+      <a data-page="summary" onclick="go('summary')"><span class="i">📊</span> สรุปรวม</a>
+      <a data-page="staff" onclick="go('staff')"><span class="i">🗂️</span> ทะเบียนบุคลากร</a>
+    </nav>
+    <div class="side-foot"><div style="margin-bottom:8px" id="whoami">👤 …</div><button onclick="logout()">🚪 ออกจากระบบ</button></div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><button class="menu-btn" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <h2 id="ptitle">หน้าหลัก</h2>
+      <select class="month-sel" id="monthSel" onchange="switchMonth(this.value)"></select>
+      <button class="btn-print" onclick="window.print()">🖨 พิมพ์หน้านี้</button></div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+<div class="online-flag" id="cloudFlag">● ออนไลน์</div>
+<script>
+// ============ CLOUD LAYER (Supabase · project เดียวกับระบบค่าเทอม · ตารางแยก) ============
+const SB_URL = 'https://npeithnldwlxablzqnlk.supabase.co';
+const SB_KEY = 'sb_publishable_4XkPqQEtVClyu03d3pGPjw_0WIsZde0';
+const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storage: window.sessionStorage } }); // ปิดหน้าต่าง = ออกจากระบบ
+
+const GROUPS=['ครู-ผบร','ครู','พี่เลี้ยง','ครู-เงินสด'];
+const THM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const f=n=>Number(n||0).toLocaleString('th-TH');
+const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+function curThaiMonth(){const d=new Date();return (d.getFullYear()+543)+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function monthLabel(m){if(!m)return '';const [y,mm]=m.split('-');return THM[+mm-1]+' '+y;}
+function prevMonthKey(m){let [y,mm]=m.split('-').map(Number);mm--;if(mm<1){mm=12;y--;}return y+'-'+String(mm).padStart(2,'0');}
+
+// ---------- state ----------
+let STAFF=[];            // ทะเบียนบุคลากร (ทุกสถานะ)
+let ENTRIES={};          // staff_id -> entry ของเดือนที่เลือก
+let REFUNDS={};          // staff_id -> refund ของเดือนที่เลือก
+let CONFIG={};           // key -> value (payroll_config)
+let MONTH=curThaiMonth();// เดือนที่ดูอยู่ เช่น '2569-07'
+let MONTHS=[];           // เดือนที่มีข้อมูลในระบบ
+let COLS={};             // group -> [col]
+let curGroup=GROUPS[0], refundUnlocked=false, slipMode='table', lineMode='pay';
+
+function flag(ok,msg){const el=document.getElementById('cloudFlag');el.textContent=ok?'● ออนไลน์':'⚠ '+msg;el.className='online-flag'+(ok?'':' err');}
+async function q(p){const {data,error}=await p;if(error){console.error(error);flag(false,'บันทึกไม่สำเร็จ');toast('⚠ ผิดพลาด: '+error.message);throw error;}flag(true);return data;}
+
+// คอลัมน์เริ่มต้น (carry=true จะถูกคัดลอกไปเดือนใหม่, chk/อื่นๆ เริ่ม 0 ใหม่ทุกเดือน)
+function defaultCols(){return [
+ {key:'base',name:'เงินเดือน',type:'add',src:'fin',locked:true,carry:true},
+ {key:'add',name:'เพิ่ม(อื่นๆ)',type:'add',src:'fin'},
+ {key:'bonus',name:'โบนัสชวนเรียน',type:'add',src:'term'},
+ {key:'sso',name:'ประกันสังคม',type:'deduct',src:'fin',carry:true},
+ {key:'late',name:'หักมาสาย',type:'deduct',src:'chk'},
+ {key:'leaveDays',name:'หักลา (วัน)',type:'deduct',src:'chk',special:'leave'},
+ {key:'otherDeduct',name:'หักอื่นๆ',type:'deduct',src:'fin'},
+];}
+
+// ---------- โหลดข้อมูล ----------
+async function loadAll(){
+  const [staff,cfg]=await Promise.all([
+    q(sb.from('staff').select('*').order('id')),
+    q(sb.from('payroll_config').select('*'))
+  ]);
+  STAFF=staff.map(r=>({id:r.id,n:r.name,p:r.position||'',g:r.pay_group||'ครู',acc:r.bank_account||'',
+    base:Number(r.base_salary||0),rule:r.refund_rule||'normal',ramt:Number(r.refund_amount||0),
+    resigned:r.status==='ลาออก',resignDate:r.resign_date||'',deg:r.education||'',emp:r.job_type||'',
+    start:r.appoint_date||'',lic:r.license_no||'',exp:r.license_expire||'',note:r.note||'',idcard:r.id_card||''}));
+  CONFIG={};cfg.forEach(r=>CONFIG[r.key]=r.value);
+  COLS=CONFIG.cols||{};GROUPS.forEach(g=>{if(!COLS[g])COLS[g]=defaultCols();});
+  const em=await q(sb.from('payroll_entries').select('month'));
+  MONTHS=[...new Set(em.map(r=>r.month))].sort();
+  if(!MONTHS.includes(MONTH)&&MONTHS.length) MONTH=MONTHS[MONTHS.length-1];
+  await loadMonth(MONTH);
+}
+async function loadMonth(m){
+  MONTH=m;
+  const [ent,ref]=await Promise.all([
+    q(sb.from('payroll_entries').select('*').eq('month',m)),
+    q(sb.from('payroll_refunds').select('*').eq('month',m))
+  ]);
+  ENTRIES={};ent.forEach(r=>ENTRIES[r.staff_id]={id:r.id,g:r.pay_group,items:r.items||{},net:Number(r.net||0),note:r.note||''});
+  REFUNDS={};ref.forEach(r=>REFUNDS[r.staff_id]={id:r.id,rate:Number(r.state_amount||0),due:Number(r.refund_due||0),
+    ok:!!r.refund_received,date:r.received_date||'',note:r.note||''});
+  renderMonthSel();
+}
+function renderMonthSel(){
+  const sel=document.getElementById('monthSel');const opts=[...MONTHS];if(!opts.includes(curThaiMonth()))opts.push(curThaiMonth());
+  opts.sort();sel.innerHTML=opts.map(m=>`<option value="${m}" ${m===MONTH?'selected':''}>📅 ${monthLabel(m)}${isClosed(m)?' 🔒':''}${hasMonth(m)?'':' (ยังไม่เปิด)'}</option>`).join('');
+}
+async function switchMonth(m){await loadMonth(m);go(curPage);}
+
+// ---------- เดือน: เปิด/ปิดงวด ----------
+function hasMonth(m){return MONTHS.includes(m===undefined?MONTH:m);}
+function isClosed(m){return (CONFIG.closed_months||[]).includes(m===undefined?MONTH:m);}
+function canEdit(){return hasMonth()&&!isClosed();}
+async function openMonth(){
+  if(hasMonth()){toast('เดือนนี้เปิดอยู่แล้ว');return;}
+  const prev=MONTHS.filter(x=>x<MONTH).sort().pop();
+  let prevEnt={};
+  if(prev){(await q(sb.from('payroll_entries').select('*').eq('month',prev))).forEach(r=>prevEnt[r.staff_id]=r);}
+  const active=STAFF.filter(s=>!s.resigned);
+  const rows=active.map(s=>{
+    const pe=prevEnt[s.id];const items={};
+    colsG(s.g).forEach(c=>{items[c.key]= c.key==='base'? s.base : (c.carry&&pe&&pe.items?Number(pe.items[c.key]||0):0);});
+    return {month:MONTH,staff_id:s.id,pay_group:s.g,base_salary:s.base,items,net:0,note:s.g==='ครู-เงินสด'?'เงินสด':''};
+  });
+  // net เริ่มต้น
+  rows.forEach(r=>{r.net=calcNetItems(r.items,r.pay_group);});
+  await q(sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'}));
+  // โอนคืน: เฉพาะคนกลุ่มมีโอนคืน
+  const rate=Number(CONFIG.state_rate||17605);
+  const refRows=active.filter(s=>s.rule!=='none'&&['ครู-ผบร','ครู'].includes(s.g)).map(s=>({
+    month:MONTH,staff_id:s.id,state_amount:s.rule==='fixed'?null:rate,net:0,refund_due:s.rule==='fixed'?s.ramt:0,refund_received:false}));
+  if(refRows.length) await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
+  if(!MONTHS.includes(MONTH))MONTHS.push(MONTH);MONTHS.sort();
+  await loadMonth(MONTH);toast('เปิดเดือน '+monthLabel(MONTH)+' แล้ว ✓ (คัดลอกฐาน+หักตายตัวจากเดือนก่อน)');go('entry');
+}
+async function closeMonth(){
+  if(!confirm('ปิดงวดเดือน '+monthLabel(MONTH)+'?\n\nหลังปิด: แก้ตัวเลขไม่ได้ จนกว่าจะกดปลดล็อก\nแนะนำ: กด "สำรองข้อมูล" ก่อนปิด'))return;
+  const cm=CONFIG.closed_months||[];if(!cm.includes(MONTH))cm.push(MONTH);
+  await saveConfig('closed_months',cm);toast('ปิดงวด '+monthLabel(MONTH)+' แล้ว 🔒');go('home');
+}
+async function reopenMonth(){
+  const why=prompt('ปลดล็อกเดือน '+monthLabel(MONTH)+' — พิมพ์เหตุผล (บันทึกไว้กันลืม):');if(why===null)return;
+  const cm=(CONFIG.closed_months||[]).filter(x=>x!==MONTH);
+  await saveConfig('closed_months',cm);
+  await saveConfig('reopen_log',[...(CONFIG.reopen_log||[]),{m:MONTH,why,at:new Date().toISOString()}]);
+  toast('ปลดล็อกแล้ว — แก้ไขได้');go('home');
+}
+async function saveConfig(key,value){CONFIG[key]=value;await q(sb.from('payroll_config').upsert({key,value},{onConflict:'key'}));}
+
+// ---------- คำนวณ ----------
+const colsG=g=>COLS[g]||[];
+const addColsG=g=>colsG(g).filter(c=>c.type==='add');
+const dedColsG=g=>colsG(g).filter(c=>c.type==='deduct');
+const itemAmt=(items,c)=>c.special==='leave'?Number(items[c.key]||0)*100:Number(items[c.key]||0);
+function calcNetItems(items,g){return addColsG(g).reduce((a,c)=>a+Number(items[c.key]||0),0)-dedColsG(g).reduce((a,c)=>a+itemAmt(items,c),0);}
+const ent=s=>ENTRIES[s.id];
+const gross=s=>{const e=ent(s);return e?addColsG(e.g).reduce((a,c)=>a+Number(e.items[c.key]||0),0):0;};
+const deduct=s=>{const e=ent(s);return e?dedColsG(e.g).reduce((a,c)=>a+itemAmt(e.items,c),0):0;};
+const net=s=>gross(s)-deduct(s);
+function refundAmt(s){
+  if(s.rule==='none')return 0;
+  if(s.rule==='fixed')return s.ramt||0;
+  const r=REFUNDS[s.id];if(!r)return 0;
+  return Math.max(0,(r.rate||0)-net(s));
+}
+const acc4=a=>(!a||a==='0')?'— ยังไม่มีบัญชี —':'••••••'+String(a).slice(-4);
+const inMonth=s=>!!ENTRIES[s.id];                      // อยู่ในงวดเดือนนี้
+const act=g=>STAFF.filter(s=>inMonth(s)&&ent(s).g===g); // คนในกลุ่ม (ตามกลุ่มที่บันทึกในเดือนนั้น)
+const allIn=()=>STAFF.filter(s=>inMonth(s));
+const payOf=s=>{const e=ent(s);return (e&&e.note==='เงินสด')||(!e&&s.g==='ครู-เงินสด')?'เงินสด':'โอน';};
+
+// ---------- บันทึกขึ้นคลาวด์ ----------
+async function saveEntries(groupOnly){
+  const rows=allIn().filter(s=>!groupOnly||ent(s).g===groupOnly).map(s=>{const e=ent(s);
+    return {month:MONTH,staff_id:s.id,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:net(s),note:e.note||''};});
+  await q(sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'}));
+  // sync net เข้าตารางโอนคืน
+  const refRows=Object.keys(REFUNDS).map(sid=>{const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];
+    return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:r.ok,received_date:r.date||null,note:r.note||''};});
+  if(refRows.length)await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
+  toast('บันทึกขึ้นคลาวด์แล้ว ✓');
+}
+async function saveRefund(sid){
+  const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];if(!r)return;
+  await q(sb.from('payroll_refunds').upsert({month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,
+    refund_due:s?refundAmt(s):0,refund_received:r.ok,received_date:r.date||null,note:r.note||''},{onConflict:'month,staff_id'}));
+}
+async function saveCols(){await saveConfig('cols',COLS);}
+
+// ---------- Backup ----------
+async function exportBackup(){
+  const [e1,e2]=await Promise.all([q(sb.from('payroll_entries').select('*')),q(sb.from('payroll_refunds').select('*'))]);
+  const blob=new Blob([JSON.stringify({exported:new Date().toISOString(),staff:STAFF,entries:e1,refunds:e2,config:CONFIG},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='backup_เงินเดือนวิภาวี_'+MONTH+'_'+Date.now()+'.json';a.click();
+  toast('ดาวน์โหลดไฟล์สำรองแล้ว ✓ (เก็บใส่โฟลเดอร์ 05_backup)');
+}
+
+// ---------- Auth ----------
+async function doLogin(){
+  const em=document.getElementById('email').value.trim(),pw=document.getElementById('pw').value;
+  const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='กำลังเข้าสู่ระบบ…';
+  const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
+  btn.disabled=false;btn.textContent='เข้าสู่ระบบ';
+  if(error){document.getElementById('loginErr').textContent='เข้าไม่สำเร็จ: อีเมลหรือรหัสผ่านไม่ถูกต้อง';return;}
+  await enterApp(em);
+}
+async function enterApp(em){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('whoami').textContent='👤 '+em;
+  try{await loadAll();go('home');}catch(e){toast('โหลดข้อมูลไม่สำเร็จ — ลองรีเฟรช');}
+}
+async function logout(){refundUnlocked=false;await sb.auth.signOut();location.reload();}
+window.addEventListener('DOMContentLoaded',async()=>{
+  const {data}=await sb.auth.getSession();
+  if(data&&data.session){await enterApp(data.session.user.email);}
+  else document.getElementById('pw').focus();
+});
+</script>
+<script>
+// ============ หน้าจอ ============
+let curPage='home';
+const TITLES={home:'หน้าหลัก',check:'บันทึกลา/ขาด/มาสาย',entry:'กรอกเงินเดือน',slip:'สลิปเงินเดือน',refund:'เงินโอนคืน (ข้อมูลลับ)',line:'ข้อความแจ้งทาง LINE',summary:'สรุปยอดรวม',staff:'ทะเบียนบุคลากร'};
+function go(p){curPage=p;if(p!=='refund')refundUnlocked=false;
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));
+  document.getElementById('ptitle').textContent=TITLES[p]||'';document.getElementById('side').classList.remove('open');
+  ({home:renderHome,check:renderCheck,entry:renderEntry,slip:renderSlip,refund:renderRefund,line:renderLine,summary:renderSummary,staff:renderStaff}[p])();window.scrollTo(0,0);}
+function printHead(t){return `<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · ${t}</div><div class="ph2">ประจำเดือน ${monthLabel(MONTH)}</div></div>`;}
+function gateHTML(){return `<div class="panel"><div class="conf-gate"><div class="clock">🗓️</div>
+  <h3 style="color:var(--navy)">เดือน ${monthLabel(MONTH)} ยังไม่เปิดงวด</h3>
+  <p>กด "เปิดเดือนนี้" ระบบจะสร้างตารางเงินเดือนของทุกคนอัตโนมัติ — คัดลอกเงินเดือนฐาน + รายการหักตายตัว (เช่น ประกันสังคม) จากเดือนก่อนให้เลย ครูกรอกแค่ที่เปลี่ยน</p>
+  <button class="btn btn-primary" onclick="openMonth()">🚀 เปิดเดือน ${monthLabel(MONTH)}</button></div></div>`;}
+function closedTip(){return isClosed()?`<div class="tip closed">🔒 เดือนนี้ปิดงวดแล้ว — ดูได้อย่างเดียว · ปลดล็อกได้ที่หน้าหลัก</div>`:'';}
+
+// ===== หน้าหลัก =====
+function renderHome(){
+  let h=printHead('สรุปเงินเดือน');
+  if(!hasMonth()){h+=gateHTML();
+    if(MONTHS.length)h+=`<div class="tip link">📂 มีข้อมูลเดือนก่อนหน้า: ${MONTHS.map(monthLabel).join(' · ')} — เลือกดูได้ที่ปุ่มเดือนมุมขวาบน</div>`;
+    document.getElementById('content').innerHTML=h;return;}
+  const A=allIn();
+  const tN=A.reduce((a,s)=>a+net(s),0),tG=A.reduce((a,s)=>a+gross(s),0),tR=A.reduce((a,s)=>a+refundAmt(s),0);
+  h+=closedTip()+`<div class="cards">
+    <div class="stat accent"><div class="lab">ยอดจ่ายสุทธิเดือนนี้</div><div class="val">฿${f(tN)}</div></div>
+    <div class="stat"><div class="lab">บุคลากรในงวดนี้</div><div class="val">${A.length} <small>คน</small></div></div>
+    <div class="stat"><div class="lab">รวมเงินเดือน (ก่อนหัก)</div><div class="val">฿${f(tG)}</div></div>
+    <div class="stat refund"><div class="lab">🔁 เงินรอรับคืนจากครู</div><div class="val">฿${f(tR)}</div></div></div>`;
+  h+=`<div class="panel"><h3>📋 ทำเงินเดือนเดือนนี้ — 5 ขั้น</h3>
+    <div class="ph-sub">กรอกช่อง<span class="yellow-tag">เหลือง</span> · ช่อง<span class="mint-tag">เขียว</span>มาจากครูเช็ก · <span class="blue-tag">ฟ้า</span>มาจากค่าเทอม · หัวคอลัมน์แก้ชื่อ/เพิ่ม/ลบได้เอง</div>
+    <div class="guide"><div class="step"><b>ขั้น 1</b>กรอกลา/มาสาย (หน้า "บันทึกลา/มาสาย")</div>
+      <div class="step"><b>ขั้น 2</b>กรอกเงินเดือน + กดบันทึก</div>
+      <div class="step"><b>ขั้น 3</b>ระบบคิด "รับสุทธิ" ให้ทันที</div>
+      <div class="step"><b>ขั้น 4</b>พิมพ์สลิป + ส่ง LINE</div>
+      <div class="step"><b>ขั้น 5</b>ตรวจเงินโอนคืน + สรุป → ปิดงวด</div></div></div>`;
+  h+=`<div class="panel"><h3>👥 ภาพรวมแต่ละกลุ่ม</h3><table><thead><tr><th>กลุ่ม</th><th class="num">จำนวน</th><th class="num">รวมรับ</th><th class="num">รวมหัก</th><th class="num">รับสุทธิ</th></tr></thead><tbody>`;
+  GROUPS.forEach(g=>{const a=act(g);
+    h+=`<tr><td><b>${g}</b></td><td class="num">${a.length}</td><td class="num">฿${f(a.reduce((x,s)=>x+gross(s),0))}</td><td class="num">฿${f(a.reduce((x,s)=>x+deduct(s),0))}</td><td class="num net">฿${f(a.reduce((x,s)=>x+net(s),0))}</td></tr>`;});
+  h+=`<tr class="totalrow"><td>รวมทั้งหมด</td><td class="num">${A.length}</td><td class="num">฿${f(tG)}</td><td class="num">฿${f(tG-tN)}</td><td class="num">฿${f(tN)}</td></tr></tbody></table></div>`;
+  h+=`<div class="panel print-hide"><h3>🛠 จัดการงวดเดือน ${monthLabel(MONTH)}</h3><div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-ghost" onclick="exportBackup()">💾 สำรองข้อมูล (.json)</button>`+
+    (isClosed()?`<button class="btn" style="background:#FFF3DC;color:#92590a;border:1px solid #F0C27A" onclick="reopenMonth()">🔓 ปลดล็อกแก้ไข</button>`
+      :`<button class="btn" style="background:#FDECEA;color:#922B21;border:1px solid #F5B7B1" onclick="closeMonth()">🔒 ปิดงวดเดือนนี้</button>`)+
+    `</div><div style="font-size:12px;color:#64748B;margin-top:8px">แนะนำ: จ่ายเงินเดือน+ตรวจโอนคืนครบแล้ว → สำรองข้อมูล → ปิดงวด กันเผลอแก้</div></div>`;
+  document.getElementById('content').innerHTML=h;
+}
+
+// ===== บันทึกลา/มาสาย =====
+function renderCheck(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  const chk=colsG(curGroup).filter(c=>c.src==='chk');const dis=canEdit()?'':'disabled';
+  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 <b>กรอกลา/มาสายที่เดียว</b> — ตัวเลขไหลเข้าหน้ากรอกเงินเดือนอัตโนมัติ (ลาไม่มีใบรับรอง = หักวันละ 100) · อนาคตจะให้ครูเวรกรอกผ่าน Google Form เอง</div>`;
+  h+=`<div class="tabs">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupC('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
+  h+=`<div class="etable-wrap"><table class="entry" style="min-width:560px"><thead><tr><th>ชื่อ-สกุล</th>`+
+    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th class="num">รวมหัก</th></tr></thead><tbody>`;
+  act(curGroup).forEach(s=>{const e=ent(s);
+    h+=`<tr><td class="nm">${s.n}<small>${s.p}</small></td>`+
+      chk.map(c=>`<td class="num"><input class="cell m" type="number" min="0" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`).join('')+
+      `<td class="num" id="ck_${s.id}" style="font-weight:800;color:var(--red)">฿${f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0))}</td></tr>`;});
+  h+=`</tbody></table></div><div class="save-bar"><div class="grouptotal">กดบันทึก ตัวเลขถึงหน้ากรอกเงินเดือนทันที</div>
+    <button class="btn btn-primary" ${dis} onclick="saveEntries()">💾 บันทึกขึ้นคลาวด์</button></div>`;
+  document.getElementById('content').innerHTML=h;
+}
+function setGroupC(g){curGroup=g;renderCheck();}
+
+// ===== กรอกเงินเดือน =====
+function renderEntry(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  const dis=canEdit()?'':'disabled';
+  let h=printHead('บัญชีเงินเดือน')+closedTip()+`<div class="tip check">✏️ <b>หัวคอลัมน์แก้ชื่อได้</b> · <b>✕ ลบ</b> ใต้หัวคอลัมน์ · <b>➕ เพิ่มคอลัมน์</b> ด้านล่าง · <span class="mint-tag">เขียว</span>=ครูเช็ก <span class="blue-tag">ฟ้า</span>=ค่าเทอม · แก้เสร็จ<b>กดบันทึก</b>ทุกครั้ง</div>`;
+  h+=`<div class="tabs print-hide">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroup('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
+  h+=`<div class="etable-wrap"><table class="entry"><thead><tr><th>ชื่อ-สกุล</th><th>วิธีรับ</th>`;
+  colsG(curGroup).forEach(c=>{
+    h+=`<th class="num"><input class="colname" ${dis} value="${esc(c.name)}" onchange="renColumn('${c.key}',this.value)">
+      <div class="colmeta"><span class="${c.type==='add'?'cadd':'cded'}">${c.type==='add'?'➕รับ':'➖หัก'}${c.special==='leave'?'·×100':''}</span>`+
+      (c.locked?'':`<span class="delcol" onclick="delColumn('${c.key}')">✕ ลบ</span>`)+`</div></th>`;});
+  h+=`<th class="num">รับสุทธิ</th></tr></thead><tbody>`;
+  act(curGroup).forEach(s=>{const e=ent(s);
+    h+=`<tr><td class="nm">${s.n}<small>${s.p} · ${acc4(s.acc)}</small>
+      <select class="grpsel" title="ย้ายกลุ่ม" ${dis} onchange="changeGroup(${s.id},this.value)" style="margin-top:3px;font-size:11px;padding:1px 4px;border:1px solid #cbd5e1;border-radius:5px;color:#475569;background:#f8fafc;display:block;max-width:130px">${GROUPS.map(g=>`<option value="${g}" ${g===e.g?'selected':''}>↔ ${g}</option>`).join('')}</select></td>
+      <td><select class="paysel ${payOf(s)==='เงินสด'?'cash':'bank'}" ${dis} onchange="setPay(${s.id},this)">
+        <option value="โอน" ${payOf(s)==='โอน'?'selected':''}>🏦 โอน</option><option value="เงินสด" ${payOf(s)==='เงินสด'?'selected':''}>💵 เงินสด</option></select></td>`;
+    colsG(curGroup).forEach(c=>{const cls=c.src==='chk'?'m':(c.src==='term'?'b':'y');
+      h+=`<td class="num"><input class="cell ${cls}" type="number" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`;});
+    h+=`<td class="rownet" id="rn_${s.id}">฿${f(net(s))}</td></tr>`;});
+  h+=`</tbody></table></div>
+    <div class="save-bar"><button class="btn btn-add" ${dis} onclick="addColumn()">➕ เพิ่มคอลัมน์</button>
+      <div class="grouptotal">รับสุทธิรวมกลุ่ม <b>${curGroup}</b>: <b id="grpTotal">฿${f(act(curGroup).reduce((a,s)=>a+net(s),0))}</b></div>
+      <button class="btn btn-primary" ${dis} onclick="saveEntries('${curGroup}')">💾 บันทึกขึ้นคลาวด์</button></div>`;
+  document.getElementById('content').innerHTML=h;
+}
+function setGroup(g){curGroup=g;renderEntry();}
+async function changeGroup(id,g){const s=STAFF.find(x=>x.id==id);const e=ent(s);const old=e.g;if(g===old)return;
+  e.g=g;colsG(g).forEach(c=>{if(e.items[c.key]===undefined)e.items[c.key]=0;});
+  await saveEntries();renderEntry();toast('ย้าย '+s.n+' จาก '+old+' → '+g+' แล้ว ✓');}
+function setPay(id,el){const e=ENTRIES[id];e.note=el.value;el.className='paysel '+(el.value==='เงินสด'?'cash':'bank');}
+function setV(id,key,v){const e=ENTRIES[id];e.items[key]=Number(v||0);
+  const s=STAFF.find(x=>x.id==id);
+  const rn=document.getElementById('rn_'+id);if(rn)rn.textContent='฿'+f(net(s));
+  const gt=document.getElementById('grpTotal');if(gt)gt.textContent='฿'+f(act(curGroup).reduce((a,x)=>a+net(x),0));
+  const ck=document.getElementById('ck_'+id);if(ck){const chk=colsG(e.g).filter(c=>c.src==='chk');ck.textContent='฿'+f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0));}}
+function renColumn(key,name){const c=colsG(curGroup).find(x=>x.key===key);if(c){c.name=name.trim()||c.name;saveCols();}}
+async function addColumn(){
+  const name=(prompt('ชื่อคอลัมน์ใหม่ (เช่น โบนัส, หักซื้อของ, เบี้ยขยัน):')||'').trim();if(!name)return;
+  const isAdd=confirm('"'+name+'" เป็นแบบไหน?\n\nกด OK = เงินรับ (บวกเข้าเงินเดือน)\nกด Cancel = เงินหัก (ลบออก)');
+  const carry=confirm('ยอดคอลัมน์นี้ "คงที่ทุกเดือน" ไหม?\n\nกด OK = คงที่ (คัดลอกไปเดือนใหม่อัตโนมัติ เช่น ประกันสังคม)\nกด Cancel = กรอกใหม่ทุกเดือน (เช่น หักซื้อของ)');
+  const k='c'+Date.now();COLS[curGroup].push({key:k,name,type:isAdd?'add':'deduct',src:'fin',carry});
+  act(curGroup).forEach(s=>{ent(s).items[k]=0;});
+  await saveCols();renderEntry();toast('เพิ่มคอลัมน์ "'+name+'" แล้ว');
+}
+async function delColumn(key){const c=colsG(curGroup).find(x=>x.key===key);if(!c||c.locked)return;
+  if(!confirm('ลบคอลัมน์ "'+c.name+'" ออกจากกลุ่ม '+curGroup+'?'))return;
+  COLS[curGroup]=COLS[curGroup].filter(x=>x.key!==key);act(curGroup).forEach(s=>{delete ent(s).items[key];});
+  await saveCols();await saveEntries(curGroup);renderEntry();toast('ลบคอลัมน์ "'+c.name+'" แล้ว');
+}
+
+// ===== สลิป =====
+function renderSlip(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  let h=`<div class="row-sel print-hide"><div class="tabs" style="margin:0">
+      <button class="tab ${slipMode==='table'?'active':''}" onclick="setSlipMode('table')">📋 ใบเซ็นรับเงิน (รายกลุ่ม)</button>
+      <button class="tab ${slipMode==='card'?'active':''}" onclick="setSlipMode('card')">🧾 สลิปรายคน</button>
+    </div></div><div id="slipArea"></div>`;
+  document.getElementById('content').innerHTML=h;
+  if(slipMode==='table') renderSlipTable(); else renderSlipCard();
+}
+function setSlipMode(m){slipMode=m;renderSlip();}
+function renderSlipTable(){
+  const school=CONFIG.school||{};
+  let h=`<div class="tabs print-hide">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupSlip('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
+  h+=`<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · บัญชีสรุปรับ-จ่ายเงินเดือน กลุ่ม${curGroup}</div><div class="ph2">ประจำเดือน ${monthLabel(MONTH)}</div></div>`;
+  h+=`<div class="etable-wrap"><table style="font-size:13.5px;min-width:800px"><thead><tr>
+    <th>ที่</th><th>ชื่อ-สกุล</th><th>ตำแหน่ง</th><th>เลขบัญชี</th>
+    <th class="num">รวมรับ</th><th class="num">รวมหัก</th><th class="num">รับสุทธิ</th>
+    <th style="width:160px">ลงชื่อรับเงิน</th><th>หมายเหตุ</th></tr></thead><tbody>`;
+  const arr=act(curGroup);let tG=0,tD=0,tN=0;
+  arr.forEach((s,i)=>{const e=ent(s);const G=gross(s),D=deduct(s),N=net(s);tG+=G;tD+=D;tN+=N;
+    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays);
+    h+=`<tr><td>${i+1}</td><td class="nm">${s.n}</td><td>${s.p}</td><td>${acc4(s.acc)}</td>
+      <td class="num">฿${f(G)}</td><td class="num">฿${f(D)}</td><td class="num net">฿${f(N)}</td>
+      <td style="height:34px"></td><td>${notes.join(' · ')}</td></tr>`;});
+  h+=`<tr class="totalrow"><td colspan="4" style="text-align:right">รวม</td><td class="num">฿${f(tG)}</td><td class="num">฿${f(tD)}</td><td class="num">฿${f(tN)}</td><td></td><td></td></tr>`;
+  h+=`</tbody></table></div>
+    <div style="margin-top:8px;font-size:12px;color:#7A5B00">*กรณีลากิจ/ลาป่วยไม่มีใบรับรองแพทย์ หักวันละ 100 บาท</div>
+    <div style="display:flex;justify-content:space-between;margin-top:30px;font-size:13px;color:#334155;flex-wrap:wrap;gap:18px">
+      <div>ลงชื่อ ....................................... ผู้จัดทำบัญชี<br><span style="font-size:12px;color:#64748B">(${school.manager||'นายภานุพันธ์ สุวรรณวงศ์'}) ผู้จัดการโรงเรียน</span></div>
+      <div>ลงชื่อ ....................................... ผู้ตรวจสอบ/อนุมัติ<br><span style="font-size:12px;color:#64748B">(นายกันหา สุวรรณวงศ์) ผู้รับใบอนุญาต</span></div>
+    </div>`;
+  document.getElementById('slipArea').innerHTML=h;
+}
+function setGroupSlip(g){curGroup=g;renderSlipTable();}
+function renderSlipCard(){
+  let h=`<div class="row-sel print-hide"><label style="font-weight:700">เลือกครู:</label><select class="big" id="slipSel" onchange="drawSlipCard()">`+
+    allIn().map(s=>`<option value="${s.id}">${s.n} (${ent(s).g})</option>`).join('')+`</select></div><div id="slipCardArea"></div>`;
+  document.getElementById('slipArea').innerHTML=h;drawSlipCard();
+}
+function drawSlipCard(){const s=STAFF.find(x=>x.id==+document.getElementById('slipSel').value);const e=ent(s);
+  let rows='';
+  addColsG(e.g).forEach(c=>{const v=e.items[c.key]||0;if(v)rows+=`<div class="slip-row"><span>${esc(c.name)}</span><span>฿${f(v)}</span></div>`;});
+  rows+=`<div class="slip-row"><span><b>รวมรับ</b></span><span><b>฿${f(gross(s))}</b></span></div>`;
+  dedColsG(e.g).forEach(c=>{const v=itemAmt(e.items,c);if(v)rows+=`<div class="slip-row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(e.items[c.key]||0)+' วัน':''}</span><span>−฿${f(v)}</span></div>`;});
+  document.getElementById('slipCardArea').innerHTML=`<div class="slip">
+    <div class="slip-h"><div class="sn">สลิปเงินเดือน</div><div class="ss">โรงเรียนอนุบาลวิภาวี · ${monthLabel(MONTH)}</div></div>
+    <div class="slip-b">
+      <div class="slip-row"><span>ชื่อ-สกุล</span><span><b>${s.n}</b></span></div>
+      <div class="slip-row"><span>ตำแหน่ง / กลุ่ม</span><span>${s.p} · ${ent(s).g}</span></div>
+      <div class="slip-row"><span>วิธีรับเงิน</span><span>${payOf(s)==='เงินสด'?'💵 เงินสด':'🏦 โอน '+acc4(s.acc)}</span></div>
+      ${rows}
+      <div class="slip-net"><span style="font-weight:700">รับสุทธิ</span><b>฿${f(net(s))}</b></div>
+      <div class="slip-sign">ลงชื่อผู้รับเงิน ............................................<br><span style="font-size:11px">วันที่ ......../......../........</span></div>
+    </div></div>`;
+}
+</script>
+<script>
+// ===== เงินโอนคืน (ลับ · PIN ชั้น 2) =====
+function refAcct(){return CONFIG.refund_account||{bank:'กสิกรไทย',no:'230-808-811-4',name:'นางสมลักษณ์ สุวรรณวงศ์'};}
+async function editRefundAcct(){
+  const a=refAcct();
+  const b=prompt('ธนาคาร:',a.bank);if(b===null)return;
+  const n=prompt('เลขบัญชี:',a.no);if(n===null)return;
+  const nm=prompt('ชื่อบัญชี:',a.name);if(nm===null)return;
+  await saveConfig('refund_account',{bank:b.trim()||a.bank,no:n.trim()||a.no,name:nm.trim()||a.name});
+  renderRefund();toast('อัปเดตบัญชีโอนคืนแล้ว ✓');
+}
+function refPeople(){return allIn().filter(s=>REFUNDS[s.id]||refundAmt(s)>0);}
+function renderRefund(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  if(!refundUnlocked){document.getElementById('content').innerHTML=`<div class="panel"><div class="conf-gate">
+    <div class="clock">🔐</div><div class="badge-conf">🔒 ข้อมูลลับ — เฉพาะผู้ดูแล</div><h3>ใส่รหัส PIN ชั้นที่ 2 เพื่อเข้าดู</h3>
+    <p>หน้านี้แสดงยอดเงินเดือน + โอนคืนของครูแต่ละคน ต้องยืนยันอีกครั้ง (กันคนอื่นเผลอเห็นจอ)</p>
+    <input type="password" id="pin2" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter')checkPin2()" style="font-size:22px;letter-spacing:8px;text-align:center;padding:12px 14px;border:2px solid var(--line);border-radius:12px;width:180px;font-family:inherit;font-weight:700;color:var(--purple)">
+    <div id="pin2err" style="color:var(--red);font-size:13px;font-weight:600;min-height:18px;margin-top:8px"></div>
+    <button class="btn btn-primary" onclick="checkPin2()">🔓 ยืนยัน · เข้าดู</button></div></div>`;
+    setTimeout(()=>{const p=document.getElementById('pin2');if(p)p.focus();},60);return;}
+  const A=refAcct();const owe=refPeople().filter(s=>refundAmt(s)>0);
+  const paidArr=owe.filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok), waitArr=owe.filter(s=>!(REFUNDS[s.id]&&REFUNDS[s.id].ok));
+  const paidAmt=paidArr.reduce((a,s)=>a+refundAmt(s),0), waitAmt=waitArr.reduce((a,s)=>a+refundAmt(s),0);
+  const dis=canEdit()?'':'disabled';
+  let h=printHead('เงินโอนคืนจากครู (ลับ)')+closedTip()+`<div class="tip" style="background:#F3EEFF;border-color:#DDD0FB;color:#5b21b6">🔒 <b>ข้อมูลลับ</b> · ครูโอนคืนแล้วครูแนทเช็กสลิปใน LINE → กดเปลี่ยนสถานะที่นี่ · <b>ล็อกอัตโนมัติเมื่อออกจากหน้านี้</b></div>
+    <div class="panel" style="border:1px solid #0F9D58;background:#F0FDF4;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">🏦</span><div><div style="font-weight:800;color:#166534">บัญชีกลางรับเงินโอนคืน</div><div style="font-size:14px">${A.bank} · <b>${A.no}</b> · ${A.name}</div></div></div><button class="btn btn-sm" onclick="editRefundAcct()">✏️ แก้บัญชี</button></div></div>
+    <div class="cards print-hide" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">
+      <div class="stat" style="border-left:4px solid #0F9D58"><div class="lab">✓ โอนคืนแล้ว</div><div class="val">${paidArr.length} <small>คน · ฿${f(paidAmt)}</small></div></div>
+      <div class="stat" style="border-left:4px solid #C0392B"><div class="lab">✗ ยังไม่โอน</div><div class="val">${waitArr.length} <small>คน · ฿${f(waitAmt)}</small></div></div>
+      <div class="stat refund"><div class="lab">รวมรอรับคืนเดือนนี้</div><div class="val">฿${f(paidAmt+waitAmt)}</div></div></div>
+    <div class="panel"><table><thead><tr><th>ชื่อ</th><th>กฎ</th><th class="num">รับสุทธิ</th><th class="num">โอนตามรัฐ<span class="yellow-tag">กรอก</span></th><th class="num">ต้องโอนคืน</th><th>สถานะ</th></tr></thead><tbody>`;
+  refPeople().forEach(s=>{const r=REFUNDS[s.id]||{};const amt=refundAmt(s);
+    const ruleTag=s.rule==='fixed'?`<span class="blue-tag">ตายตัว ฿${f(s.ramt)}</span>`:(s.rule==='none'?'<span style="color:#9CA3AF">ไม่มี</span>':'<span class="mint-tag">17,605−สุทธิ</span>');
+    h+=`<tr><td>${s.n}</td><td>${ruleTag}</td><td class="num">฿${f(net(s))}</td>
+      <td class="num">${s.rule==='fixed'?'<span style="color:#9CA3AF">—</span>':`<input type="number" ${dis} value="${r.rate||0}" style="width:110px;text-align:right;padding:6px 8px;border:2px solid var(--yellowbd);background:var(--yellow);border-radius:8px;font-family:inherit;font-weight:600" onchange="setRate(${s.id},this.value)">`}</td>
+      <td class="num" id="rf_${s.id}" style="color:var(--purple);font-weight:800">฿${f(amt)}</td>
+      <td id="stc_${s.id}">${amt>0?stPill(s):'<span style="color:#9CA3AF">—</span>'}</td></tr>`;});
+  h+=`</tbody></table><div class="refund-total"><div><div style="font-size:13px;color:#e2d4fb">รวมเงินที่โรงเรียนรอรับคืนจากครูเดือนนี้</div></div><b id="refTotal">฿${f(paidAmt+waitAmt)}</b></div></div>`;
+  document.getElementById('content').innerHTML=h;
+}
+function checkPin2(){const v=(document.getElementById('pin2').value||'').trim();
+  if(v===(CONFIG.pin2||'5678')){refundUnlocked=true;renderRefund();}
+  else{document.getElementById('pin2err').textContent='รหัสไม่ถูกต้อง ลองใหม่';document.getElementById('pin2').value='';document.getElementById('pin2').focus();}}
+function stPill(s){const r=REFUNDS[s.id]||{};
+  return r.ok?`<button class="stpill st-ok" onclick="toggleSt(${s.id})">✓ โอนแล้ว ${r.date?'· '+r.date:''}</button>`
+    :`<button class="stpill st-no" onclick="toggleSt(${s.id})">✗ ยังไม่โอน</button>`;}
+async function toggleSt(id){if(!canEdit()){toast('เดือนนี้ปิดงวดแล้ว');return;}
+  if(!REFUNDS[id])REFUNDS[id]={rate:0,ok:false,date:'',note:''};
+  const r=REFUNDS[id];r.ok=!r.ok;r.date=r.ok?thToday():'';
+  await saveRefund(id);renderRefund();}
+async function setRate(id,v){if(!REFUNDS[id])REFUNDS[id]={rate:0,ok:false,date:'',note:''};
+  REFUNDS[id].rate=Number(v||0);await saveRefund(id);
+  const s=STAFF.find(x=>x.id==id);const c=document.getElementById('rf_'+id);if(c)c.textContent='฿'+f(refundAmt(s));
+  renderRefund();}
+
+// ===== LINE =====
+function renderLine(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  let h=`<div class="row-sel">
+    <div class="tabs" style="margin:0"><button class="tab ${lineMode==='pay'?'active':''}" onclick="setLineMode('pay')">📤 แจ้งเงินเดือน</button><button class="tab ${lineMode==='confirm'?'active':''}" onclick="setLineMode('confirm')">✅ ยืนยันรับโอนคืน</button></div>
+    <label style="font-weight:700;margin-left:8px">ครู:</label><select class="big" id="lineSel" onchange="drawLine()">`+
+    allIn().map(s=>`<option value="${s.id}">${s.n}</option>`).join('')+`</select></div><div id="lineArea"></div>`;
+  document.getElementById('content').innerHTML=h;drawLine();
+}
+function setLineMode(m){lineMode=m;renderLine();}
+function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSel').value);const r=refundAmt(s);const A=refAcct();const ML=monthLabel(MONTH);
+  let msg;
+  if(lineMode==='confirm'){
+    msg = r>0
+      ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`
+      : `เรียน ${s.n}\n\nเดือน${ML} ไม่มียอดที่ต้องโอนคืนค่ะ\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+  } else {
+    msg = `เรียน ${s.n}\n\nแจ้งเงินเดือนประจำเดือน ${ML}\n${payOf(s)==='เงินสด'?'รับเป็นเงินสดที่ฝ่ายการเงินได้เลยค่ะ':'โอนเข้าบัญชีเรียบร้อยแล้วค่ะ'}`;
+    if(r>0) msg += `\n\n🔸 เดือนนี้มียอดต้องโอนคืน ฿${f(r)}\nโอนเข้า: ${A.bank} ${A.no} (${A.name})\nโอนแล้วส่งสลิปให้ฝ่ายการเงินทาง LINE ได้เลยค่ะ`;
+    msg += `\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+  }
+  let groupCard='';
+  if(lineMode==='pay'){
+    const active=allIn().length;
+    const gmsg=`เรียนคุณครูทุกท่าน 🙏\n\nโรงเรียนได้จ่ายเงินเดือนประจำเดือน ${ML} เรียบร้อยแล้วค่ะ\n• ท่านที่รับโอน — โอนเข้าบัญชีแล้ว\n• ท่านที่รับเงินสด — รับได้ที่ฝ่ายการเงิน\n\nท่านที่มียอดต้องโอนคืน จะมีข้อความแจ้งเป็นรายบุคคลอีกครั้งค่ะ\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+    window._groupMsg=gmsg;
+    groupCard=`<div class="panel" style="border:1px solid #16A34A;background:#F0FDF4"><h3>📢 ส่งทีเดียวทั้งกลุ่ม (${active} คน)</h3><div class="tip" style="margin-bottom:10px">ข้อความกลางส่งเข้ากลุ่มไลน์ครูทีเดียว — ไม่มียอดเงิน ปลอดภัย · ยอดโอนคืนแจ้งรายคนแยก</div><div class="linebox">${gmsg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyGroup()">📋 คัดลอกข้อความกลุ่ม (ส่งทีเดียว)</button></div>`;
+  }
+  const perTitle=lineMode==='confirm'?'💬 ยืนยันรับโอนคืน — รายคน (ส่งทีละคน)':'💬 ข้อความรายคน — '+s.n;
+  document.getElementById('lineArea').innerHTML=groupCard+`<div class="panel"><h3>${perTitle}</h3><div class="tip" style="margin-bottom:10px">🔒 แบบสั้น-ปลอดภัย: ไม่ใส่ยอดเงินเดือนในข้อความ (กันหลุดเมื่อครูแชร์ต่อ)</div><div class="linebox">${msg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyLine()">📋 คัดลอกข้อความรายคน</button></div>`;
+  window._lineMsg=msg;
+}
+function copyLine(){navigator.clipboard.writeText(window._lineMsg||'').then(()=>toast('คัดลอกข้อความรายคนแล้ว ✓'));}
+function copyGroup(){navigator.clipboard.writeText(window._groupMsg||'').then(()=>toast('คัดลอกข้อความกลุ่มแล้ว ✓'));}
+
+// ===== สรุปรวม =====
+function govFundOf(){const g=CONFIG.govfund||{};return Number(g[MONTH]||0);}
+function confirmedRefund(){return refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok).reduce((a,s)=>a+refundAmt(s),0);}
+let _gfTimer=null;
+function setTopup(v){const g=CONFIG.govfund||{};g[MONTH]=Number(v||0);CONFIG.govfund=g;
+  const tN=allIn().reduce((a,s)=>a+net(s),0);
+  document.getElementById('topupVal').textContent='฿'+f(Math.max(0,tN-govFundOf()-confirmedRefund()));
+  clearTimeout(_gfTimer);_gfTimer=setTimeout(()=>saveConfig('govfund',g),800);}
+function renderSummary(){
+  if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
+  const A=allIn();
+  let h=printHead('สรุปยอดรวม')+closedTip()+`<div class="panel"><h3>📊 สรุปยอดจ่ายเงินเดือนทั้งโรงเรียน</h3><div class="ph-sub">ประจำเดือน ${monthLabel(MONTH)}</div>
+    <table><thead><tr><th>กลุ่ม</th><th class="num">จำนวน</th><th class="num">รวมรับ</th><th class="num">รวมหัก</th><th class="num">รับสุทธิ</th><th class="num">โอนคืนรวม</th></tr></thead><tbody>`;
+  let tG=0,tD=0,tN=0,tR=0;
+  GROUPS.forEach(g=>{const a=act(g);
+    const G=a.reduce((x,s)=>x+gross(s),0),D=a.reduce((x,s)=>x+deduct(s),0),N=a.reduce((x,s)=>x+net(s),0),R=a.reduce((x,s)=>x+refundAmt(s),0);
+    tG+=G;tD+=D;tN+=N;tR+=R;
+    h+=`<tr><td><b>${g}</b></td><td class="num">${a.length}</td><td class="num">฿${f(G)}</td><td class="num">฿${f(D)}</td><td class="num net">฿${f(N)}</td><td class="num" style="color:var(--purple);font-weight:700">฿${f(R)}</td></tr>`;});
+  h+=`<tr class="totalrow"><td>รวมทั้งหมด</td><td class="num">${A.length}</td><td class="num">฿${f(tG)}</td><td class="num">฿${f(tD)}</td><td class="num">฿${f(tN)}</td><td class="num">฿${f(tR)}</td></tr></tbody></table>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:16px">
+      <div style="flex:1;min-width:240px;background:linear-gradient(140deg,var(--navy),var(--teal));color:#fff;border-radius:14px;padding:18px 22px"><div style="font-size:13px;color:#cfe0f1">ต้นทุนเงินเดือนจริง (รับสุทธิรวม)</div><div style="font-size:28px;font-weight:800">฿${f(tN)}</div></div>
+      <div style="flex:1;min-width:240px;background:linear-gradient(140deg,#5B21B6,#7C3AED);color:#fff;border-radius:14px;padding:18px 22px"><div style="font-size:13px;color:#e2d4fb">🔁 เงินรอรับคืนจากครูรวม</div><div style="font-size:28px;font-weight:800">฿${f(tR)}</div></div>
+    </div></div>`;
+  const cRefund=confirmedRefund(), cCount=refPeople().filter(s=>REFUNDS[s.id]&&REFUNDS[s.id].ok).length, gf=govFundOf(), topup=Math.max(0,tN-gf-cRefund);
+  h+=`<div class="panel"><h3>💵 เงินที่โรงเรียนต้องเติมเข้าบัญชีกลางเงินเดือน</h3>
+    <div class="ph-sub">กรอกเฉพาะ "เงินอุดหนุนรัฐ" · "เงินครูโอนคืน" ดึงจากสถานะโอนแล้วอัตโนมัติ</div>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:540px">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span>เงินเดือนสุทธิที่ต้องจ่ายเดือนนี้</span><b style="font-size:16px">฿${f(tN)}</b></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span>− เงินอุดหนุนรัฐเดือนนี้ <span class="yellow-tag">กรอก</span></span><span>฿<input type="number" value="${gf}" ${canEdit()?'':'disabled'} oninput="setTopup(this.value)" style="width:130px;text-align:right;padding:8px;border:2px solid var(--yellowbd);background:var(--yellow);border-radius:8px;font-family:inherit;font-weight:600"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span>− เงินครูโอนคืน (ยืนยันแล้ว) <span class="mint-tag">อัตโนมัติ</span></span><b style="color:#0a7c4a;font-size:16px">฿${f(cRefund)}</b></div>
+    </div>
+    <div style="font-size:12px;color:#64748B;margin-top:6px">↑ ดึงจากครูสถานะ "โอนแล้ว" ${cCount} คน · เปลี่ยนสถานะในหน้า "เงินโอนคืน" ยอดนี้ขึ้นตามทันที</div>
+    <div style="margin-top:16px;background:linear-gradient(140deg,#B45309,#D97706);color:#fff;border-radius:14px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><div style="font-size:14px;color:#ffe9d0;font-weight:700">🏦 เดือนนี้โรงเรียนต้องเติมเข้าบัญชีกลางอีก</div><div style="font-size:11.5px;color:#ffe9d0;margin-top:3px">= เงินเดือนสุทธิ − เงินอุดหนุนรัฐ − เงินครูโอนคืนที่ยืนยันแล้ว</div></div>
+      <b id="topupVal" style="font-size:30px;font-weight:800">฿${f(topup)}</b>
+    </div></div>`;
+  document.getElementById('content').innerHTML=h;
+}
+
+// ===== ทะเบียนบุคลากร =====
+const THMON={'ม.ค.':1,'ก.พ.':2,'มี.ค.':3,'เม.ย.':4,'พ.ค.':5,'มิ.ย.':6,'ก.ค.':7,'ส.ค.':8,'ก.ย.':9,'ต.ค.':10,'พ.ย.':11,'ธ.ค.':12};
+function thDate(s){if(!s)return null;const m=String(s).match(/(\d{1,2})\s*([ก-๙\.]+)\s*(\d{4})/);if(!m||!THMON[m[2]])return null;return new Date(+m[3]-543,THMON[m[2]]-1,+m[1]);}
+function monthsLeft(s){const d=thDate(s);if(!d)return null;return (d-new Date())/(1000*60*60*24*30.44);}
+function thToday(){const d=new Date(),M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return d.getDate()+' '+M[d.getMonth()]+' '+(d.getFullYear()+543);}
+function licBadge(exp){
+  if(!exp)return '<span style="color:#94a3b8">—</span>';
+  const ml=monthsLeft(exp);let bg='#DCFCE7',col='#166534',ic='🟢';
+  if(ml!==null&&ml<=6){bg='#FEE2E2';col='#991B1B';ic='🔴';}
+  else if(ml!==null&&ml<=12){bg='#FEF3C7';col='#92400E';ic='🟡';}
+  return `<span style="background:${bg};color:${col};padding:2px 7px;border-radius:6px;font-size:12px;white-space:nowrap">${ic} ${exp}</span>`;
+}
+let staffForm=null;
+function renderStaff(){
+  let h=printHead('ทะเบียนบุคลากร')+`<div class="tip check">🗂️ <b>ทะเบียนกลาง (บันทึกจริงขึ้นคลาวด์)</b> — เพิ่ม/แก้ไข/ลาออก ได้ที่นี่ · ชื่อ/กลุ่ม/บัญชีใช้ร่วมกับหน้ากรอกเงินเดือน · การ์ดแดง/เหลือง = ใบวิชาชีพใกล้หมดอายุ</div>`;
+  if(staffForm){
+    const d=staffForm.data, isEdit=staffForm.mode==='edit';
+    const opt=(arr,val)=>arr.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${o}</option>`).join('');
+    const F=(lb,id,v,ph='',tp='text')=>`<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:12px;color:#475569">${lb}</label><input id="${id}" type="${tp}" value="${esc(v==null?'':v)}" placeholder="${ph}" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-family:inherit"></div>`;
+    h+=`<div style="border:2px solid #2563EB;background:#EFF6FF;border-radius:12px;padding:15px;margin-bottom:16px"><div style="font-weight:800;font-size:15px;margin-bottom:11px">${isEdit?'✏️ แก้ไขข้อมูลบุคลากร':'➕ เพิ่มบุคลากรใหม่'}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px">${F('ชื่อ-สกุล *','sf_n',d.n,'นาย/นาง/นางสาว...')}<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:12px;color:#475569">กลุ่มเงินเดือน *</label><select id="sf_g" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-family:inherit">${opt(GROUPS,d.g)}</select></div>${F('ตำแหน่ง','sf_p',d.p,'ครู/พี่เลี้ยง')}${F('เลขบัญชี','sf_acc',d.acc,'เลขบัญชี')}${F('เงินเดือน (ฐาน)','sf_base',d.base,'0','number')}<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:12px;color:#475569">กฎโอนคืน</label><select id="sf_rule" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-family:inherit">${opt(['normal','fixed','none'],d.rule)}</select></div>${F('ยอดตายตัว (ถ้ากฎ fixed)','sf_ramt',d.ramt,'0','number')}${F('วุฒิการศึกษา','sf_deg',d.deg,'ป.ตรี...')}${F('วันบรรจุ','sf_start',d.start,'1 มิ.ย. 2569')}${F('เลขใบวิชาชีพ','sf_lic',d.lic,'')}${F('ใบวิชาชีพหมดอายุ','sf_exp',d.exp,'25 ก.ย. 2572')}</div><div style="display:flex;gap:9px;margin-top:13px"><button class="btn btn-primary" onclick="saveStaffForm()">💾 บันทึกขึ้นคลาวด์</button><button class="btn btn-sm" onclick="cancelStaffForm()">ยกเลิก</button></div></div>`;
+  } else { h+=`<div style="margin-bottom:13px"><button class="btn btn-primary" onclick="openAddStaff()">➕ เพิ่มบุคลากรใหม่</button></div>`; }
+  const warn=STAFF.filter(s=>!s.resigned&&s.exp&&monthsLeft(s.exp)!==null&&monthsLeft(s.exp)<=12).sort((a,b)=>monthsLeft(a.exp)-monthsLeft(b.exp));
+  h+=`<div style="margin-bottom:14px">`;
+  if(warn.length){
+    h+=`<div style="font-weight:700;color:#991B1B;margin-bottom:7px">⚠ ใบประกอบวิชาชีพใกล้หมดอายุ (${warn.length} คน)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px">`;
+    warn.forEach(s=>{const ml=Math.max(0,Math.round(monthsLeft(s.exp)));const red=monthsLeft(s.exp)<=6;h+=`<div style="border:1px solid ${red?'#FCA5A5':'#FCD34D'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;padding:10px 12px"><div style="font-weight:700">${s.n}</div><div style="font-size:12px;color:#6b7280">${s.p} · ${s.g}</div><div style="margin-top:5px;font-size:13px">${red?'🔴':'🟡'} หมดอายุ <b>${s.exp}</b> · เหลือ ~${ml} เดือน</div></div>`;});
+    h+=`</div>`;
+  } else {
+    h+=`<div style="border:1px solid #86EFAC;background:#F0FDF4;border-radius:10px;padding:10px 12px;color:#166534">🟢 ทุกใบประกอบวิชาชีพยังไม่ใกล้หมดอายุ (ภายใน 12 เดือน)</div>`;
+  }
+  h+=`</div>`;
+  h+=`<div class="etable-wrap"><table class="entry"><thead><tr><th>ชื่อ-สกุล</th><th>กลุ่ม</th><th>ตำแหน่ง</th><th>วุฒิ</th><th>วันบรรจุ</th><th>เลขบัญชี</th><th>ใบวิชาชีพ</th><th>วันหมดอายุ</th><th>กฎโอนคืน</th><th>จัดการ</th></tr></thead><tbody>`;
+  STAFF.forEach(s=>{const rz=s.resigned;
+    const rule=s.rule==='fixed'?'ตายตัว ฿'+f(s.ramt):(s.rule==='none'?'ไม่มี':'ปกติ');
+    h+=`<tr style="${rz?'opacity:.55;background:#F8FAFC':''}"><td class="nm">${s.n}${rz?' <span style="background:#E2E8F0;color:#475569;padding:1px 6px;border-radius:5px;font-size:11px">🚪 ลาออก '+(s.resignDate||'')+'</span>':''}</td><td>${s.g}</td><td>${s.p}</td><td style="font-size:12px">${s.deg||'—'}</td><td style="white-space:nowrap">${s.start||'—'}</td><td style="white-space:nowrap">${acc4(s.acc)}</td><td style="font-size:12px">${s.lic||'—'}</td><td>${licBadge(s.exp)}</td><td style="font-size:12px">${rule}</td><td style="white-space:nowrap">${rz?`<button class="btn btn-sm" onclick="restoreStaff(${s.id})">↩ กู้คืน</button>`:`<button class="btn btn-sm" onclick="openEditStaff(${s.id})">✏️</button> <button class="btn btn-sm btn-danger" onclick="resignStaff(${s.id})">🚪 ลาออก</button>`}</td></tr>`;});
+  const rzc=STAFF.filter(s=>s.resigned).length;
+  h+=`</tbody></table></div><div style="margin-top:8px;color:#475569">ทำงานอยู่ <b>${STAFF.length-rzc}</b> คน${rzc?` · ลาออก <b>${rzc}</b> คน`:''}</div>`;
+  document.getElementById('content').innerHTML=h;
+}
+function openAddStaff(){staffForm={mode:'add',data:{g:'ครู',p:'ครู',rule:'normal',ramt:0,base:0}};renderStaff();}
+function openEditStaff(id){const s=STAFF.find(x=>x.id==id);staffForm={mode:'edit',id,data:{n:s.n,g:s.g,p:s.p,acc:s.acc,base:s.base,rule:s.rule,ramt:s.ramt,deg:s.deg,start:s.start,lic:s.lic,exp:s.exp}};renderStaff();}
+function cancelStaffForm(){staffForm=null;renderStaff();}
+function gv(id){const e=document.getElementById(id);return e?String(e.value).trim():'';}
+async function saveStaffForm(){
+  const n=gv('sf_n');if(!n){alert('กรุณากรอกชื่อ-สกุล');return;}
+  const row={name:n,pay_group:gv('sf_g'),position:gv('sf_p')||gv('sf_g'),bank_account:gv('sf_acc')||null,
+    base_salary:Number(gv('sf_base')||0),refund_rule:gv('sf_rule')||'normal',refund_amount:Number(gv('sf_ramt')||0)||null,
+    education:gv('sf_deg')||null,appoint_date:gv('sf_start')||null,license_no:gv('sf_lic')||null,license_expire:gv('sf_exp')||null};
+  if(['พี่เลี้ยง','ครู-เงินสด'].includes(row.pay_group)&&row.refund_rule==='normal')row.refund_rule='none';
+  if(staffForm.mode==='add'){await q(sb.from('staff').insert(row));toast('เพิ่ม '+n+' แล้ว ✓');}
+  else{await q(sb.from('staff').update(row).eq('id',staffForm.id));toast('บันทึก '+n+' แล้ว ✓');}
+  staffForm=null;await loadAll();renderStaff();
+}
+async function resignStaff(id){const s=STAFF.find(x=>x.id==id);
+  if(!confirm('ทำเครื่องหมายว่า '+s.n+' ลาออก?\n(จะไม่ถูกดึงเข้าเดือนใหม่ แต่เดือนเก่าและประวัติยังอยู่ครบ)'))return;
+  await q(sb.from('staff').update({status:'ลาออก',resign_date:thToday()}).eq('id',id));
+  await loadAll();renderStaff();toast(s.n+' — บันทึกลาออกแล้ว');}
+async function restoreStaff(id){const s=STAFF.find(x=>x.id==id);
+  await q(sb.from('staff').update({status:'ทำงาน',resign_date:null}).eq('id',id));
+  await loadAll();renderStaff();toast('กู้คืน '+s.n+' กลับมาทำงานแล้ว');}
+
+function toast(m){let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
+  t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
+</script>
+<!-- ระบบเงินเดือนวิภาวี v1.0 · 2 ก.ค. 2569 · END-OF-FILE -->
+</body>
+</html>

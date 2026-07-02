@@ -623,17 +623,17 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
   let msg;
   if(lineMode==='confirm'){
     msg = r>0
-      ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`
-      : `เรียน ${s.n}\n\nเดือน${ML} ไม่มียอดที่ต้องโอนคืนค่ะ\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+      ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏\n\n— ฝ่ายการเงิน`
+      : `เรียน ${s.n}\n\nเดือน${ML} ไม่มียอดที่ต้องโอนคืนค่ะ\n\n— ฝ่ายการเงิน`;
   } else {
     msg = `เรียน ${s.n}\n\nแจ้งเงินเดือนประจำเดือน ${ML}\n${payOf(s)==='เงินสด'?'รับเป็นเงินสดที่ฝ่ายการเงินได้เลยค่ะ':'โอนเข้าบัญชีเรียบร้อยแล้วค่ะ'}`;
     if(r>0) msg += `\n\n🔸 เดือนนี้มียอดต้องโอนคืน ฿${f(r)}\nโอนเข้า: ${A.bank} ${A.no} (${A.name})\nโอนแล้วส่งสลิปให้ฝ่ายการเงินทาง LINE ได้เลยค่ะ`;
-    msg += `\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+    msg += `\n\n— ฝ่ายการเงิน`;
   }
   let groupCard='';
   if(lineMode==='pay'){
     const active=allIn().length;
-    const gmsg=`เรียนคุณครูทุกท่าน 🙏\n\nโรงเรียนได้จ่ายเงินเดือนประจำเดือน ${ML} เรียบร้อยแล้วค่ะ\n• ท่านที่รับโอน — โอนเข้าบัญชีแล้ว\n• ท่านที่รับเงินสด — รับได้ที่ฝ่ายการเงิน\n\nท่านที่มียอดต้องโอนคืน จะมีข้อความแจ้งเป็นรายบุคคลอีกครั้งค่ะ\n\n— ฝ่ายการเงิน โรงเรียนอนุบาลวิภาวี`;
+    const gmsg=`เรียนคุณครูทุกท่าน 🙏\n\nโรงเรียนได้จ่ายเงินเดือนประจำเดือน ${ML} เรียบร้อยแล้วค่ะ\n• ท่านที่รับโอน — โอนเข้าบัญชีแล้ว\n• ท่านที่รับเงินสด — รับได้ที่ฝ่ายการเงิน\n\nท่านที่มียอดต้องโอนคืน จะมีข้อความแจ้งเป็นรายบุคคลอีกครั้งค่ะ\n\n— ฝ่ายการเงิน`;
     window._groupMsg=gmsg;
     groupCard=`<div class="panel" style="border:1px solid #16A34A;background:#F0FDF4"><h3>📢 ส่งทีเดียวทั้งกลุ่ม (${active} คน)</h3><div class="tip" style="margin-bottom:10px">ข้อความกลางส่งเข้ากลุ่มไลน์ครูทีเดียว — ไม่มียอดเงิน ปลอดภัย · ยอดโอนคืนแจ้งรายคนแยก</div><div class="linebox">${gmsg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyGroup()">📋 คัดลอกข้อความกลุ่ม (ส่งทีเดียว)</button></div>`;
   }
@@ -792,6 +792,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.4 (วันที่ลา + ลาครึ่งวัน 0.5 = หัก 50) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.5 (LINE ไร้ชื่อโรงเรียน · สลิปออนไลน์ครูปิดตามนโยบาย ผจก.) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

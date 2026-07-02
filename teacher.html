@@ -49,10 +49,9 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="head"><div class="logo">🏫</div><h1>โรงเรียนอนุบาลวิภาวี</h1><div class="s">ระบบสำหรับคุณครู · ดูสลิปเงินเดือน / บันทึกลา-มาสาย</div></div>
+  <div class="head"><div class="logo">🏫</div><h1>โรงเรียนอนุบาลวิภาวี</h1><div class="s">สำหรับครูเวรเช็กเวลา · บันทึกลา/มาสาย</div></div>
   <div class="tabs">
-    <button class="tab active" id="tabT" onclick="setMode('t')">👤 สลิปของฉัน</button>
-    <button class="tab" id="tabD" onclick="setMode('d')">📝 ครูเวรเช็กเวลา</button>
+    <button class="tab active" id="tabD" style="cursor:default">📝 ครูเวรเช็กเวลา</button>
   </div>
   <div class="card" id="card"></div>
 </div>
@@ -72,10 +71,9 @@ function defCols(){return [
  {key:'base',name:'เงินเดือน',type:'add'},{key:'add',name:'เพิ่ม(อื่นๆ)',type:'add'},{key:'bonus',name:'โบนัสชวนเรียน',type:'add'},
  {key:'sso',name:'ประกันสังคม',type:'deduct'},{key:'deposit',name:'หักมัดจำ',type:'deduct'},
  {key:'late',name:'หักมาสาย',type:'deduct'},{key:'leaveDays',name:'หักลา (วัน)',type:'deduct',special:'leave'},{key:'otherDeduct',name:'หักอื่นๆ',type:'deduct'}];}
-let mode='t';
-function setMode(m){mode=m;document.getElementById('tabT').classList.toggle('active',m==='t');
-  document.getElementById('tabD').classList.toggle('active',m==='d');
-  if(m==='t')renderTLogin();else renderDLogin();}
+let mode='d';
+// โหมด "สลิปของฉัน" ปิดใช้งานตามนโยบายผู้จัดการ (2 ก.ค. 69) — โค้ดยังอยู่ เปิดกลับได้ภายหลัง
+function setMode(m){mode='d';renderDLogin();}
 
 // ===== โหมดครู: ดูสลิปตัวเอง =====
 let tState={};
@@ -172,8 +170,8 @@ async function dSend(ids){
   if(error||!data){document.getElementById('derr2').textContent='ส่งไม่สำเร็จ ลองใหม่ค่ะ';return;}
   document.getElementById('derr2').innerHTML='<div class="ok-banner">✓ ส่งเรียบร้อย — ฝ่ายการเงินจะเห็นทันที ขอบคุณค่ะ</div>';
 }
-setMode('t');
+setMode('d');
 </script>
-<!-- หน้าสำหรับครู v1.2 (ซ่อนยอดโอนคืน — แจ้งทาง LINE แทน) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- หน้าสำหรับครู v1.3 (ปิดสลิปออนไลน์ตามนโยบาย ผจก. — เหลือครูเวรเช็กเวลา) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>สำหรับคุณครู · โรงเรียนอนุบาลวิภาวี</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--navy:#13294B;--teal:#0E7C86;--line:#E2E8F0;--mute:#64748B;--green:#0F9D58;--red:#C0392B;--purple:#6D28D9;
+    --yellow:#FFF7DC;--yellowbd:#E7C84B;--mint:#E5F6EE;--mintbd:#7FC9A6;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sarabun',sans-serif;background:linear-gradient(150deg,#13294B,#1E3A5F 60%,#0E7C86);min-height:100vh;color:#1f2937;padding:16px 12px 40px}
+  .wrap{max-width:520px;margin:0 auto}
+  .head{text-align:center;color:#fff;margin-bottom:14px}
+  .head .logo{width:58px;height:58px;border-radius:50%;background:linear-gradient(140deg,#0E7C86,#C9A24B);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .head h1{font-size:18px;font-weight:800}.head .s{font-size:12.5px;color:#c9d6e8}
+  .tabs{display:flex;gap:8px;margin-bottom:12px}
+  .tab{flex:1;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:12px;padding:11px;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
+  .tab.active{background:#fff;color:var(--navy);border-color:#fff}
+  .card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+  label{display:block;font-size:13px;font-weight:700;color:#374151;margin:12px 0 5px}
+  input,select{width:100%;font-family:inherit;font-size:15px;padding:12px;border:2px solid var(--line);border-radius:11px;font-weight:600}
+  input:focus,select:focus{outline:none;border-color:var(--teal)}
+  .btn{width:100%;margin-top:16px;background:var(--navy);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15.5px;font-weight:700;font-family:inherit;cursor:pointer}
+  .btn:hover{background:#0c1d38}.btn:disabled{opacity:.6}
+  .btn.green{background:var(--green)}.btn.green:hover{background:#0a7c46}
+  .err{color:var(--red);font-size:13px;font-weight:600;min-height:18px;margin-top:8px;text-align:center}
+  .note{font-size:11.5px;color:#94A3B8;text-align:center;margin-top:12px}
+  .row{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;border-bottom:1px dashed #E9EDF3}
+  .row.minus span:last-child{color:var(--red)}
+  .netbox{background:#EAF7EF;border-radius:10px;padding:12px 14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+  .netbox b{color:var(--green);font-size:22px;font-weight:800}
+  .sec{font-weight:800;color:var(--navy);font-size:14px;margin:16px 0 6px}
+  .refbox{background:#F3EEFF;border-radius:12px;padding:14px;text-align:center;margin-top:8px}
+  .refbox .l{font-size:13px;color:var(--purple);font-weight:600}.refbox .v{font-size:28px;font-weight:800;color:var(--purple)}
+  .pill{display:inline-block;border-radius:999px;padding:5px 12px;font-weight:700;font-size:12.5px}
+  .p-no{background:#FDECEA;color:#b3271a}.p-wait{background:#FFF3DC;color:#92590a}.p-ok{background:#E5F6EE;color:#0a7c4a}
+  .acct{font-size:13px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:10px 12px;margin-top:10px;color:#166534}
+  .priv{font-size:12px;color:var(--mute);background:#F4F7FB;border-radius:8px;padding:8px 11px;margin-top:12px;text-align:center}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  th,td{padding:7px 6px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#F4F7FB;color:#475569;font-size:12px;white-space:nowrap}
+  td input{width:74px;padding:8px;font-size:14px;text-align:right;background:var(--mint);border-color:var(--mintbd)}
+  .nm{font-weight:700;font-size:13px}.nm small{display:block;font-weight:500;color:var(--mute);font-size:11px}
+  .ok-banner{background:#E5F6EE;border:1px solid #7FC9A6;color:#0a5d3c;border-radius:10px;padding:11px 14px;font-weight:700;font-size:14px;margin-top:12px;text-align:center}
+  .back{background:none;border:none;color:var(--teal);font-weight:700;font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:8px;padding:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><div class="logo">🏫</div><h1>โรงเรียนอนุบาลวิภาวี</h1><div class="s">ระบบสำหรับคุณครู · ดูสลิปเงินเดือน / บันทึกลา-มาสาย</div></div>
+  <div class="tabs">
+    <button class="tab active" id="tabT" onclick="setMode('t')">👤 สลิปของฉัน</button>
+    <button class="tab" id="tabD" onclick="setMode('d')">📝 ครูเวรเช็กเวลา</button>
+  </div>
+  <div class="card" id="card"></div>
+</div>
+<script>
+const SB_URL='https://npeithnldwlxablzqnlk.supabase.co';
+const SB_KEY='sb_publishable_4XkPqQEtVClyu03d3pGPjw_0WIsZde0';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const f=n=>Number(n||0).toLocaleString('th-TH');
+const esc=s=>String(s==null?'':s).replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const THM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const AY_START='2569-05';
+function curM(){const d=new Date();return (d.getFullYear()+543)+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function mLabel(m){const [y,mm]=m.split('-');return THM[+mm-1]+' '+y;}
+function nextM(m){let [y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++;}return y+'-'+String(mm).padStart(2,'0');}
+function monthOpts(sel){let h='',m=AY_START,g=0;const c=curM();while(m<=c&&g<60){h=`<option value="${m}" ${m===(sel||c)?'selected':''}>${mLabel(m)}</option>`+h;m=nextM(m);g++;}return h;}
+function defCols(){return [
+ {key:'base',name:'เงินเดือน',type:'add'},{key:'add',name:'เพิ่ม(อื่นๆ)',type:'add'},{key:'bonus',name:'โบนัสชวนเรียน',type:'add'},
+ {key:'sso',name:'ประกันสังคม',type:'deduct'},{key:'deposit',name:'หักมัดจำ',type:'deduct'},
+ {key:'late',name:'หักมาสาย',type:'deduct'},{key:'leaveDays',name:'หักลา (วัน)',type:'deduct',special:'leave'},{key:'otherDeduct',name:'หักอื่นๆ',type:'deduct'}];}
+let mode='t';
+function setMode(m){mode=m;document.getElementById('tabT').classList.toggle('active',m==='t');
+  document.getElementById('tabD').classList.toggle('active',m==='d');
+  if(m==='t')renderTLogin();else renderDLogin();}
+
+// ===== โหมดครู: ดูสลิปตัวเอง =====
+let tState={};
+function renderTLogin(){
+  document.getElementById('card').innerHTML=`
+    <label>ชื่อ-สกุล (พิมพ์เต็ม เช่น นางสาว...)</label><input id="tn" value="${esc(tState.n||'')}" placeholder="นาย/นาง/นางสาว ชื่อ นามสกุล">
+    <label>รหัส PIN 6 หลัก (ฝ่ายการเงินแจ้งทาง LINE)</label><input id="tp" type="password" maxlength="6" inputmode="numeric" placeholder="••••••" onkeydown="if(event.key==='Enter')tView()">
+    <label>เดือน</label><select id="tm">${monthOpts(tState.m)}</select>
+    <div class="err" id="terr"></div>
+    <button class="btn" id="tbtn" onclick="tView()">🔍 ดูสลิปของฉัน</button>
+    <div class="priv">🔒 เห็นเฉพาะข้อมูลของตัวเองเท่านั้น · ระบบตรวจชื่อ+PIN ก่อนแสดงผล</div>`;
+}
+async function tView(){
+  const n=document.getElementById('tn').value.trim(),p=document.getElementById('tp').value.trim(),m=document.getElementById('tm').value;
+  if(!n||p.length<4){document.getElementById('terr').textContent='กรอกชื่อและ PIN ให้ครบค่ะ';return;}
+  const b=document.getElementById('tbtn');b.disabled=true;b.textContent='กำลังตรวจสอบ…';
+  const {data,error}=await sb.rpc('teacher_slip',{p_name:n,p_pin:p,p_month:m});
+  b.disabled=false;b.textContent='🔍 ดูสลิปของฉัน';
+  if(error||!data){document.getElementById('terr').textContent='ไม่พบข้อมูล — เช็กการสะกดชื่อ/PIN อีกครั้ง หรือติดต่อฝ่ายการเงิน';return;}
+  tState={n,p,m};drawSlip(data,m);
+}
+function drawSlip(d,m){
+  const cols=(d.cols&&d.cols[d.grp])||defCols();
+  const items=d.items||{};const amt=c=>c.special==='leave'?Number(items[c.key]||0)*100:Number(items[c.key]||0);
+  let inc='',ded='',g=0,dd=0;
+  cols.filter(c=>c.type==='add').forEach(c=>{const v=Number(items[c.key]||0);g+=v;if(v)inc+=`<div class="row"><span>${esc(c.name)}</span><span>฿${f(v)}</span></div>`;});
+  cols.filter(c=>c.type==='deduct').forEach(c=>{const v=amt(c);dd+=v;if(v)ded+=`<div class="row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(items[c.key]||0)+' วัน':''}</span><span>−฿${f(v)}</span></div>`;});
+  if(!ded)ded=`<div class="row" style="color:#16A34A">— เดือนนี้ไม่มีรายการหัก —</div>`;
+  const net=d.has_entry?(g-dd):0;
+  const acc=d.acc?('🏦 โอนเข้าบัญชี ••••••'+String(d.acc).slice(-4)):'💵 เงินสด';
+  const stMap={'ยังไม่โอน':'<span class="pill p-no">✗ ยังไม่โอน</span>','รอตรวจ':'<span class="pill p-wait">⏳ รอฝ่ายการเงินตรวจ</span>','โอนแล้ว':'<span class="pill p-ok">✓ ฝ่ายการเงินยืนยันแล้ว</span>'};
+  const due=Number(d.refund_due||0);const acct=d.acct||{};
+  let refund='';
+  if(due>0){refund=`<div class="sec">🔁 เงินที่ต้องโอนคืนโรงเรียน</div>
+    <div class="refbox"><div class="l">ยอดที่ต้องโอนคืนเดือนนี้</div><div class="v">฿${f(due)}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px"><span>สถานะ</span>${stMap[d.refund_status]||stMap['ยังไม่โอน']}</div>
+    <div class="acct">โอนเข้า: ${esc(acct.bank||'')} <b>${esc(acct.no||'')}</b><br>ชื่อบัญชี ${esc(acct.name||'')}<br>โอนแล้ว<b>ส่งสลิปให้ฝ่ายการเงินทาง LINE</b> แล้วกดปุ่มด้านล่าง</div>`
+    +(d.refund_status==='ยังไม่โอน'?`<button class="btn green" onclick="tPaid()">✅ ฉันโอนแล้ว + ส่งสลิปใน LINE แล้ว</button>`:'')
+    +(d.refund_status==='รอตรวจ'?`<div class="ok-banner">รับเรื่องแล้ว — รอฝ่ายการเงินเช็กยอดเข้าบัญชีค่ะ</div>`:'');}
+  else refund=`<div class="ok-banner" style="margin-top:14px">✓ เดือนนี้ไม่มียอดต้องโอนคืน</div>`;
+  document.getElementById('card').innerHTML=`
+    <button class="back" onclick="renderTLogin()">← กลับ / เปลี่ยนเดือน</button>
+    <div class="sec" style="margin-top:0">🧾 สลิปเงินเดือน · ${mLabel(m)}</div>
+    <div style="font-weight:800;font-size:16px;color:var(--navy)">${esc(d.name)}</div>
+    <div style="font-size:12.5px;color:var(--mute);margin-bottom:8px">${esc(d.position||'')} · กลุ่ม${esc(d.grp||'')} · รับโดย ${acc}</div>
+    ${d.has_entry?`${inc}<div class="row"><span><b>รวมรับ</b></span><span><b>฿${f(g)}</b></span></div>
+    <div style="font-size:11.5px;color:#94A3B8;margin:6px 0 2px">รายการหัก</div>${ded}
+    <div class="netbox"><span style="font-weight:700">รับสุทธิ</span><b>฿${f(net)}</b></div>`
+    :`<div class="err" style="text-align:left">เดือนนี้ฝ่ายการเงินยังไม่เปิดงวด/ยังไม่มีข้อมูลค่ะ</div>`}
+    ${refund}
+    <div class="priv">🔒 ข้อมูลส่วนตัว — ไม่ควรแชร์หน้าจอนี้ให้ผู้อื่น</div>`;
+}
+async function tPaid(){
+  const {data}=await sb.rpc('teacher_mark_paid',{p_name:tState.n,p_pin:tState.p,p_month:tState.m});
+  if(data){const {data:d2}=await sb.rpc('teacher_slip',{p_name:tState.n,p_pin:tState.p,p_month:tState.m});if(d2)drawSlip(d2,tState.m);}
+}
+
+// ===== โหมดครูเวร: บันทึกลา/มาสาย =====
+let dState={};
+function renderDLogin(){
+  document.getElementById('card').innerHTML=`
+    <label>รหัส PIN ครูเวร (ฝ่ายการเงินแจ้ง)</label><input id="dp" type="password" maxlength="6" inputmode="numeric" placeholder="••••••" onkeydown="if(event.key==='Enter')dLoad()">
+    <label>เดือน</label><select id="dm">${monthOpts(dState.m)}</select>
+    <div class="err" id="derr"></div>
+    <button class="btn" id="dbtn" onclick="dLoad()">เปิดตารางกรอก</button>
+    <div class="priv">หน้านี้เห็นเฉพาะรายชื่อครู — ไม่เห็นเงินเดือนของใคร</div>`;
+}
+async function dLoad(){
+  const p=document.getElementById('dp').value.trim(),m=document.getElementById('dm').value;
+  const b=document.getElementById('dbtn');b.disabled=true;b.textContent='กำลังโหลด…';
+  const [names,cur]=await Promise.all([sb.rpc('duty_names',{p_pin:p}),sb.rpc('duty_load',{p_pin:p,p_month:m})]);
+  b.disabled=false;b.textContent='เปิดตารางกรอก';
+  if(names.error||!names.data){document.getElementById('derr').textContent='PIN ไม่ถูกต้องค่ะ';return;}
+  dState={p,m};const prev={};(cur.data||[]).forEach(r=>prev[r.staff_id]=r);
+  let h=`<button class="back" onclick="renderDLogin()">← กลับ / เปลี่ยนเดือน</button>
+    <div class="sec" style="margin-top:0">📝 ลา/มาสาย · ${mLabel(m)}</div>
+    <div style="font-size:12.5px;color:var(--mute)">ลาไม่มีใบรับรองแพทย์ = หักวันละ 100 · มาสายกรอกเป็นบาท · กรอกเฉพาะคนที่มีรายการ</div>
+    <table><thead><tr><th>ชื่อ</th><th style="text-align:right">สาย (บาท)</th><th style="text-align:right">ลา (วัน)</th></tr></thead><tbody>`;
+  names.data.forEach(s=>{const pv=prev[s.id]||{};
+    h+=`<tr><td class="nm">${esc(s.name)}<small>${esc(s.p||'')} · ${esc(s.g||'')}</small></td>
+      <td><input type="number" min="0" id="l_${s.id}" value="${Number(pv.late||0)||''}" placeholder="0"></td>
+      <td><input type="number" min="0" id="v_${s.id}" value="${Number(pv.leave_days||0)||''}" placeholder="0"></td></tr>`;});
+  h+=`</tbody></table><div class="err" id="derr2"></div>
+    <button class="btn green" id="dsend" onclick="dSend(${JSON.stringify(names.data.map(s=>s.id))})">📤 ส่งให้ฝ่ายการเงิน</button>
+    <div class="note">ส่งซ้ำได้ — ระบบใช้ตัวเลขล่าสุดที่ส่ง</div>`;
+  document.getElementById('card').innerHTML=h;
+}
+async function dSend(ids){
+  const rows=ids.map(id=>({id,late:Number((document.getElementById('l_'+id)||{}).value||0),leave:Number((document.getElementById('v_'+id)||{}).value||0)}));
+  const b=document.getElementById('dsend');b.disabled=true;b.textContent='กำลังส่ง…';
+  const {data,error}=await sb.rpc('duty_submit',{p_pin:dState.p,p_month:dState.m,p_rows:rows});
+  b.disabled=false;b.textContent='📤 ส่งให้ฝ่ายการเงิน';
+  if(error||!data){document.getElementById('derr2').textContent='ส่งไม่สำเร็จ ลองใหม่ค่ะ';return;}
+  document.getElementById('derr2').innerHTML='<div class="ok-banner">✓ ส่งเรียบร้อย — ฝ่ายการเงินจะเห็นทันที ขอบคุณค่ะ</div>';
+}
+setMode('t');
+</script>
+<!-- หน้าสำหรับครู v1.0 · 2 ก.ค. 2569 · END-OF-FILE -->
+</body>
+</html>

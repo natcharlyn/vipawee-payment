@@ -107,10 +107,10 @@ function drawSlip(d,m){
   const net=d.has_entry?(g-dd):0;
   const acc=d.acc?('🏦 โอนเข้าบัญชี ••••••'+String(d.acc).slice(-4)):'💵 เงินสด';
   const stMap={'ยังไม่โอน':'<span class="pill p-no">✗ ยังไม่โอน</span>','รอตรวจ':'<span class="pill p-wait">⏳ รอฝ่ายการเงินตรวจ</span>','โอนแล้ว':'<span class="pill p-ok">✓ ฝ่ายการเงินยืนยันแล้ว</span>'};
-  const due=Number(d.refund_due||0);const acct=d.acct||{};
+  const hasRef=!!d.has_refund;const acct=d.acct||{};
   let refund='';
-  if(due>0){refund=`<div class="sec">🔁 เงินที่ต้องโอนคืนโรงเรียน</div>
-    <div class="refbox"><div class="l">ยอดที่ต้องโอนคืนเดือนนี้</div><div class="v">฿${f(due)}</div></div>
+  if(hasRef){refund=`<div class="sec">🔁 เงินที่ต้องโอนคืนโรงเรียน</div>
+    <div class="refbox"><div class="l">ยอดที่ต้องโอนคืนเดือนนี้</div><div class="v" style="font-size:16px;line-height:1.5">📱 ตามที่ฝ่ายการเงิน<br>แจ้งทาง LINE รายบุคคล</div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px"><span>สถานะ</span>${stMap[d.refund_status]||stMap['ยังไม่โอน']}</div>
     <div class="acct">โอนเข้า: ${esc(acct.bank||'')} <b>${esc(acct.no||'')}</b><br>ชื่อบัญชี ${esc(acct.name||'')}<br>โอนแล้ว<b>ส่งสลิปให้ฝ่ายการเงินทาง LINE</b> แล้วกดปุ่มด้านล่าง</div>`
     +(d.refund_status==='ยังไม่โอน'?`<button class="btn green" onclick="tPaid()">✅ ฉันโอนแล้ว + ส่งสลิปใน LINE แล้ว</button>`:'')
@@ -174,6 +174,6 @@ async function dSend(ids){
 }
 setMode('t');
 </script>
-<!-- หน้าสำหรับครู v1.1 (วันที่ลา + ลาครึ่งวัน 0.5) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- หน้าสำหรับครู v1.2 (ซ่อนยอดโอนคืน — แจ้งทาง LINE แทน) · 2 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

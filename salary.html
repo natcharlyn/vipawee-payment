@@ -419,14 +419,14 @@ function renderHome(){
 function renderCheck(){
   if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
   const chk=colsG(curGroup).filter(c=>c.src==='chk');const dis=canEdit()?'':'disabled';
-  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 <b>ครูเวรกรอกเองได้แล้ว</b> ที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> แท็บ "ครูเวรเช็กเวลา" (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) → ครูแนทกดปุ่ม <b>📥 ดึงข้อมูลจากครูเวร</b> ด้านล่าง · หรือกรอกในตารางนี้เองก็ได้ · ลาไม่มีใบรับรอง: เต็มวัน = 1 (หัก 100) · <b>ครึ่งวัน = 0.5 (หัก 50)</b> · จดวันที่ลาไว้ในช่องขวากันลืม</div>`;
+  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 <b>ครูเวรกรอกเองได้แล้ว</b> ที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> แท็บ "ครูเวรเช็กเวลา" (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) → ครูแนทกดปุ่ม <b>📥 ดึงข้อมูลจากครูเวร</b> ด้านล่าง · หรือกรอกในตารางนี้เองก็ได้ · ลาไม่มีใบรับรอง: เต็มวัน = 1 (หัก 100) · <b>ครึ่งวัน = 0.5 (หัก 50)</b> · ช่องหมายเหตุจดย่อ: <b>จ/3 พ/15</b> = จันทร์ที่ 3, พุธที่ 15 · ครึ่งวันเติม (ค) เช่น พ/15(ค)</div>`;
   h+=`<div class="tabs">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupC('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
   h+=`<div class="etable-wrap"><table class="entry" style="min-width:700px"><thead><tr><th>ชื่อ-สกุล</th>`+
-    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>วันที่ลา (จดไว้กันลืม)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
+    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>หมายเหตุ (ย่อ: จ/3 = จันทร์ที่ 3)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
   act(curGroup).forEach(s=>{const e=ent(s);
     h+=`<tr><td class="nm">${s.n}<small>${s.p}</small></td>`+
       chk.map(c=>`<td class="num"><input class="cell m" type="number" min="0" step="0.5" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`).join('')+
-      `<td><input class="cell m" type="text" style="width:180px;text-align:left" ${dis} value="${esc(e.items.leaveNote||'')}" placeholder="เช่น 3, 15 (ครึ่งวัน)" oninput="setNote(${s.id},this.value)"></td>`+
+      `<td><input class="cell m" type="text" style="width:180px;text-align:left" ${dis} value="${esc(e.items.leaveNote||'')}" placeholder="เช่น จ/3 พ/15(ค)" oninput="setNote(${s.id},this.value)"></td>`+
       `<td class="num" id="ck_${s.id}" style="font-weight:800;color:var(--red)">฿${f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0))}</td></tr>`;});
   h+=`</tbody></table></div><div class="save-bar"><button class="btn btn-ghost" ${dis} onclick="importAttendance()">📥 ดึงข้อมูลจากครูเวร</button><div class="grouptotal">กดบันทึก ตัวเลขถึงหน้ากรอกเงินเดือนทันที</div>
     <button class="btn btn-primary" ${dis} onclick="saveEntries()">💾 บันทึกขึ้นคลาวด์</button></div>`;

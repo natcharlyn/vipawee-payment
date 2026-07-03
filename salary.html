@@ -242,6 +242,7 @@ async function loadMonth(m){
   REFUNDS={};ref.forEach(r=>REFUNDS[r.staff_id]={id:r.id,rate:Number(r.state_amount||0),due:Number(r.refund_due||0),
     st:(r.status||(r.refund_received?'โอนแล้ว':'ยังไม่โอน')),date:r.received_date||'',note:r.note||''});
   await autoImportAttendance();
+  await autoImportBonus();
   renderMonthSel();
 }
 // ดึงลา/มาสายจากครูเวรเข้าระบบอัตโนมัติ (เฉพาะรายการที่ส่งใหม่กว่าครั้งล่าสุดที่ซิงก์)
@@ -263,6 +264,37 @@ async function autoImportAttendance(){
       toast('📥 อัปเดตลา/มาสายจากครูเวรอัตโนมัติ '+changed+' รายการ ✓');
     }
     if(newest!==last){sync[MONTH]=newest;await saveConfig('att_sync',sync);}
+  }catch(err){console.error(err);}
+}
+// ดึงโบนัสเพื่อนบ้านชวนเรียนจากระบบค่าเทอมอัตโนมัติ · 100 บาท/น้องที่ครูชวน & จ่ายค่าเทอมตรงเดือน · เริ่ม พ.ย.2569
+async function autoImportBonus(){
+  if(!hasMonth()||isClosed())return;
+  try{
+    const [by,bm]=MONTH.split('-').map(Number);const gy=by-543;
+    if(gy*100+bm<202611)return; // โครงการเริ่ม พ.ย. 2569 (ตรงกับฝั่งผู้ปกครอง)
+    const T_MONTHS=['พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
+    const T_NUMS=[5,6,7,8,9,11,12,1,2,3];
+    const idx=T_NUMS.indexOf(bm);if(idx<0)return; // ต.ค. ไม่มีเก็บค่าเทอม
+    const mName=T_MONTHS[idx];const endMonth=new Date(gy,bm,0,23,59,59);
+    const [studs,txs]=await Promise.all([
+      q(sb.from('students').select('id,referrer_name,deleted')),
+      q(sb.from('transactions').select('student_id,date,items,voided_at'))
+    ]);
+    const staffByName={};STAFF.forEach(s=>{if(!s.resigned)staffByName[(s.n||'').trim()]=s;});
+    const cnt={}; // staff_id -> จำนวนน้องที่จ่ายตรงเดือน
+    studs.filter(s=>!s.deleted).forEach(st=>{
+      const rn=(st.referrer_name||'').trim();if(!rn)return;
+      const staff=staffByName[rn];if(!staff)return; // ผู้แนะนำไม่ใช่ครูในระบบ → ข้าม (ผปค.)
+      const ontime=txs.some(t=>t.student_id==st.id&&!t.voided_at&&new Date(t.date)<=endMonth&&
+        (t.items||[]).some(it=>it.label&&it.label.startsWith('ค่าเทอม')&&(it.monthsList||[]).includes(mName)));
+      if(ontime)cnt[staff.id]=(cnt[staff.id]||0)+1;
+    });
+    const ups=[];let changed=0;
+    Object.keys(ENTRIES).forEach(sid=>{const e=ENTRIES[sid];const want=(cnt[sid]||0)*100;
+      if(Number(e.items.bonus||0)!==want){e.items.bonus=want;changed++;const s=STAFF.find(x=>x.id==sid);
+        ups.push({month:MONTH,staff_id:+sid,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:s?net(s):Number(e.net||0),note:e.note||''});}});
+    if(ups.length){await q(sb.from('payroll_entries').upsert(ups,{onConflict:'month,staff_id'}));
+      toast('🤝 อัปเดตโบนัสชวนเรียนอัตโนมัติ '+changed+' รายการ ✓');}
   }catch(err){console.error(err);}
 }
 function renderMonthSel(){

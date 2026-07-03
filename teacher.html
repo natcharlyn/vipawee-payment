@@ -41,7 +41,8 @@
   table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
   th,td{padding:7px 6px;text-align:left;border-bottom:1px solid var(--line)}
   th{background:#F4F7FB;color:#475569;font-size:12px;white-space:nowrap}
-  td input{width:74px;padding:8px;font-size:14px;text-align:right;background:var(--mint);border-color:var(--mintbd)}
+  td input{width:100%;padding:8px;font-size:14px;text-align:right;background:var(--mint);border-color:var(--mintbd)}
+  td input[type=text]{text-align:left}
   .nm{font-weight:700;font-size:13px}.nm small{display:block;font-weight:500;color:var(--mute);font-size:11px}
   .ok-banner{background:#E5F6EE;border:1px solid #7FC9A6;color:#0a5d3c;border-radius:10px;padding:11px 14px;font-weight:700;font-size:14px;margin-top:12px;text-align:center}
   .back{background:none;border:none;color:var(--teal);font-weight:700;font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:8px;padding:0}
@@ -51,8 +52,7 @@
     .card{padding:26px 32px}
     table{font-size:14.5px}
     th,td{padding:9px 10px}
-    td input{width:120px;font-size:15px}
-    td input[type=text]{width:200px}
+    td input{font-size:15px}
     .btn{max-width:420px;margin-left:auto;margin-right:auto;display:block}
   }
 </style>
@@ -161,12 +161,12 @@ async function dLoad(){
   let h=`<button class="back" onclick="renderDLogin()">← กลับ / เปลี่ยนเดือน</button>
     <div class="sec" style="margin-top:0">📝 ลา/มาสาย · ${mLabel(m)}</div>
     <div style="font-size:12.5px;color:var(--mute)">ลาเต็มวัน = 1 (หัก 100) · <b>ครึ่งวัน = 0.5 (หัก 50)</b> · มาสายกรอกเป็นบาท · หมายเหตุจดย่อ: <b>จ/3 พ/15</b> = จันทร์ที่ 3, พุธที่ 15 (ครึ่งวันเติม (ค)) · กรอกเฉพาะคนที่มีรายการ</div>
-    <table><thead><tr><th>ชื่อ</th><th style="text-align:right">สาย (บาท)</th><th style="text-align:right">ลา (วัน)</th><th>หมายเหตุ (ย่อ)</th></tr></thead><tbody>`;
+    <table style="table-layout:fixed;width:100%"><thead><tr><th style="width:30%">ชื่อ</th><th style="width:14%;text-align:right">สาย (บาท)</th><th style="width:13%;text-align:right">ลา (วัน)</th><th style="width:43%">หมายเหตุ (ย่อ: จ/3 พ/15(ค))</th></tr></thead><tbody>`;
   names.data.forEach(s=>{const pv=prev[s.id]||{};
     h+=`<tr><td class="nm">${esc(s.name)}<small>${esc(s.p||'')} · ${esc(s.g||'')}</small></td>
       <td><input type="number" min="0" id="l_${s.id}" value="${Number(pv.late||0)||''}" placeholder="0"></td>
       <td><input type="number" min="0" step="0.5" id="v_${s.id}" value="${Number(pv.leave_days||0)||''}" placeholder="0"></td>
-      <td><input type="text" id="n_${s.id}" value="${esc(pv.note||'')}" placeholder="เช่น จ/3 พ/15(ค)" style="width:110px;text-align:left"></td></tr>`;});
+      <td><input type="text" id="n_${s.id}" value="${esc(pv.note||'')}" placeholder="เช่น จ/3 พ/15(ค)"></td></tr>`;});
   h+=`</tbody></table><div class="err" id="derr2"></div>
     <button class="btn green" id="dsend" onclick="dSend(${JSON.stringify(names.data.map(s=>s.id))})">📤 ส่งให้ฝ่ายการเงิน</button>
     <div class="note">ส่งซ้ำได้ — ระบบใช้ตัวเลขล่าสุดที่ส่ง</div>`;
@@ -182,6 +182,6 @@ async function dSend(ids){
 }
 setMode('d');
 </script>
-<!-- หน้าสำหรับครู v1.4 (รองรับจอโน้ตบุ๊ก) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- หน้าสำหรับครู v1.5 (จัดตารางตรงหัว · หมายเหตุกว้างขึ้น) · 3 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

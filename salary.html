@@ -553,10 +553,47 @@ function renderSlipTable(){
     <div style="display:flex;justify-content:space-between;margin-top:30px;font-size:13px;color:#334155;flex-wrap:wrap;gap:18px">
       <div>ลงชื่อ ....................................... ผู้จัดทำบัญชี<br><span style="font-size:12px;color:#64748B">(${school.manager||'นายภานุพันธ์ สุวรรณวงศ์'}) ผู้จัดการโรงเรียน</span></div>
       <div>ลงชื่อ ....................................... ผู้ตรวจสอบ/อนุมัติ<br><span style="font-size:12px;color:#64748B">(นายกันหา สุวรรณวงศ์) ผู้รับใบอนุญาต</span></div>
-    </div>`;
+    </div>
+    <div class="save-bar print-hide" style="margin-top:22px"><button class="btn btn-ghost" onclick="exportSlipExcel(false)">⬇️ ส่งออก Excel — กลุ่มนี้</button>
+      <button class="btn btn-primary" onclick="exportSlipExcel(true)">⬇️ ส่งออก Excel — ทุกกลุ่ม (${monthLabel(MONTH)})</button></div>`;
   document.getElementById('slipArea').innerHTML=h;
 }
 function setGroupSlip(g){curGroup=g;renderSlipTable();}
+// ===== ส่งออกใบเซ็นรับเงินเป็นไฟล์ Excel (.xls เปิดใน Excel ได้ทันที ปริ้นจาก Excel สวยกว่า) =====
+function _slipXlsTable(g){
+  const addC=addColsG(g),dedC=dedColsG(g);const arr=act(g);
+  const NC=5+addC.length+1+dedC.length+1+1+2;
+  let t=`<table><tr><td colspan="${NC}" style="border:none;font-size:16pt;font-weight:bold;text-align:center">โรงเรียนอนุบาลวิภาวี · บัญชีสรุปรับ-จ่ายเงินเดือน กลุ่ม${esc(g)}</td></tr>`;
+  t+=`<tr><td colspan="${NC}" style="border:none;text-align:center">ประจำเดือน ${monthLabel(MONTH)}</td></tr>`;
+  t+=`<tr><th>ที่</th><th>ชื่อ-สกุล</th><th>วุฒิ</th><th>ตำแหน่ง</th><th>เลขที่บัญชี</th>`
+    +addC.map(c=>`<th>${esc(c.name)}</th>`).join('')+`<th>รวมรับ</th>`
+    +dedC.map(c=>`<th>${esc(c.name)}</th>`).join('')+`<th>รวมหัก</th><th>รับสุทธิ</th><th>ลงชื่อรับเงิน</th><th>หมายเหตุ</th></tr>`;
+  let tG=0,tD=0,tN=0;const tA={},tX={};
+  arr.forEach((s,i)=>{const e=ent(s);const G=gross(s),D=deduct(s),N=net(s);tG+=G;tD+=D;tN+=N;
+    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));
+    t+=`<tr><td class="n">${i+1}</td><td>${esc(s.n)}</td><td>${esc(s.deg||'')}</td><td>${esc(s.p)}</td><td style="mso-number-format:'\\@'">${esc(s.acc||'')}</td>`
+      +addC.map(c=>{const v=Number(e.items[c.key]||0);tA[c.key]=(tA[c.key]||0)+v;return `<td class="n">${v||''}</td>`;}).join('')
+      +`<td class="n" style="font-weight:bold">${G}</td>`
+      +dedC.map(c=>{const v=itemAmt(e.items,c);tX[c.key]=(tX[c.key]||0)+v;return `<td class="n">${v||''}</td>`;}).join('')
+      +`<td class="n" style="font-weight:bold">${D}</td><td class="n" style="font-weight:bold">${N}</td><td style="width:120pt"></td><td>${esc(notes.join(' · '))}</td></tr>`;});
+  t+=`<tr style="background:#FCE4D6;font-weight:bold"><td colspan="5" style="text-align:right">รวม</td>`
+    +addC.map(c=>`<td class="n">${tA[c.key]||0}</td>`).join('')+`<td class="n">${tG}</td>`
+    +dedC.map(c=>`<td class="n">${tX[c.key]||0}</td>`).join('')+`<td class="n">${tD}</td><td class="n">${tN}</td><td></td><td></td></tr>`;
+  t+=`<tr><td colspan="${NC}" style="border:none;color:#7A5B00">*กรณีลากิจ/ลาป่วยไม่มีใบรับรองแพทย์ หักวันละ 100 บาท (ครึ่งวัน 50 บาท)</td></tr>`;
+  t+=`<tr><td colspan="${NC}" style="border:none">&nbsp;</td></tr>`;
+  const mg=(CONFIG.school||{}).manager||'นายภานุพันธ์ สุวรรณวงศ์';
+  t+=`<tr><td colspan="${NC}" style="border:none">ลงชื่อ ................................................ ผู้จัดทำบัญชี (${esc(mg)}) ผู้จัดการโรงเรียน&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ลงชื่อ ................................................ ผู้ตรวจสอบ/อนุมัติ (นายกันหา สุวรรณวงศ์) ผู้รับใบอนุญาต</td></tr>`;
+  return t+`</table><br>`;
+}
+function exportSlipExcel(all){
+  const gs=all?GROUPS.filter(g=>act(g).length):[curGroup];
+  if(!gs.length||!hasMonth()){toast('เดือนนี้ยังไม่มีข้อมูล');return;}
+  let h='';gs.forEach(g=>{h+=_slipXlsTable(g);});
+  const blob=new Blob(['﻿<html><head><meta charset="UTF-8"><style>table{border-collapse:collapse}td,th{border:.5pt solid #999;font-family:"TH SarabunPSK","Sarabun",sans-serif;font-size:13pt;padding:2px 6px;vertical-align:middle}th{background:#DDEBF7;font-weight:bold}td.n{text-align:right;mso-number-format:"#\\,##0"}</style></head><body>',h,'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='เงินเดือน_'+monthLabel(MONTH).replace(/\s+/g,'')+(all?'_ทุกกลุ่ม':'_'+curGroup)+'.xls';a.click();
+  toast('⬇️ ดาวน์โหลดไฟล์ Excel แล้ว — เปิดใน Excel ปริ้น/ตกแต่งต่อได้เลย');
+}
 function renderSlipCard(){
   let h=`<div class="row-sel print-hide"><label style="font-weight:700">เลือกครู:</label><select class="big" id="slipSel" onchange="drawSlipCard()">`+
     allIn().map(s=>`<option value="${s.id}">${s.n} (${ent(s).g})</option>`).join('')+`</select></div><div id="slipCardArea"></div>`;
@@ -822,6 +859,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.6 (auto-sync ครูเวร · ตารางสลิปแบบ Excel · ซ่อน PIN) · 2 ก.ค. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.7 (ส่งออก Excel ใบเซ็นรับเงิน) · 3 ก.ค. 2569 · END-OF-FILE -->
 </body>
 </html>

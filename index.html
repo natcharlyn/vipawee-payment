@@ -981,7 +981,7 @@ details summary{cursor:pointer;outline:none}
       <div class="field" style="grid-column:1/-1"><label>เหตุผลส่วนลด</label><select class="select" id="f-discountReason">
         <option value="">-</option><option>พิการ</option><option>อันดับ 1 ของชั้น</option><option>ลูกบุคคลากร</option><option>อื่นๆ</option>
       </select></div>
-      <div class="field"><label>🤝 ผู้แนะนำ (เพื่อนบ้านชวนเรียน)</label><input class="input" id="f-referrerName" placeholder="ชื่อ ผปค. ที่แนะนำ (ถ้ามี)" list="teacher-datalist"><select class="select" id="f-referrerTeacher" onchange="pickReferrerTeacher(this)" style="margin-top:6px"><option value="">— หรือเลือกครูผู้แนะนำ (ดึงจากระบบเงินเดือน) —</option></select><datalist id="teacher-datalist"></datalist></div>
+      <div class="field"><label>🤝 ผู้แนะนำ (เพื่อนบ้านชวนเรียน)</label><input class="input" id="f-referrerName" placeholder="ชื่อ ผปค. ที่แนะนำ (ถ้ามี)"><select class="select" id="f-referrerTeacher" onchange="pickReferrerTeacher(this)" style="margin-top:6px"><option value="">— หรือเลือกครูผู้แนะนำ (ดึงจากระบบเงินเดือน) —</option></select></div>
       <div class="field" style="position:relative"><label>ลูกของผู้แนะนำ (พิมพ์ค้นหาแล้วเลือก)</label><input class="input" id="f-referrerNick" placeholder="พิมพ์ชื่อเล่น/ชื่อจริง..." oninput="refSearch(this)" autocomplete="off"><input type="hidden" id="f-referrerChildId"><div id="ref-results" class="hidden" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #D1D5DB;border-radius:8px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div></div>
       <div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea class="input" id="f-note" rows="2"></textarea></div>
     </div>
@@ -4361,4 +4361,4 @@ function clearAll(){
 })();
 </script>
 </body>
-</html>
+</html>                                                                   

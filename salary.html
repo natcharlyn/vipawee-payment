@@ -368,6 +368,16 @@ async function exportBackup(){
   a.download='backup_เงินเดือนวิภาวี_'+MONTH+'_'+Date.now()+'.json';a.click();
   toast('ดาวน์โหลดไฟล์สำรองแล้ว ✓ (เก็บใส่โฟลเดอร์ 05_backup)');
 }
+// สำรองอัตโนมัติ: ครบ 7 วัน → เตือน + รอครูคลิก 1 ครั้ง แล้วดาวน์โหลดไฟล์สำรองให้ (เบราว์เซอร์ต้องมี user click ก่อนดาวน์โหลด)
+function maybeAutoBackup(){
+  try{
+    const last=Number(localStorage.getItem('salary_lastBackup')||0);
+    if((Date.now()-last)/(1000*60*60*24)<7)return;
+    toast('🛡️ ถึงเวลาสำรองข้อมูลเงินเดือน — คลิกที่ใดก็ได้ 1 ครั้ง ระบบจะดาวน์โหลดไฟล์สำรองให้ (เก็บใส่ 05_backup)');
+    const h=async()=>{try{await exportBackup();localStorage.setItem('salary_lastBackup',String(Date.now()));}catch(e){console.error(e);}};
+    document.addEventListener('click',h,{once:true});
+  }catch(e){}
+}
 
 // ---------- Auth ----------
 async function doLogin(){
@@ -382,7 +392,7 @@ async function enterApp(em){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('whoami').textContent='👤 '+em;
-  try{await loadAll();go('home');}catch(e){toast('โหลดข้อมูลไม่สำเร็จ — ลองรีเฟรช');}
+  try{await loadAll();go('home');maybeAutoBackup();}catch(e){toast('โหลดข้อมูลไม่สำเร็จ — ลองรีเฟรช');}
 }
 async function logout(){refundUnlocked=false;await sb.auth.signOut();location.reload();}
 window.addEventListener('DOMContentLoaded',async()=>{

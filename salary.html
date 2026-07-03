@@ -328,8 +328,9 @@ function calcNetItems(items,g){return addColsG(g).reduce((a,c)=>a+Number(items[c
 const ent=s=>ENTRIES[s.id];
 const gross=s=>{const e=ent(s);return e?addColsG(e.g).reduce((a,c)=>a+Number(e.items[c.key]||0),0):0;};
 const deduct=s=>{const e=ent(s);return e?dedColsG(e.g).reduce((a,c)=>a+itemAmt(e.items,c),0):0;};
-const net=s=>gross(s)-deduct(s);
+const net=s=>{if(isClosed()&&ENTRIES[s.id])return Number(ENTRIES[s.id].net||0);return gross(s)-deduct(s);};
 function refundAmt(s){
+  if(isClosed()&&REFUNDS[s.id])return Number(REFUNDS[s.id].due||0);
   if(s.rule==='none')return 0;
   if(s.rule==='fixed')return s.ramt||0;
   const r=REFUNDS[s.id];if(!r)return 0;

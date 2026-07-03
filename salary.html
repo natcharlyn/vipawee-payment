@@ -484,7 +484,7 @@ function renderHome(){
 function renderCheck(){
   if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
   const chk=colsG(curGroup).filter(c=>c.src==='chk');const dis=canEdit()?'':'disabled';
-  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 ครูเวรกรอกที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) — <b>ข้อมูลเข้าระบบเองอัตโนมัติ</b>ทุกครั้งที่เปิดระบบ/เปลี่ยนเดือน (ปุ่ม 📥 ไว้กดรีเฟรชระหว่างเปิดหน้าค้าง) · ลา: เต็มวัน 1 (หัก 100) · ครึ่งวัน 0.5 (หัก 50) · หมายเหตุย่อ <b>จ/3 พ/15(ค)</b> = จันทร์ที่ 3, พุธที่ 15 ครึ่งวัน</div>`;
+  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 ครูเวรกรอกที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) — <b>ข้อมูลเข้าระบบเองอัตโนมัติ</b>ทุกครั้งที่เปิดระบบ/เปลี่ยนเดือน (ปุ่ม 📥 ไว้กดรีเฟรชระหว่างเปิดหน้าค้าง) · ลา: เต็มวัน 1 (หัก 100) · ครึ่งวัน 0.5 (หัก 50) · หมายเหตุย่อ <b>จ/3 พ/15(ค)</b> = จันทร์ที่ 3, พุธที่ 15 ครึ่งวัน</div>`+`<div style="margin:-2px 0 12px"><button class="btn" onclick="copyDutyLink()" style="background:#2563eb;color:#fff;border:none">📋 คัดลอกลิงก์ + ข้อความส่งครูเวร</button></div>`;
   h+=`<div class="tabs">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupC('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
   h+=`<div class="etable-wrap"><table class="entry" style="min-width:700px"><thead><tr><th>ชื่อ-สกุล</th>`+
     chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>หมายเหตุ (ย่อ: จ/3 = จันทร์ที่ 3)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
@@ -753,6 +753,7 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
 }
 function copyLine(){navigator.clipboard.writeText(window._lineMsg||'').then(()=>toast('คัดลอกข้อความรายคนแล้ว ✓'));}
 function copyGroup(){navigator.clipboard.writeText(window._groupMsg||'').then(()=>toast('คัดลอกข้อความกลุ่มแล้ว ✓'));}
+function copyDutyLink(){const msg='📋 บันทึกเวลา ลา/ขาด/มาสาย (ครูเวร) · เดือน '+monthLabel(MONTH)+'\nกรอกที่ลิงก์นี้ค่ะ 👇\nhttps://natcharlyn.github.io/vipawee-payment/teacher.html\nPIN: '+(CONFIG.duty_pin||'')+'\nเลือกเดือนให้ตรง กรอกเสร็จกด "ส่งให้ฝ่ายการเงิน" ค่ะ 🙏';navigator.clipboard.writeText(msg).then(()=>toast('📋 คัดลอกลิงก์+ข้อความแล้ว วางในไลน์ส่งครูเวรได้เลย ✓'));}
 
 // ===== สรุปรวม =====
 function govFundOf(){const g=CONFIG.govfund||{};return Number(g[MONTH]||0);}

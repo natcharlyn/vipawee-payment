@@ -139,9 +139,9 @@
     <div class="sub">โรงเรียนอนุบาลวิภาวี · อ.ศรีวิไล จ.บึงกาฬ</div>
     <div class="lock-note">🔒 ระบบภายใน — เฉพาะเจ้าหน้าที่การเงินเท่านั้น</div>
     <div class="pin-label">อีเมล</div>
-    <input type="email" class="txt-input" id="email" placeholder="กรอกอีเมลทุกครั้ง" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
+    <input type="text" class="txt-input" id="email" placeholder="กรอกอีเมลทุกครั้ง" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" spellcheck="false" name="nu_field" data-lpignore="true" data-form-type="other" inputmode="email">
     <div class="pin-label">รหัสผ่าน</div>
-    <input type="password" class="txt-input" id="pw" placeholder="กรอกรหัสผ่านทุกครั้ง" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
+    <input type="text" class="txt-input" id="pw" placeholder="กรอกรหัสผ่านทุกครั้ง" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" style="-webkit-text-security:disc;text-security:disc" spellcheck="false" name="np_field" data-lpignore="true" data-form-type="other">
     <div class="login-err" id="loginErr"></div>
     <button class="btn-login" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="login-hint">ปิดหน้าต่าง = ออกจากระบบอัตโนมัติ</div>

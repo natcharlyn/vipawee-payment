@@ -228,7 +228,7 @@ details summary{cursor:pointer;outline:none}
     <label style="font-size:13px;font-weight:600;color:#374151">อีเมล</label>
     <input id="login-email" type="email" autocomplete="username" style="width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 14px;font-size:15px;box-sizing:border-box">
     <label style="font-size:13px;font-weight:600;color:#374151">รหัสผ่าน</label>
-    <input id="login-pass" type="password" autocomplete="current-password" style="width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 18px;font-size:15px;box-sizing:border-box" onkeydown="if(event.key==='Enter')doLogin()">
+    <input id="login-pass" type="password" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="กรอกรหัสผ่านทุกครั้ง" style="width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 18px;font-size:15px;box-sizing:border-box" onkeydown="if(event.key==='Enter')doLogin()">
     <button onclick="doLogin()" id="login-btn" style="width:100%;padding:12px;background:#1A3A8F;color:white;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">เข้าสู่ระบบ</button>
     <div id="login-err" style="color:#DC2626;font-size:13px;margin-top:12px;text-align:center;min-height:18px"></div>
     <div id="login-loading" style="display:none;text-align:center;color:#6B7280;font-size:13px;margin-top:8px">⏳ กำลังโหลดข้อมูล...</div>
@@ -4361,4 +4361,4 @@ function clearAll(){
 })();
 </script>
 </body>
-</html>                                                                   
+</html>

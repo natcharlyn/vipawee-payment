@@ -141,7 +141,7 @@
     <div class="pin-label">อีเมล</div>
     <input type="email" class="txt-input" id="email" value="natcharlyn@gmail.com" autocomplete="username">
     <div class="pin-label">รหัสผ่าน</div>
-    <input type="password" class="txt-input" id="pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+    <input type="password" class="txt-input" id="pw" placeholder="กรอกรหัสผ่านทุกครั้ง" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
     <div class="login-err" id="loginErr"></div>
     <button class="btn-login" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="login-hint">ปิดหน้าต่าง = ออกจากระบบอัตโนมัติ</div>

@@ -139,7 +139,7 @@
     <div class="sub">โรงเรียนอนุบาลวิภาวี · อ.ศรีวิไล จ.บึงกาฬ</div>
     <div class="lock-note">🔒 ระบบภายใน — เฉพาะเจ้าหน้าที่การเงินเท่านั้น</div>
     <div class="pin-label">อีเมล</div>
-    <input type="email" class="txt-input" id="email" value="natcharlyn@gmail.com" autocomplete="username">
+    <input type="email" class="txt-input" id="email" placeholder="กรอกอีเมลทุกครั้ง" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
     <div class="pin-label">รหัสผ่าน</div>
     <input type="password" class="txt-input" id="pw" placeholder="กรอกรหัสผ่านทุกครั้ง" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
     <div class="login-err" id="loginErr"></div>

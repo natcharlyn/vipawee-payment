@@ -158,6 +158,7 @@
       <a data-page="refund" onclick="go('refund')"><span class="i">🔁</span> เงินโอนคืน <span class="lockmini">🔒</span></a>
       <a data-page="line" onclick="go('line')"><span class="i">💬</span> ข้อความ LINE</a>
       <a data-page="summary" onclick="go('summary')"><span class="i">📊</span> สรุปรวม</a>
+      <a data-page="eval" onclick="go('eval')"><span class="i">📋</span> สรุปประเมินครู</a>
       <a data-page="deposit" onclick="go('deposit')"><span class="i">💰</span> เงินมัดจำ</a>
       <a data-page="staff" onclick="go('staff')"><span class="i">🗂️</span> ทะเบียนบุคลากร</a>
     </nav>
@@ -210,6 +211,7 @@ function defaultCols(){return [
  {key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true},
  {key:'late',name:'หักมาสาย',type:'deduct',src:'chk'},
  {key:'leaveDays',name:'หักลา (วัน)',type:'deduct',src:'chk',special:'leave'},
+ {key:'absentDays',name:'ขาด',type:'deduct',src:'chk',special:'absent'},
  {key:'otherDeduct',name:'หักอื่นๆ',type:'deduct',src:'fin'},
 ];}
 
@@ -227,7 +229,8 @@ async function loadAll(){
     .sort((a,b)=>(GROUPS.indexOf(a.g)-GROUPS.indexOf(b.g))||(a.id-b.id)); // เรียง: ผบร→ครู→พี่เลี้ยง→เงินสด แล้วตาม id
   CONFIG={};cfg.forEach(r=>CONFIG[r.key]=r.value);
   COLS=CONFIG.cols||{};GROUPS.forEach(g=>{if(!COLS[g])COLS[g]=defaultCols();
-    if(!COLS[g].find(c=>c.key==='deposit'))COLS[g].splice(Math.min(4,COLS[g].length),0,{key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true});});
+    if(!COLS[g].find(c=>c.key==='deposit'))COLS[g].splice(Math.min(4,COLS[g].length),0,{key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true});
+    if(!COLS[g].find(c=>c.key==='absentDays')){const li=COLS[g].findIndex(c=>c.key==='leaveDays');COLS[g].splice(li>=0?li+1:COLS[g].length,0,{key:'absentDays',name:'ขาด',type:'deduct',src:'chk',special:'absent'});}});
   const em=await q(sb.from('payroll_entries').select('month'));
   MONTHS=[...new Set(em.map(r=>r.month))].sort();
   if(!MONTHS.includes(MONTH)&&MONTHS.length) MONTH=MONTHS[MONTHS.length-1];
@@ -256,7 +259,7 @@ async function autoImportAttendance(){
     rows.forEach(r=>{const ts=r.updated_at||'';if(ts>newest)newest=ts;
       if(ts<=last)return;
       const e=ENTRIES[r.staff_id];if(!e)return;
-      e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);
+      e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);e.items.absentDays=Number(r.absent_days||0);
       if(r.note!=null&&r.note!=='')e.items.leaveNote=r.note;changed++;});
     if(changed){
       const ups=rows.map(r=>{const s=STAFF.find(x=>x.id==r.staff_id);if(!s||!ENTRIES[s.id])return null;const e=ENTRIES[s.id];
@@ -356,7 +359,7 @@ async function saveConfig(key,value){CONFIG[key]=value;await q(sb.from('payroll_
 const colsG=g=>COLS[g]||[];
 const addColsG=g=>colsG(g).filter(c=>c.type==='add');
 const dedColsG=g=>colsG(g).filter(c=>c.type==='deduct');
-const itemAmt=(items,c)=>c.special==='leave'?Number(items[c.key]||0)*100:Number(items[c.key]||0);
+const itemAmt=(items,c)=>c.special==='leave'?Number(items[c.key]||0)*100:c.special==='absent'?Number(items[c.key]||0)*Number((CONFIG&&CONFIG.absent_rate)||0):Number(items[c.key]||0);
 function calcNetItems(items,g){return addColsG(g).reduce((a,c)=>a+Number(items[c.key]||0),0)-dedColsG(g).reduce((a,c)=>a+itemAmt(items,c),0);}
 const ent=s=>ENTRIES[s.id];
 const gross=s=>{const e=ent(s);return e?addColsG(e.g).reduce((a,c)=>a+Number(e.items[c.key]||0),0):0;};
@@ -437,11 +440,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
 <script>
 // ============ หน้าจอ ============
 let curPage='home';
-const TITLES={home:'หน้าหลัก',check:'บันทึกลา/ขาด/มาสาย',entry:'กรอกเงินเดือน',slip:'สลิปเงินเดือน',refund:'เงินโอนคืน (ข้อมูลลับ)',line:'ข้อความแจ้งทาง LINE',summary:'สรุปยอดรวม',deposit:'เงินมัดจำ',staff:'ทะเบียนบุคลากร'};
+const TITLES={home:'หน้าหลัก',check:'บันทึกลา/ขาด/มาสาย',entry:'กรอกเงินเดือน',slip:'สลิปเงินเดือน',refund:'เงินโอนคืน (ข้อมูลลับ)',line:'ข้อความแจ้งทาง LINE',summary:'สรุปยอดรวม',eval:'สรุปประเมินครู (มาสาย/ลา/ขาด)',deposit:'เงินมัดจำ',staff:'ทะเบียนบุคลากร'};
 function go(p){curPage=p;if(p!=='refund')refundUnlocked=false;
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));
   document.getElementById('ptitle').textContent=TITLES[p]||'';document.getElementById('side').classList.remove('open');
-  ({home:renderHome,check:renderCheck,entry:renderEntry,slip:renderSlip,refund:renderRefund,line:renderLine,summary:renderSummary,deposit:renderDeposit,staff:renderStaff}[p])();window.scrollTo(0,0);}
+  ({home:renderHome,check:renderCheck,entry:renderEntry,slip:renderSlip,refund:renderRefund,line:renderLine,summary:renderSummary,eval:renderEval,deposit:renderDeposit,staff:renderStaff}[p])();window.scrollTo(0,0);}
 function printHead(t){return `<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · ${t}</div><div class="ph2">ประจำเดือน ${monthLabel(MONTH)}</div></div>`;}
 function gateHTML(){return `<div class="panel"><div class="conf-gate"><div class="clock">🗓️</div>
   <h3 style="color:var(--navy)">เดือน ${monthLabel(MONTH)} ยังไม่เปิดงวด</h3>
@@ -485,10 +488,10 @@ function renderHome(){
 function renderCheck(){
   if(!hasMonth()){document.getElementById('content').innerHTML=gateHTML();return;}
   const chk=colsG(curGroup).filter(c=>c.src==='chk');const dis=canEdit()?'':'disabled';
-  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 ครูเวรกรอกที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) — <b>ข้อมูลเข้าระบบเองอัตโนมัติ</b>ทุกครั้งที่เปิดระบบ/เปลี่ยนเดือน (ปุ่ม 📥 ไว้กดรีเฟรชระหว่างเปิดหน้าค้าง) · ลา: เต็มวัน 1 (หัก 100) · ครึ่งวัน 0.5 (หัก 50) · หมายเหตุย่อ <b>จ/3 พ/15(ค)</b> = จันทร์ที่ 3, พุธที่ 15 ครึ่งวัน</div>`+`<div style="margin:-2px 0 12px"><button class="btn" onclick="copyDutyLink()" style="background:#2563eb;color:#fff;border:none">📋 คัดลอกลิงก์ + ข้อความส่งครูเวร</button></div>`;
+  let h=printHead('บันทึกการลา/ขาด/มาสาย')+closedTip()+`<div class="tip check">📝 ครูเวรกรอกที่ natcharlyn.github.io/vipawee-payment/<b>teacher.html</b> (PIN เวร: <b>${esc(CONFIG.duty_pin||'')}</b>) — <b>ข้อมูลเข้าระบบเองอัตโนมัติ</b>ทุกครั้งที่เปิดระบบ/เปลี่ยนเดือน (ปุ่ม 📥 ไว้กดรีเฟรชระหว่างเปิดหน้าค้าง) · ลา: เต็มวัน 1 (หัก 100) · ครึ่งวัน 0.5 (หัก 50) · <b>ขาด: กรอกจำนวนวัน</b> (บันทึกไว้ประเมิน — ยังไม่หักเงินอัตโนมัติ) · หมายเหตุย่อ <b>จ/3 พ/15(ค)</b> = จันทร์ที่ 3, พุธที่ 15 ครึ่งวัน</div>`+`<div style="margin:-2px 0 12px"><button class="btn" onclick="copyDutyLink()" style="background:#2563eb;color:#fff;border:none">📋 คัดลอกลิงก์ + ข้อความส่งครูเวร</button></div>`;
   h+=`<div class="tabs">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroupC('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
   h+=`<div class="etable-wrap"><table class="entry" style="min-width:700px"><thead><tr><th>ชื่อ-สกุล</th>`+
-    chk.map(c=>`<th class="num">${esc(c.name)}${c.special==='leave'?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>หมายเหตุ (ย่อ: จ/3 = จันทร์ที่ 3)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
+    chk.map(c=>`<th class="num">${esc(c.name)}${(c.special==='leave'||c.special==='absent')?' (วัน)':' (บาท)'}<span class="mint-tag">กรอก</span></th>`).join('')+`<th>หมายเหตุ (ย่อ: จ/3 = จันทร์ที่ 3)</th><th class="num">รวมหัก</th></tr></thead><tbody>`;
   act(curGroup).forEach(s=>{const e=ent(s);
     h+=`<tr><td class="nm">${s.n}<small>${s.p}</small></td>`+
       chk.map(c=>`<td class="num"><input class="cell m" type="number" min="0" step="0.5" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`).join('')+
@@ -504,7 +507,7 @@ async function importAttendance(){
   if(!canEdit()){toast('เดือนนี้ปิดงวดแล้ว');return;}
   const rows=await q(sb.from('attendance').select('*').eq('month',MONTH));
   if(!rows.length){toast('ยังไม่มีข้อมูลจากครูเวรเดือนนี้');return;}
-  let n=0;rows.forEach(r=>{const e=ENTRIES[r.staff_id];if(e){e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);if(r.note)e.items.leaveNote=r.note;n++;}});
+  let n=0;rows.forEach(r=>{const e=ENTRIES[r.staff_id];if(e){e.items.late=Number(r.late||0);e.items.leaveDays=Number(r.leave_days||0);e.items.absentDays=Number(r.absent_days||0);if(r.note)e.items.leaveNote=r.note;n++;}});
   await saveEntries();renderCheck();toast('ดึงข้อมูลครูเวรแล้ว '+n+' คน ✓');}
 
 // ===== กรอกเงินเดือน =====
@@ -582,7 +585,7 @@ function renderSlipTable(){
     <th style="width:110px">ลงชื่อรับเงิน</th><th>หมายเหตุ</th></tr></thead><tbody>`;
   const arr=act(curGroup);let tG=0,tD=0,tN=0;const tAdd={},tDed={};
   arr.forEach((s,i)=>{const e=ent(s);const G=gross(s),D=deduct(s),N=net(s);tG+=G;tD+=D;tN+=N;
-    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));
+    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));if((e.items.absentDays||0)>0)notes.push('ขาด '+e.items.absentDays+' วัน');
     h+=`<tr><td>${i+1}</td><td class="nm">${s.n}</td><td style="font-size:11px">${esc(s.deg||'')}</td><td>${s.p}</td><td style="white-space:nowrap">${esc(s.acc||'—')}</td>`
       +addC.map(c=>{const v=Number(e.items[c.key]||0);tAdd[c.key]=(tAdd[c.key]||0)+v;return `<td class="num">${v?f(v):'-'}</td>`;}).join('')
       +`<td class="num" style="font-weight:700">${f(G)}</td>`
@@ -614,7 +617,7 @@ function _slipXlsTable(g){
     +dedC.map(c=>`<th>${esc(c.name)}</th>`).join('')+`<th>รวมหัก</th><th>รับสุทธิ</th><th>ลงชื่อรับเงิน</th><th>หมายเหตุ</th></tr>`;
   let tG=0,tD=0,tN=0;const tA={},tX={};
   arr.forEach((s,i)=>{const e=ent(s);const G=gross(s),D=deduct(s),N=net(s);tG+=G;tD+=D;tN+=N;
-    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));
+    const notes=[];if(payOf(s)==='เงินสด')notes.push('เงินสด');if((e.items.leaveDays||0)>0)notes.push('ลา '+e.items.leaveDays+(e.items.leaveNote?' ('+e.items.leaveNote+')':''));if((e.items.absentDays||0)>0)notes.push('ขาด '+e.items.absentDays+' วัน');
     t+=`<tr><td class="n">${i+1}</td><td>${esc(s.n)}</td><td>${esc(s.deg||'')}</td><td>${esc(s.p)}</td><td style="mso-number-format:'\\@'">${esc(s.acc||'')}</td>`
       +addC.map(c=>{const v=Number(e.items[c.key]||0);tA[c.key]=(tA[c.key]||0)+v;return `<td class="n">${v||''}</td>`;}).join('')
       +`<td class="n" style="font-weight:bold">${G}</td>`
@@ -647,7 +650,8 @@ function drawSlipCard(){const s=STAFF.find(x=>x.id==+document.getElementById('sl
   let rows='';
   addColsG(e.g).forEach(c=>{const v=e.items[c.key]||0;if(v)rows+=`<div class="slip-row"><span>${esc(c.name)}</span><span>฿${f(v)}</span></div>`;});
   rows+=`<div class="slip-row"><span><b>รวมรับ</b></span><span><b>฿${f(gross(s))}</b></span></div>`;
-  dedColsG(e.g).forEach(c=>{const v=itemAmt(e.items,c);if(v)rows+=`<div class="slip-row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(e.items[c.key]||0)+' วัน'+(e.items.leaveNote?' · '+esc(e.items.leaveNote):''):''}</span><span>−฿${f(v)}</span></div>`;});
+  dedColsG(e.g).forEach(c=>{const v=itemAmt(e.items,c);if(v)rows+=`<div class="slip-row minus"><span>${esc(c.name)}${c.special==='leave'?' '+(e.items[c.key]||0)+' วัน'+(e.items.leaveNote?' · '+esc(e.items.leaveNote):''):c.special==='absent'?' '+(e.items[c.key]||0)+' วัน':''}</span><span>−฿${f(v)}</span></div>`;});
+  if((e.items.absentDays||0)>0&&!Number((CONFIG&&CONFIG.absent_rate)||0))rows+=`<div class="slip-row"><span>ขาดงาน (บันทึกไว้)</span><span>${e.items.absentDays} วัน</span></div>`;
   document.getElementById('slipCardArea').innerHTML=`<div class="slip">
     <div class="slip-h"><div class="sn">สลิปเงินเดือน</div><div class="ss">โรงเรียนอนุบาลวิภาวี · ${monthLabel(MONTH)}</div></div>
     <div class="slip-b">
@@ -734,12 +738,20 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
   let msg;
   if(lineMode==='confirm'){
     msg = r>0
-      ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏\n\n— ฝ่ายการเงิน`
-      : `เรียน ${s.n}\n\nเดือน${ML} ไม่มียอดที่ต้องโอนคืนค่ะ\n\n— ฝ่ายการเงิน`;
+      ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏`
+      : `เรียน ${s.n}\n\nเดือน${ML} ไม่มียอดที่ต้องโอนคืนค่ะ`;
   } else {
+    const e=ent(s);const it=e?e.items:{};
+    const late=Number(it.late||0),lv=Number(it.leaveDays||0),ab=Number(it.absentDays||0),lnote=it.leaveNote||'';
+    const L=[];
+    if(late>0)L.push(`• มาสาย: หัก ${f(late)} บาท`);
+    if(lv>0)L.push(`• ลา: ${lv} วัน${lnote?' ('+lnote+')':''}`);
+    else if(lnote)L.push(`• หมายเหตุ: ${lnote}`);
+    if(ab>0)L.push(`• ขาด: ${ab} วัน`);
+    const att = L.length?`\n\n📋 บันทึกเวลาเดือนนี้\n`+L.join('\n'):`\n\n✓ เดือนนี้มาเต็มเวลา ไม่มีขาด/ลา/มาสาย`;
     msg = `เรียน ${s.n}\n\nแจ้งเงินเดือนประจำเดือน ${ML}\n${payOf(s)==='เงินสด'?'รับเป็นเงินสดที่ฝ่ายการเงินได้เลยค่ะ':'โอนเข้าบัญชีเรียบร้อยแล้วค่ะ'}`;
+    msg += att;
     if(r>0) msg += `\n\n🔸 เดือนนี้มียอดต้องโอนคืน ฿${f(r)}\nโอนเข้า: ${A.bank} ${A.no} (${A.name})\nโอนแล้วส่งสลิปให้ฝ่ายการเงินทาง LINE ได้เลยค่ะ`;
-    msg += `\n\n— ฝ่ายการเงิน`;
   }
   let groupCard='';
   if(lineMode==='pay'){
@@ -755,6 +767,66 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
 function copyLine(){navigator.clipboard.writeText(window._lineMsg||'').then(()=>toast('คัดลอกข้อความรายคนแล้ว ✓'));}
 function copyGroup(){navigator.clipboard.writeText(window._groupMsg||'').then(()=>toast('คัดลอกข้อความกลุ่มแล้ว ✓'));}
 function copyDutyLink(){const msg='📋 บันทึกเวลา ลา/ขาด/มาสาย (ครูเวร) · เดือน '+monthLabel(MONTH)+'\nกรอกที่ลิงก์นี้ค่ะ 👇\nhttps://natcharlyn.github.io/vipawee-payment/teacher.html\nPIN: '+(CONFIG.duty_pin||'')+'\nเลือกเดือนให้ตรง กรอกเสร็จกด "ส่งให้ฝ่ายการเงิน" ค่ะ 🙏';navigator.clipboard.writeText(msg).then(()=>toast('📋 คัดลอกลิงก์+ข้อความแล้ว วางในไลน์ส่งครูเวรได้เลย ✓'));}
+
+// ===== สรุปประเมินครู (มาสาย/ลา/ขาด · รายเดือน/เทอม/ปี) =====
+let evalMetric='late', evalAY=null, EVAL_ROWS=null;
+const EVAL_TL={5:'พ.ค.',6:'มิ.ย.',7:'ก.ค.',8:'ส.ค.',9:'ก.ย.',11:'พ.ย.',12:'ธ.ค.',1:'ม.ค.',2:'ก.พ.',3:'มี.ค.'};
+function ayMonths(gy){
+  const t1=[5,6,7,8,9].map(m=>({gy,bm:m,term:1}));
+  const t2=[11,12].map(m=>({gy,bm:m,term:2})).concat([1,2,3].map(m=>({gy:gy+1,bm:m,term:2})));
+  return t1.concat(t2).map(o=>({key:o.gy+'-'+String(o.bm).padStart(2,'0'),bm:o.bm,term:o.term,label:EVAL_TL[o.bm]}));
+}
+function ayOf(month){const p=String(month).split('-').map(Number);const gy=p[0],bm=p[1];return bm>=5?gy:gy-1;}
+async function renderEval(){
+  document.getElementById('content').innerHTML=`<div class="panel">กำลังโหลดข้อมูล…</div>`;
+  if(!EVAL_ROWS){try{EVAL_ROWS=await q(sb.from('payroll_entries').select('month,staff_id,items'));}catch(e){EVAL_ROWS=[];}}
+  const ays=[...new Set((EVAL_ROWS||[]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);
+  if(!ays.length){document.getElementById('content').innerHTML=`<div class="panel">ยังไม่มีข้อมูลลา/ขาด/มาสายในระบบ</div>`;return;}
+  if(evalAY==null||!ays.includes(evalAY))evalAY=ays[ays.length-1];
+  drawEval();
+}
+function drawEval(){
+  const months=ayMonths(evalAY);const mkeys=new Set(months.map(m=>m.key));
+  const byStaff={};
+  (EVAL_ROWS||[]).forEach(r=>{if(!mkeys.has(r.month))return;const it=r.items||{};
+    const v=evalMetric==='late'?Number(it.late||0):evalMetric==='leave'?Number(it.leaveDays||0):Number(it.absentDays||0);
+    (byStaff[r.staff_id]=byStaff[r.staff_id]||{})[r.month]=v;});
+  const unit=evalMetric==='late'?'นาที':'วัน';
+  const metricName=evalMetric==='late'?'มาสาย (นาที)':evalMetric==='leave'?'ลา (วัน)':'ขาด (วัน)';
+  const staff=STAFF.filter(s=>!s.resigned);
+  const ays=[...new Set((EVAL_ROWS||[]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);
+  let h=`<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · สรุปประเมินครู</div><div class="ph2">ปีการศึกษา ${evalAY} · ${metricName}</div></div>`+
+    `<div class="tip">📋 สรุป <b>${metricName}</b> ปีการศึกษา ${evalAY} · เทอม 1 (พ.ค.–ก.ย.) · เทอม 2 (พ.ย.–มี.ค.) · ใช้ประกอบการประเมินครูท้ายปี (ต.ค./เม.ย. ปิดเทอม ไม่รวม)</div>`+
+    `<div class="tabs print-hide" style="align-items:center">
+      <button class="tab ${evalMetric==='late'?'active':''}" onclick="setEvalMetric('late')">🕐 มาสาย</button>
+      <button class="tab ${evalMetric==='leave'?'active':''}" onclick="setEvalMetric('leave')">🌴 ลา</button>
+      <button class="tab ${evalMetric==='absent'?'active':''}" onclick="setEvalMetric('absent')">❌ ขาด</button>
+      <select class="big" style="margin-left:8px" onchange="setEvalAY(this.value)">${ays.map(y=>`<option value="${y}" ${y===evalAY?'selected':''}>ปีการศึกษา ${y}</option>`).join('')}</select>
+      <button class="btn" onclick="window.print()" style="margin-left:auto">🖨️ พิมพ์</button></div>`;
+  h+=`<div class="etable-wrap"><table class="entry" style="min-width:900px"><thead><tr><th style="text-align:left">ชื่อ-สกุล</th>`+
+    months.map(m=>`<th class="num">${m.label}</th>`).join('')+
+    `<th class="num" style="background:#EFF6FF">เทอม1</th><th class="num" style="background:#EFF6FF">เทอม2</th><th class="num" style="background:#FEF9C3">ทั้งปี</th></tr></thead><tbody>`;
+  const yearTots=staff.map(s=>{const mm=byStaff[s.id]||{};return months.reduce((a,m)=>a+(mm[m.key]||0),0);});
+  const maxY=Math.max(0,...yearTots);
+  let gT1=0,gT2=0,gY=0;
+  staff.forEach(s=>{const mm=byStaff[s.id]||{};
+    const t1=months.filter(m=>m.term===1).reduce((a,m)=>a+(mm[m.key]||0),0);
+    const t2=months.filter(m=>m.term===2).reduce((a,m)=>a+(mm[m.key]||0),0);
+    const yr=t1+t2;gT1+=t1;gT2+=t2;gY+=yr;
+    const hot=yr>0&&yr===maxY;
+    h+=`<tr><td class="nm" style="text-align:left">${s.n}<small>${s.g}</small></td>`+
+      months.map(m=>{const v=mm[m.key]||0;return `<td class="num" style="${v?'':'color:#CBD5E1'}">${v||'·'}</td>`;}).join('')+
+      `<td class="num" style="background:#EFF6FF">${t1||'·'}</td><td class="num" style="background:#EFF6FF">${t2||'·'}</td>`+
+      `<td class="num" style="${hot?'background:#FEE2E2;font-weight:800':'background:#FEF9C3;font-weight:700'}">${yr||'·'}</td></tr>`;});
+  h+=`<tr class="totalrow"><td style="text-align:right">รวมทั้งโรงเรียน</td>`+
+    months.map(m=>{const mv=staff.reduce((a,s)=>a+((byStaff[s.id]||{})[m.key]||0),0);return `<td class="num">${mv||'·'}</td>`;}).join('')+
+    `<td class="num">${gT1}</td><td class="num">${gT2}</td><td class="num">${gY}</td></tr>`;
+  h+=`</tbody></table></div>
+    <div style="margin-top:8px;font-size:12px;color:#64748B">หน่วย: ${unit} · ช่อง <b>ทั้งปี</b> ไฮไลต์แดง = มากที่สุด · จุด (·) = เดือนที่ยังไม่มีข้อมูล</div>`;
+  document.getElementById('content').innerHTML=h;
+}
+function setEvalMetric(m){evalMetric=m;drawEval();}
+function setEvalAY(y){evalAY=Number(y);drawEval();}
 
 // ===== สรุปรวม =====
 function govFundOf(){const g=CONFIG.govfund||{};return Number(g[MONTH]||0);}

@@ -223,7 +223,8 @@ async function loadAll(){
     base:Number(r.base_salary||0),rule:r.refund_rule||'normal',ramt:Number(r.refund_amount||0),
     resigned:r.status==='ลาออก',resignDate:r.resign_date||'',deg:r.education||'',emp:r.job_type||'',
     start:r.appoint_date||'',lic:r.license_no||'',exp:r.license_expire||'',note:r.note||'',idcard:r.id_card||'',
-    depT:r.deposit_target==null?null:Number(r.deposit_target),depUp:Number(r.deposit_upfront||0),depRet:r.deposit_returned||'',depNote:r.deposit_note||'',pin:r.pin||''}));
+    depT:r.deposit_target==null?null:Number(r.deposit_target),depUp:Number(r.deposit_upfront||0),depRet:r.deposit_returned||'',depNote:r.deposit_note||'',pin:r.pin||''}))
+    .sort((a,b)=>(GROUPS.indexOf(a.g)-GROUPS.indexOf(b.g))||(a.id-b.id)); // เรียง: ผบร→ครู→พี่เลี้ยง→เงินสด แล้วตาม id
   CONFIG={};cfg.forEach(r=>CONFIG[r.key]=r.value);
   COLS=CONFIG.cols||{};GROUPS.forEach(g=>{if(!COLS[g])COLS[g]=defaultCols();
     if(!COLS[g].find(c=>c.key==='deposit'))COLS[g].splice(Math.min(4,COLS[g].length),0,{key:'deposit',name:'หักมัดจำ',type:'deduct',src:'fin',locked:true});});

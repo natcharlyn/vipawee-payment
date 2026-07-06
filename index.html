@@ -690,12 +690,14 @@ details summary{cursor:pointer;outline:none}
   <div class="card">
     <div class="card-title">💾 สำรองข้อมูล (Backup)</div>
     <p style="color:#6B7280;margin-bottom:14px;font-size:14px">
-      ครูควรกด "ดาวน์โหลด Backup" ทุก 1-2 สัปดาห์ · เก็บใน Google Drive / OneDrive<br>
+      ครูควรกดดาวน์โหลด ทุก 1-2 สัปดาห์ · เก็บใน Google Drive / OneDrive<br>
       ⚠ ถ้าคอมพัง/Browser ล้าง = ข้อมูลหาย · Backup จะช่วยกู้กลับได้
     </p>
-    <button class="btn btn-primary" onclick="downloadBackup()">⬇ ดาวน์โหลด Backup</button>
+    <button class="btn btn-primary" onclick="downloadBackupExcel()">📗 ดาวน์โหลด Excel (เปิดอ่านง่าย)</button>
+    <button class="btn" onclick="downloadBackup()">⬇ ไฟล์กู้คืน (.json)</button>
     <button class="btn" onclick="document.getElementById('restore-file').click()">⬆ Restore จากไฟล์</button>
     <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup(this)">
+    <p style="color:#9CA3AF;margin-top:10px;font-size:12.5px">📗 <b>Excel</b> = เปิดอ่าน/ตรวจข้อมูลง่าย (นักเรียน · รับเงิน · สลิป · ค่ารถ) · <b>.json</b> = ไฟล์สำหรับกู้คืนข้อมูล เปิดอ่านไม่ได้ (ปกติ) เก็บไว้เฉยๆ ใช้ตอนกด Restore</p>
   </div>
   <div class="card">
     <div class="card-title">🏫 ข้อมูลโรงเรียน <button class="btn btn-sm" style="margin-left:auto" onclick="toggleEditSchool()">✏ แก้</button></div>
@@ -4288,6 +4290,37 @@ function downloadBackup(){
   a.click();
   toast('ดาวน์โหลด backup ✓');
 }
+// ดาวน์โหลดข้อมูลเป็น Excel หลายชีต (เปิดอ่านง่ายใน Excel/Google Sheets) — คนละไฟล์กับ .json กู้คืน
+function downloadBackupExcel(){
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cell = v => (typeof v==='number' && isFinite(v))
+    ? '<Cell><Data ss:Type="Number">'+v+'</Data></Cell>'
+    : '<Cell><Data ss:Type="String">'+esc(v)+'</Data></Cell>';
+  const row = arr => '<Row>'+arr.map(cell).join('')+'</Row>';
+  const sheet = (name, headers, rows) =>
+    '<Worksheet ss:Name="'+esc(name)+'"><Table>'+row(headers)+rows.map(row).join('')+'</Table></Worksheet>';
+  const stuRows = STUDENTS.map(s => [s.nick||'', s.name||'', s.cls||'', s.village||'', s.useBus||'', s.busCode||'',
+    s.payTuition||'', s.discount||'ไม่มี', (s.deleted?'ย้ายออก':'ปกติ'), s.referrerName||'', s.note||'']);
+  const txRows = TX.map(t => [t.date||'', t.receiptNo||'', t.payerName||'', t.studentNick||'', t.studentClass||'',
+    (t.items||[]).map(it=>it.label+' '+(it.amount||0)).join(' · '), Number(t.total||0), t.method||'', (t.voidedAt?'ยกเลิก':'ปกติ'), t.cashier||'']);
+  const slipRows = SLIPS.map(s => [s.date||'', Number(s.amount||0), s.from||'', s.studentNick||'', (s.matched?'จับคู่แล้ว':'ยังไม่จับคู่')]);
+  const poRows = PAYOUTS.map(p => [p.busCode||'', p.driver||'', (p.months||[]).join(', '), p.year||'', Number(p.amount||0), p.date||'', p.receiver||'']);
+  const stkRows = STOCK.map(s => [s.item||'', s.price||'', s.cat||'', s.note||'']);
+  const xml = '<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n'
+    +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+    + sheet('นักเรียน', ['ชื่อเล่น','ชื่อ-สกุล','ชั้น','หมู่บ้าน','ใช้รถ','รหัสรถ','การจ่ายค่าเทอม','ส่วนลด','สถานะ','ผู้แนะนำ','หมายเหตุ'], stuRows)
+    + sheet('รับเงิน', ['วันที่','ใบเสร็จ','ผู้จ่าย','เด็ก','ชั้น','รายการ','ยอดรวม','วิธีจ่าย','สถานะ','ผู้รับเงิน'], txRows)
+    + sheet('สลิปโอน', ['วันที่','จำนวน','จาก','เด็ก','สถานะ'], slipRows)
+    + sheet('ค่ารถ-จ่ายคนขับ', ['รหัสรถ','คนขับ','เดือน','ปี','ยอด','วันที่','ผู้รับ'], poRows)
+    + sheet('สต็อก', ['รายการ','ราคา','หมวด','หมายเหตุ'], stkRows)
+    + '</Workbook>';
+  const blob = new Blob(['﻿'+xml], {type:'application/vnd.ms-excel'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vipawee_ข้อมูล_' + new Date().toISOString().slice(0,10) + '.xls';
+  a.click();
+  toast('📗 ดาวน์โหลด Excel เปิดอ่านง่าย ✓');
+}
 // เซฟ backup อัตโนมัติเมื่อเปิดแอปครั้งแรกของแต่ละสัปดาห์ (ครูไม่ต้องกดเอง)
 function autoBackupWeekly(){
   try{
@@ -4301,7 +4334,7 @@ function autoBackupWeekly(){
         document.removeEventListener('click', fn, true);
         downloadBackup();
         localStorage.setItem('vipawee_lastBackup2', String(Date.now()));
-        toast('💾 เซฟ backup อัตโนมัติประจำสัปดาห์แล้ว · ดูไฟล์ในโฟลเดอร์ Downloads');
+        toast('💾 เซฟไฟล์กู้คืนอัตโนมัติ (.json) แล้ว · เก็บไว้เฉยๆ ไม่ต้องเปิด · ถ้าอยากดูข้อมูลกดปุ่ม 📗 Excel ที่หน้าตั้งค่า');
       };
       document.addEventListener('click', fn, true);
     }

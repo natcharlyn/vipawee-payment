@@ -373,12 +373,23 @@ details summary{cursor:pointer;outline:none}
       <div class="page-sub">บันทึก note การโอน · แมพกับเด็ก · ออกใบเสร็จ</div>
     </div>
     <div class="tools">
+      <button class="btn" onclick="toggleUnpaid()">📋 ใครยังไม่จ่าย</button>
       <button class="btn btn-primary" onclick="newSlip()">➕ เพิ่มสลิปใหม่</button>
     </div>
   </div>
+  <div class="card hidden" id="unpaid-panel" style="border:1px solid #F0C27A;background:#FFFBEB">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <b style="color:#B45309">📋 เด็กที่ยังมียอดค้าง (ยังไม่จ่ายเดือนนี้)</b>
+      <select class="select" id="unpaid-cls" onchange="renderUnpaid()" style="width:auto;min-width:150px"></select>
+      <span id="unpaid-count" style="color:#6B7280;font-size:13px"></span>
+      <button class="btn btn-sm btn-primary" style="margin-left:auto" onclick="copyUnpaid()">📋 คัดลอกรายชื่อส่งครู</button>
+    </div>
+    <div id="unpaid-list" style="max-height:360px;overflow:auto"></div>
+    <div style="font-size:12px;color:#9CA3AF;margin-top:8px">💡 ยอดค้าง = ค่าเทอม + ค่ารถ + ค่ารายปี + ยกยอด ที่ยังไม่จ่าย · เลือกห้องเพื่อกรอง แล้วกดคัดลอกส่งครูประจำชั้นให้ตามต่อได้เลย</div>
+  </div>
   <div class="card">
     <table class="tbl">
-      <thead><tr><th>วันที่</th><th>จำนวน</th><th>ผู้ส่ง</th><th>เด็ก</th><th>สถานะ</th><th></th></tr></thead>
+      <thead><tr><th>วันที่</th><th>จำนวน</th><th>ผู้ส่ง</th><th>เด็ก / จับคู่ด้วยยอด</th><th>สถานะ</th><th></th></tr></thead>
       <tbody id="slip-list"></tbody>
     </table>
   </div>
@@ -3729,13 +3740,80 @@ function renderSlips(){
       <td>${s.date}</td>
       <td style="font-weight:700">฿${fmt(s.amount)}</td>
       <td>${s.from || '-'}</td>
-      <td>${s.studentNick ? '<span class="lnk" onclick="openDetailByNick(\''+s.studentNick+'\')">'+s.studentNick+'</span>' : '<span style="color:#9CA3AF">ยังไม่ระบุ</span>'}</td>
+      <td>${s.studentNick ? '<span class="lnk" onclick="openDetailByNick(\''+s.studentNick+'\')">'+s.studentNick+'</span>' : slipSuggestHTML(s)}</td>
       <td>${s.matched ? '<span class="b b-paid">บันทึกแล้ว</span>' : '<span class="b b-pending">รอบันทึก</span>'}</td>
       <td>
         ${!s.matched ? `<button class="btn btn-sm btn-primary" onclick="slipToRecord(${s.id})">→ บันทึกรับเงิน</button>` : ''}
         <button class="btn btn-sm btn-danger" onclick="delSlip(${s.id})">×</button>
       </td>
     </tr>`).join('');
+}
+// ===== ตัวช่วยกระทบยอด: ใครยังไม่จ่าย + จับคู่สลิปด้วยยอดเงิน =====
+const _esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let _unpaidOpen=false;
+function toggleUnpaid(){ _unpaidOpen=!_unpaidOpen; const p=$('unpaid-panel'); if(!p)return; p.classList.toggle('hidden', !_unpaidOpen); if(_unpaidOpen) renderUnpaid(true); }
+function _owedList(){ return activeStudents().map(s=>({s, owed:estimateOwed(s)})).filter(o=>o.owed>0)
+  .sort((a,b)=> String(a.s.cls||'').localeCompare(String(b.s.cls||''),'th') || b.owed-a.owed); }
+function renderUnpaid(initList){
+  const all=_owedList(); const sel=$('unpaid-cls');
+  if(initList && sel){ const classes=[...new Set(all.map(o=>o.s.cls))];
+    sel.innerHTML='<option value="">ทุกห้อง ('+all.length+' คน)</option>'+classes.map(c=>'<option value="'+_esc(c)+'">'+_esc(c)+'</option>').join(''); }
+  const cls=sel?sel.value:''; const rows=all.filter(o=>!cls||o.s.cls===cls);
+  const cnt=$('unpaid-count'); if(cnt) cnt.textContent='· ค้าง '+rows.length+' คน รวม ฿'+fmt(rows.reduce((a,o)=>a+o.owed,0));
+  $('unpaid-list').innerHTML = rows.length
+    ? '<table class="tbl"><thead><tr><th>ชื่อเล่น</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th style="text-align:right">ยอดค้าง</th></tr></thead><tbody>'
+      + rows.map(o=>'<tr><td><span class="lnk" onclick="openDetail('+o.s.id+')">'+_esc(o.s.nick)+'</span></td><td>'+_esc(o.s.name)+'</td><td>'+_esc(o.s.cls)+'</td><td style="text-align:right;font-weight:700;color:#B91C1C">฿'+fmt(o.owed)+'</td></tr>').join('')
+      + '</tbody></table>'
+    : '<div style="text-align:center;color:#16A34A;padding:20px">🎉 จ่ายครบทุกคนแล้ว</div>';
+}
+function copyUnpaid(){
+  const sel=$('unpaid-cls'); const cls=sel?sel.value:'';
+  const rows=_owedList().filter(o=>!cls||o.s.cls===cls);
+  if(!rows.length){ toast('ไม่มีคนค้าง', 'error'); return; }
+  const head='📋 รายชื่อยังไม่จ่าย'+(cls?(' · '+cls):'')+' ('+rows.length+' คน)\n';
+  const body=rows.map((o,i)=>(i+1)+'. '+o.s.nick+' ('+o.s.name+') · '+o.s.cls+' · ค้าง ฿'+fmt(o.owed)).join('\n');
+  navigator.clipboard.writeText(head+body).then(()=>toast('📋 คัดลอกรายชื่อแล้ว วางในไลน์ส่งครูได้เลย ✓')).catch(()=>toast('คัดลอกไม่สำเร็จ','error'));
+}
+function slipCandidates(amount){
+  const A=Math.round(Number(amount)||0); if(!A) return [];
+  const out=[];
+  activeStudents().forEach(s=>{
+    const owed=estimateOwed(s);
+    const p=getPriceForClass(s.cls);
+    const perMonth=p?(s.discount==='ฟรี 100%'?0:s.discount==='ลด 50%'?Math.round(p.monthly*0.5):p.monthly):0;
+    const busPrice=getBusPrice(s.village); const useBus=s.useBus&&s.useBus!=='ไม่ใช้';
+    const busMonth=(useBus&&busPrice>0)?(s.useBus!=='ไป-กลับ'?Math.round(busPrice/2):busPrice):0;
+    let why='';
+    if(owed===A) why='ตรงยอดค้างทั้งหมด';
+    else if(perMonth&&perMonth===A) why='ค่าเทอม 1 เดือน';
+    else if(busMonth>0&&perMonth+busMonth===A) why='ค่าเทอม+ค่ารถ 1 เดือน';
+    else if(busMonth&&busMonth===A) why='ค่ารถ 1 เดือน';
+    if(why) out.push({s, why, owed});
+  });
+  return out;
+}
+function slipSuggestHTML(slip){
+  let list=slipCandidates(slip.amount);
+  const fromq=(slip.from||'').toLowerCase().trim();
+  if(fromq){ const byName=list.filter(o=>fromq.includes((o.s.nick||'').toLowerCase())||fromq.includes((o.s.name||'').toLowerCase())); if(byName.length) list=byName; }
+  if(!list.length) return '<span style="color:#9CA3AF">ยังไม่ระบุ · <span class="lnk" onclick="quickSearchSlip('+slip.id+')">🔍 ค้นชื่อ</span></span>';
+  if(list.length>6) return '<span style="color:#B45309">ยอดตรง '+list.length+' คน · <span class="lnk" onclick="quickSearchSlip('+slip.id+')">🔍 เลือก/ค้นชื่อ</span></span>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center"><span style="font-size:11px;color:#9CA3AF">ยอดตรง:</span>'
+    + list.map(o=>'<button class="btn btn-sm" style="background:#ECFDF5;border:1px solid #6EE7B7;color:#065F46;padding:2px 8px" onclick="assignSlipStu('+slip.id+',\''+String(o.s.nick).replace(/'/g,"\\'")+'\')" title="'+o.why+' · ค้าง ฿'+fmt(o.owed)+'">'+_esc(o.s.nick)+' ('+_esc(o.s.cls)+')</button>').join('')
+    + ' <span class="lnk" style="font-size:12px" onclick="quickSearchSlip('+slip.id+')">🔍 ค้นเอง</span></div>';
+}
+function assignSlipStu(id, nick){
+  const slip=SLIPS.find(s=>s.id===id); if(!slip)return;
+  slip.studentNick=nick; saveSLIPS(); renderSlips();
+  toast('จับคู่ '+nick+' แล้ว · กด → บันทึกรับเงิน ได้เลย ✓');
+}
+function quickSearchSlip(id){
+  const q=prompt('พิมพ์ชื่อเล่น/ชื่อเด็ก:'); if(!q)return;
+  const t=q.trim();
+  const m=activeStudents().filter(s=>(s.nick||'').includes(t)||(s.name||'').includes(t));
+  if(!m.length){ toast('ไม่พบชื่อนี้','error'); return; }
+  if(m.length>1){ toast('เจอหลายคน: '+m.slice(0,6).map(s=>s.nick+'('+s.cls+')').join(', ')+' · พิมพ์เจาะจงขึ้น','error'); return; }
+  assignSlipStu(id, m[0].nick);
 }
 function openDetailByNick(nick){
   const s = STUDENTS.find(x => x.nick === nick);

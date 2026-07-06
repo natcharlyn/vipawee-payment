@@ -1909,13 +1909,30 @@ function pickCashier(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(s.va
 function customCashier(el){ setCashier(el.value); }
 function syncCashierUI(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(!s) return; if(['วีรญา','ภาวิณี'].includes(cashierName)){ s.value=cashierName; c.style.display='none'; } else { s.value='__custom__'; c.style.display=''; c.value=cashierName; } }
 
-function saveTx(){
+// บันทึกรายการรับเงิน 1 ใบ ขึ้นคลาวด์แบบ "ยืนยันผล" (ลองซ้ำ 3 ครั้ง + ต่ออายุ session ถ้าหมดอายุ) — คืน true เฉพาะเมื่อเข้าคลาวด์จริง
+let _savingTx = false;
+async function cloudUpsertTx(tx){
+  const row = txToRow(tx);
+  for(let i=1;i<=3;i++){
+    try{
+      const { error } = await sb.from('transactions').upsert(row);
+      if(!error) return true;
+      if(/JWT|auth|token|permission|policy|expired|denied|row-level/i.test(String(error.message||''))){
+        try{ await sb.auth.refreshSession(); }catch(_){}
+      }
+    }catch(e){ /* เน็ตหลุด — ลองใหม่ */ }
+    if(i<3) await new Promise(r=>setTimeout(r, 700*i));
+  }
+  return false;
+}
+async function saveTx(){
   if(Object.keys(owedSelected).length === 0){
     toast('กรุณาเลือกอย่างน้อย 1 รายการ', 'error'); return;
   }
   const items = Object.values(owedSelected);
   const total = items.reduce((s,x)=>s+x.amount, 0);
   if(total <= 0){ toast('ยอดรวมต้องมากกว่า 0 บาท · ส่วนลดห้ามเกินยอดที่จ่าย', 'error'); return; }
+  if(_savingTx) return; _savingTx = true;
   const tx = {
     id: Date.now(),
     date: new Date().toISOString(),
@@ -1932,7 +1949,14 @@ function saveTx(){
     cashier: cashierName || 'วีรญา'
   };
   TX.unshift(tx);
-  saveTX();
+  toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
+  const ok = await cloudUpsertTx(tx);
+  _savingTx = false;
+  if(!ok){
+    TX = TX.filter(t => t.id !== tx.id);   // ถอนออก: ไม่ให้เลขใบเสร็จถูกใช้ + ไม่ค้างในเครื่อง
+    toast('⚠ ยังบันทึกไม่สำเร็จ (เน็ต/คลาวด์) · ยังไม่ออกใบเสร็จ · กรุณากดบันทึกใหม่อีกครั้ง', 'error');
+    return;
+  }
   showReceipt(tx);
 }
 
@@ -2314,7 +2338,7 @@ function openCoursePay(id){
   $('coursepay-modal').classList.add('active');
 }
 function closeCoursePay(){ $('coursepay-modal').classList.remove('active'); }
-function saveCoursePay(){
+async function saveCoursePay(){
   const s = STUDENTS.find(x=>x.id===coursePayId); if(!s) return;
   const amt = +$('cp-amount').value || 0;
   if(amt <= 0){ toast('ใส่จำนวนเงินมากกว่า 0 บาท', 'error'); return; }
@@ -2334,7 +2358,10 @@ function saveCoursePay(){
     method: $('cp-method').value, style: 'F',
     receiptNo: nextReceiptNo(), cashier: cashierName || 'วีรญา'
   };
-  TX.unshift(tx); saveTX();
+  TX.unshift(tx);
+  toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
+  const ok = await cloudUpsertTx(tx);
+  if(!ok){ TX = TX.filter(t=>t.id!==tx.id); toast('⚠ ยังบันทึกไม่สำเร็จ · ยังไม่ออกใบเสร็จ · กดบันทึกใหม่อีกครั้ง','error'); return; }
   closeCoursePay(); renderSpecial(); showReceipt(tx);
 }
 function printCourseInvoice(id){
@@ -4332,19 +4359,19 @@ function savePricing(){
 function addCustomFee(){
   const name = (prompt('ชื่อค่าใหม่ (เช่น ค่าคอมพิวเตอร์, ค่าชุดนักเรียน):')||'').trim();
   if(!name) return;
-  const term = confirm('\u201c'+name+'\u201d คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
+  const term = confirm('“'+name+'” คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
   if(!Array.isArray(SCHOOL.customFees)) SCHOOL.customFees=[];
   SCHOOL.customFees.push({key:'cf'+Date.now(), label:name, type: term?'term':'once'});
   cloudSaveSchool(); renderPricing();
-  toast('เพิ่มประเภท \u201c'+name+'\u201d แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
+  toast('เพิ่มประเภท “'+name+'” แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
 }
 function delCustomFee(key){
   const cf=(SCHOOL.customFees||[]).find(x=>x.key===key); if(!cf) return;
-  if(!confirm('ลบประเภท \u201c'+cf.label+'\u201d ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
+  if(!confirm('ลบประเภท “'+cf.label+'” ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
   SCHOOL.customFees = (SCHOOL.customFees||[]).filter(x=>x.key!==key);
   (SCHOOL.pricing||[]).forEach(p=>{ if(p.cf) delete p.cf[key]; });
   cloudSaveSchool(); renderPricing();
-  toast('ลบประเภท \u201c'+cf.label+'\u201d แล้ว');
+  toast('ลบประเภท “'+cf.label+'” แล้ว');
 }
 function saveSchool(){
   SCHOOL = {

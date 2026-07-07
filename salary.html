@@ -295,7 +295,11 @@ async function autoImportBonus(){
     });
     const ups=[];let changed=0;
     Object.keys(ENTRIES).forEach(sid=>{const e=ENTRIES[sid];const want=(cnt[sid]||0)*100;
-      if(Number(e.items.bonus||0)!==want){e.items.bonus=want;changed++;const s=STAFF.find(x=>x.id==sid);
+      const prevRef=Number(e.items.bonusRef||0);        // โบนัสชวนเรียนที่เคยเติมอัตโนมัติรอบก่อน
+      const manual=Number(e.items.bonus||0)-prevRef;    // ส่วนที่ครูกรอกมือ (โบนัสพิเศษ) — ต้องไม่หาย
+      const newBonus=manual+want;                        // กรอกมือ + ชวนเรียนรอบนี้ (บวกเพิ่ม ไม่เขียนทับ)
+      if(Number(e.items.bonus||0)!==newBonus||prevRef!==want){
+        e.items.bonus=newBonus;e.items.bonusRef=want;changed++;const s=STAFF.find(x=>x.id==sid);
         ups.push({month:MONTH,staff_id:+sid,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:s?net(s):Number(e.net||0),note:e.note||''});}});
     if(ups.length){await q(sb.from('payroll_entries').upsert(ups,{onConflict:'month,staff_id'}));
       toast('🤝 อัปเดตโบนัสชวนเรียนอัตโนมัติ '+changed+' รายการ ✓');}

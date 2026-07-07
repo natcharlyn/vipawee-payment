@@ -791,7 +791,7 @@ function drawEval(){
   (EVAL_ROWS||[]).forEach(r=>{if(!mkeys.has(r.month))return;const it=r.items||{};
     const v=evalMetric==='late'?Number(it.late||0):evalMetric==='leave'?Number(it.leaveDays||0):Number(it.absentDays||0);
     (byStaff[r.staff_id]=byStaff[r.staff_id]||{})[r.month]=v;});
-  const unit=evalMetric==='late'?'นาที':'วัน';
+  const unit=evalMetric==='late'?'นาที (= บาทที่หัก · 1 นาที = 1 บาท)':'วัน';
   const metricName=evalMetric==='late'?'มาสาย (นาที)':evalMetric==='leave'?'ลา (วัน)':'ขาด (วัน)';
   const staff=STAFF.filter(s=>!s.resigned);
   const ays=[...new Set((EVAL_ROWS||[]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);

@@ -1909,19 +1909,29 @@ function pickCashier(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(s.va
 function customCashier(el){ setCashier(el.value); }
 function syncCashierUI(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(!s) return; if(['วีรญา','ภาวิณี'].includes(cashierName)){ s.value=cashierName; c.style.display='none'; } else { s.value='__custom__'; c.style.display=''; c.value=cashierName; } }
 
-// บันทึกรายการรับเงิน 1 ใบ ขึ้นคลาวด์แบบ "ยืนยันผล" (ลองซ้ำ 3 ครั้ง + ต่ออายุ session ถ้าหมดอายุ) — คืน true เฉพาะเมื่อเข้าคลาวด์จริง
+// จองเลขใบเสร็จจากคลาวด์ (authoritative) — กันเลขซ้ำข้ามเครื่อง/หลายแคชเชียร์ + กัน local ล้าสมัย
+async function cloudNextReceiptNo(){
+  const prefix = AY + '-'; let mx = 0;
+  try{
+    const { data } = await sb.from('transactions').select('receipt_no').ilike('receipt_no', prefix+'%').order('receipt_no',{ascending:false}).limit(1);
+    if(data && data[0] && data[0].receipt_no) mx = parseInt(String(data[0].receipt_no).slice(prefix.length),10) || 0;
+  }catch(e){}
+  TX.forEach(t=>{ if(t.receiptNo && String(t.receiptNo).indexOf(prefix)===0){ const v=parseInt(String(t.receiptNo).slice(prefix.length),10); if(v>mx) mx=v; } });
+  return prefix + String(mx+1).padStart(5,'0');
+}
+// บันทึกรายการรับเงิน 1 ใบ ขึ้นคลาวด์แบบ "ยืนยันผล" — จองเลขจากคลาวด์ + ลองซ้ำ + ต่ออายุ session — คืน true เฉพาะเมื่อเข้าคลาวด์จริง
 let _savingTx = false;
-async function cloudUpsertTx(tx){
-  const row = txToRow(tx);
-  for(let i=1;i<=3;i++){
+async function cloudSaveNewTx(tx){
+  for(let i=1;i<=4;i++){
     try{
-      const { error } = await sb.from('transactions').upsert(row);
+      tx.receiptNo = await cloudNextReceiptNo();
+      const { error } = await sb.from('transactions').upsert(txToRow(tx));
       if(!error) return true;
-      if(/JWT|auth|token|permission|policy|expired|denied|row-level/i.test(String(error.message||''))){
-        try{ await sb.auth.refreshSession(); }catch(_){}
-      }
+      const msg = String(error.message||'');
+      if(/duplicate|unique|already exists/i.test(msg)) continue; // เลขชน → ขอเลขใหม่
+      if(/JWT|auth|token|permission|policy|expired|denied|row-level/i.test(msg)){ try{ await sb.auth.refreshSession(); }catch(_){} }
     }catch(e){ /* เน็ตหลุด — ลองใหม่ */ }
-    if(i<3) await new Promise(r=>setTimeout(r, 700*i));
+    if(i<4) await new Promise(r=>setTimeout(r, 700*i));
   }
   return false;
 }
@@ -1945,18 +1955,16 @@ async function saveTx(){
     total: total,
     method: payMethod,
     style: receiptStyle,
-    receiptNo: nextReceiptNo(),
     cashier: cashierName || 'วีรญา'
   };
-  TX.unshift(tx);
   toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
-  const ok = await cloudUpsertTx(tx);
+  const ok = await cloudSaveNewTx(tx);
   _savingTx = false;
   if(!ok){
-    TX = TX.filter(t => t.id !== tx.id);   // ถอนออก: ไม่ให้เลขใบเสร็จถูกใช้ + ไม่ค้างในเครื่อง
     toast('⚠ ยังบันทึกไม่สำเร็จ (เน็ต/คลาวด์) · ยังไม่ออกใบเสร็จ · กรุณากดบันทึกใหม่อีกครั้ง', 'error');
     return;
   }
+  TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
   showReceipt(tx);
 }
 
@@ -2351,17 +2359,19 @@ async function saveCoursePay(){
   } else {
     items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')', amount: amt, months:0}];
   }
+  if(_savingTx) return; _savingTx = true;
   const tx = {
     id: Date.now(), date: new Date().toISOString(),
     studentId: s.id, studentName: s.name, studentNick: s.nick, studentClass: s.cls,
     payerName: s.nick, items: items, total: items.reduce((a,it)=>a+it.amount,0),
     method: $('cp-method').value, style: 'F',
-    receiptNo: nextReceiptNo(), cashier: cashierName || 'วีรญา'
+    cashier: cashierName || 'วีรญา'
   };
-  TX.unshift(tx);
   toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
-  const ok = await cloudUpsertTx(tx);
-  if(!ok){ TX = TX.filter(t=>t.id!==tx.id); toast('⚠ ยังบันทึกไม่สำเร็จ · ยังไม่ออกใบเสร็จ · กดบันทึกใหม่อีกครั้ง','error'); return; }
+  const ok = await cloudSaveNewTx(tx);
+  _savingTx = false;
+  if(!ok){ toast('⚠ ยังบันทึกไม่สำเร็จ · ยังไม่ออกใบเสร็จ · กดบันทึกใหม่อีกครั้ง','error'); return; }
+  TX.unshift(tx);
   closeCoursePay(); renderSpecial(); showReceipt(tx);
 }
 function printCourseInvoice(id){
@@ -4359,19 +4369,19 @@ function savePricing(){
 function addCustomFee(){
   const name = (prompt('ชื่อค่าใหม่ (เช่น ค่าคอมพิวเตอร์, ค่าชุดนักเรียน):')||'').trim();
   if(!name) return;
-  const term = confirm('“'+name+'” คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
+  const term = confirm('\u201c'+name+'\u201d คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
   if(!Array.isArray(SCHOOL.customFees)) SCHOOL.customFees=[];
   SCHOOL.customFees.push({key:'cf'+Date.now(), label:name, type: term?'term':'once'});
   cloudSaveSchool(); renderPricing();
-  toast('เพิ่มประเภท “'+name+'” แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
+  toast('เพิ่มประเภท \u201c'+name+'\u201d แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
 }
 function delCustomFee(key){
   const cf=(SCHOOL.customFees||[]).find(x=>x.key===key); if(!cf) return;
-  if(!confirm('ลบประเภท “'+cf.label+'” ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
+  if(!confirm('ลบประเภท \u201c'+cf.label+'\u201d ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
   SCHOOL.customFees = (SCHOOL.customFees||[]).filter(x=>x.key!==key);
   (SCHOOL.pricing||[]).forEach(p=>{ if(p.cf) delete p.cf[key]; });
   cloudSaveSchool(); renderPricing();
-  toast('ลบประเภท “'+cf.label+'” แล้ว');
+  toast('ลบประเภท \u201c'+cf.label+'\u201d แล้ว');
 }
 function saveSchool(){
   SCHOOL = {

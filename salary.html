@@ -346,6 +346,8 @@ async function openMonth(){
   await loadMonth(MONTH);toast('เปิดเดือน '+monthLabel(MONTH)+' แล้ว ✓ (คัดลอกฐาน+หักตายตัวจากเดือนก่อน)');go('entry');
 }
 async function closeMonth(){
+  const neg=allIn().filter(s=>netRaw(s)<0);
+  if(neg.length&&!confirm('⚠ มี '+neg.length+' คนที่ยอดหักเกินเงินเดือน (สุทธิติดลบ):\n'+neg.map(s=>'• '+s.n+' เกิน ฿'+f(-netRaw(s))).join('\n')+'\n\nระบบจะจ่ายเป็น ฿0 ให้คนเหล่านี้ · แนะนำแก้ก่อนปิดงวด (ลดยอดหักมัดจำเดือนนี้)\n\nยืนยันปิดงวดทั้งที่ยังติดลบ?'))return;
   if(!confirm('ปิดงวดเดือน '+monthLabel(MONTH)+'?\n\nหลังปิด: แก้ตัวเลขไม่ได้ จนกว่าจะกดปลดล็อก\nแนะนำ: กด "สำรองข้อมูล" ก่อนปิด'))return;
   const cm=CONFIG.closed_months||[];if(!cm.includes(MONTH))cm.push(MONTH);
   await saveConfig('closed_months',cm);toast('ปิดงวด '+monthLabel(MONTH)+' แล้ว 🔒');go('home');
@@ -368,7 +370,13 @@ function calcNetItems(items,g){return addColsG(g).reduce((a,c)=>a+Number(items[c
 const ent=s=>ENTRIES[s.id];
 const gross=s=>{const e=ent(s);return e?addColsG(e.g).reduce((a,c)=>a+Number(e.items[c.key]||0),0):0;};
 const deduct=s=>{const e=ent(s);return e?dedColsG(e.g).reduce((a,c)=>a+itemAmt(e.items,c),0):0;};
-const net=s=>{if(isClosed()&&ENTRIES[s.id])return Number(ENTRIES[s.id].net||0);return gross(s)-deduct(s);};
+const net=s=>{if(isClosed()&&ENTRIES[s.id])return Number(ENTRIES[s.id].net||0);return Math.max(0,gross(s)-deduct(s));}; // กันสุทธิติดลบ: จ่ายจริงไม่ต่ำกว่า 0
+const netRaw=s=>gross(s)-deduct(s); // ยอดดิบ (อาจติดลบ) — ใช้ตรวจเตือนว่าหักเกินเงินเดือน
+function negOf(arr){return arr.filter(s=>netRaw(s)<0).map(s=>({n:s.n,short:-netRaw(s)}));}
+function negBannerHTML(arr){const L=negOf(arr);if(!L.length)return '';
+  return `<div class="tip" style="background:#FEF2F2;border:1.5px solid #FCA5A5;color:#991B1B">⚠ <b>ยอดหักเกินเงินเดือน ${L.length} คน</b> — ระบบจ่ายเป็น <b>฿0</b> ให้ (ไม่ติดลบ): `
+    +L.map(x=>`${esc(x.n)} เกิน ฿${f(x.short)}`).join(' · ')
+    +` <br>💡 แนะนำ: ลดยอด <b>หักมัดจำ</b> เดือนนี้ลง (ส่วนที่เหลือจะไปหักเดือนหน้าเอง) หรือตรวจว่ากรอกยอดหักถูกไหม</div>`;}
 function refundAmt(s){
   if(isClosed()&&REFUNDS[s.id])return Number(REFUNDS[s.id].due||0);
   if(s.rule==='none')return 0;
@@ -520,6 +528,7 @@ function renderEntry(){
   const dis=canEdit()?'':'disabled';
   let h=printHead('บัญชีเงินเดือน')+closedTip()+`<div class="tip check">✏️ <b>หัวคอลัมน์แก้ชื่อได้</b> · <b>✕ ลบ</b> ใต้หัวคอลัมน์ · <b>➕ เพิ่มคอลัมน์</b> ด้านล่าง · <span class="mint-tag">เขียว</span>=ครูเช็ก <span class="blue-tag">ฟ้า</span>=ค่าเทอม · แก้เสร็จ<b>กดบันทึก</b>ทุกครั้ง</div>`;
   h+=`<div class="tabs print-hide">`+GROUPS.map(g=>`<button class="tab ${g===curGroup?'active':''}" onclick="setGroup('${g}')">${g}<span class="cnt">${act(g).length}</span></button>`).join('')+`</div>`;
+  h+=`<div id="negBanner">${negBannerHTML(act(curGroup))}</div>`;
   h+=`<div class="etable-wrap"><table class="entry"><thead><tr><th>ชื่อ-สกุล</th><th>วิธีรับ</th>`;
   colsG(curGroup).forEach(c=>{
     h+=`<th class="num"><input class="colname" ${dis} value="${esc(c.name)}" onchange="renColumn('${c.key}',this.value)">
@@ -533,7 +542,7 @@ function renderEntry(){
         <option value="โอน" ${payOf(s)==='โอน'?'selected':''}>🏦 โอน</option><option value="เงินสด" ${payOf(s)==='เงินสด'?'selected':''}>💵 เงินสด</option></select></td>`;
     colsG(curGroup).forEach(c=>{const cls=c.src==='chk'?'m':(c.src==='term'?'b':'y');
       h+=`<td class="num"><input class="cell ${cls}" type="number" step="any" ${dis} value="${e.items[c.key]||0}" oninput="setV(${s.id},'${c.key}',this.value)"></td>`;});
-    h+=`<td class="rownet" id="rn_${s.id}">฿${f(net(s))}</td></tr>`;});
+    h+=`<td class="rownet" id="rn_${s.id}">${netRaw(s)<0?`<span style="color:var(--red);font-weight:800" title="หักเกินเงินเดือน ฿${f(-netRaw(s))}">⚠ ฿0</span>`:'฿'+f(net(s))}</td></tr>`;});
   h+=`</tbody></table></div>
     <div class="save-bar"><button class="btn btn-add" ${dis} onclick="addColumn()">➕ เพิ่มคอลัมน์</button>
       <div class="grouptotal">รับสุทธิรวมกลุ่ม <b>${curGroup}</b>: <b id="grpTotal">฿${f(act(curGroup).reduce((a,s)=>a+net(s),0))}</b></div>
@@ -547,7 +556,8 @@ async function changeGroup(id,g){const s=STAFF.find(x=>x.id==id);const e=ent(s);
 function setPay(id,el){const e=ENTRIES[id];e.note=el.value;el.className='paysel '+(el.value==='เงินสด'?'cash':'bank');}
 function setV(id,key,v){const e=ENTRIES[id];e.items[key]=Number(v||0);
   const s=STAFF.find(x=>x.id==id);
-  const rn=document.getElementById('rn_'+id);if(rn)rn.textContent='฿'+f(net(s));
+  const rn=document.getElementById('rn_'+id);if(rn)rn.innerHTML=netRaw(s)<0?`<span style="color:var(--red);font-weight:800" title="หักเกินเงินเดือน ฿${f(-netRaw(s))}">⚠ ฿0</span>`:'฿'+f(net(s));
+  const nb=document.getElementById('negBanner');if(nb)nb.innerHTML=negBannerHTML(act(curGroup));
   const gt=document.getElementById('grpTotal');if(gt)gt.textContent='฿'+f(act(curGroup).reduce((a,x)=>a+net(x),0));
   const ck=document.getElementById('ck_'+id);if(ck){const chk=colsG(e.g).filter(c=>c.src==='chk');ck.textContent='฿'+f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0));}}
 function renColumn(key,name){const c=colsG(curGroup).find(x=>x.key===key);if(c){c.name=name.trim()||c.name;saveCols();}}

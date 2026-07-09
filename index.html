@@ -1668,9 +1668,9 @@ function renderAutoDiscount(){
 function setRefCredit(el){
   const s = selStudent; if(!s) return;
   const bal = refCreditBalance(s);
-  // ยอดที่ต้องจ่ายในใบเสร็จ (ไม่รวมส่วนลดเครดิต) — หักได้ไม่เกินนี้ กันยอดติดลบ
-  let sub = 0; Object.keys(owedSelected).forEach(k => { if(k !== 'refcredit') sub += (owedSelected[k].amount||0); });
-  const cap = Math.max(0, Math.min(bal, sub > 0 ? sub : bal));
+  // หักเครดิตได้เฉพาะ "ค่าเทอม" ในใบเสร็จนี้ (ไม่รวมค่ารถ/ค่าชุด/ค่าอื่น) · กันยอดติดลบ
+  let sub = 0; Object.keys(owedSelected).forEach(k => { const it = owedSelected[k]; if(k !== 'refcredit' && it.label && String(it.label).startsWith('ค่าเทอม')) sub += (it.amount||0); });
+  const cap = Math.max(0, Math.min(bal, sub));
   let v = Math.max(0, Number(el.value)||0);
   let capped = false;
   if(v > cap){ v = cap; capped = true; el.value = v; }   // กันพิมพ์เกิน — ปรับลงอัตโนมัติ
@@ -2007,6 +2007,16 @@ function showReceipt(tx){
   $('rcpt-modal').classList.add('active');
   toast(tx.voidedAt ? 'ใบเสร็จนี้ถูกยกเลิกแล้ว' : 'บันทึกเรียบร้อย ✓');
 }
+// บรรทัดโชว์เครดิตเพื่อนบ้านชวนเรียนคงเหลือในใบเสร็จ (เฉพาะผู้ปกครองผู้แนะนำ)
+function refReceiptLine(tx){
+  const s = STUDENTS.find(x => x.id === tx.studentId);
+  if(!s || isTeacherReferrer(s.referrerName)) return '';
+  if(refReferred(s).length === 0) return '';
+  const nowYM = new Date().getFullYear()*100 + (new Date().getMonth()+1);
+  if(nowYM < REF_START_YM) return '';
+  const bal = refCreditBalance(s);
+  return '<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:9px 14px;text-align:center;margin-top:10px;font-size:12.5px;color:#15803D">🤝 เครดิตเพื่อนบ้านชวนเรียนคงเหลือ <b>฿' + fmt(bal) + '</b></div>';
+}
 function receiptF(tx){
   return `
     <div id="rcpt-print" style="font-family:'Sarabun',sans-serif;max-width:380px;margin:0 auto;background:white;border-radius:14px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.08)">
@@ -2032,6 +2042,7 @@ function receiptF(tx){
           <div style="font-size:26px;font-weight:800;margin-top:2px">฿${fmt(tx.total)}</div>
           <div style="font-size:11px;opacity:0.8;margin-top:4px">${tx.method}</div>
         </div>
+        ${refReceiptLine(tx)}
       </div>
       <div style="background:#FAF7F2;padding:14px;text-align:center;font-size:11px;color:#6B7280">
         ${SCHOOL.bank} · ${SCHOOL.bankNo}<br>${SCHOOL.bankName}<br>

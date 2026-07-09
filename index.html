@@ -1597,62 +1597,80 @@ function renderOwed(){
 }
 
 // ====== หักส่วนลดเพื่อนบ้านชวนเรียนอัตโนมัติ ======
+// ===== เครดิตสะสมเพื่อนบ้านชวนเรียน (ฝั่งผู้ปกครอง) · เกณฑ์เดือนเดียวกัน · จ่ายช้า=ไม่นับ =====
+const REF_START_YM = 202611; // พ.ย. 2569 (Gregorian พ.ย. 2026) — เริ่มนับสิทธิ์
+function refReferred(s){
+  return activeStudents().filter(x =>
+    (x.referrerChildId && x.referrerChildId === s.id) ||
+    (!x.referrerChildId && x.referrerNick && x.referrerNick === s.nick));
+}
+function refOnTimeMonths(cId){ // จำนวนเดือนที่เด็กใหม่ cId จ่ายค่าเทอมตรงเดือน (ตั้งแต่ พ.ย.2569)
+  const now = new Date();
+  const nowYM = now.getFullYear()*100 + (now.getMonth()+1);
+  const seen = new Set();
+  activeTX().filter(t => t.studentId === cId).forEach(t => {
+    const d = new Date(t.date);
+    const ay = (d.getMonth()+1) >= 5 ? d.getFullYear() : d.getFullYear()-1; // ปีการศึกษาของใบเสร็จ (เริ่ม พ.ค.)
+    (t.items||[]).forEach(it => {
+      if(!(it.label && it.label.startsWith('ค่าเทอม'))) return;
+      (it.monthsList||[]).forEach(mName => {
+        const mi = MONTHS.indexOf(mName); if(mi < 0) return;
+        const mNum = MONTH_NUMS[mi];
+        const yearOfM = mNum >= 5 ? ay : ay+1;
+        const ymKey = yearOfM*100 + mNum;
+        if(ymKey < REF_START_YM) return;      // ก่อนโครงการเริ่ม
+        if(ymKey > nowYM) return;             // เดือนอนาคต (ยังไม่ถึง)
+        const endOfM = new Date(yearOfM, mNum, 0, 23,59,59);
+        if(d <= endOfM) seen.add(ymKey);      // จ่ายภายใน/ก่อนเดือนนั้น = ตรงเวลา (จ่ายช้า=ไม่นับ)
+      });
+    });
+  });
+  return seen.size;
+}
+function refCreditAccrued(s){ return refReferred(s).reduce((a,c)=>a+refOnTimeMonths(c.id)*100, 0); }
+function refCreditRedeemed(s){
+  let sum = 0;
+  activeTX().filter(t => t.studentId === s.id).forEach(t =>
+    (t.items||[]).forEach(it => { if(it.label && it.label.indexOf('เครดิตชวนเรียน') >= 0) sum += Math.abs(it.amount||0); }));
+  return sum;
+}
+function refCreditBalance(s){ return Math.max(0, refCreditAccrued(s) - refCreditRedeemed(s)); }
+
+// ====== หักส่วนลดจาก "เครดิตสะสม" (ตอนผู้แนะนำมาจ่ายค่าเทอม) ======
 function renderAutoDiscount(){
   const s = selStudent;
   if(!s) return;
-  // เด็กใหม่ที่ระบุ "ลูกผู้แนะนำ" = s (s เป็นผู้แนะนำ)
-  const referred = activeStudents().filter(x =>
-    (x.referrerChildId && x.referrerChildId === s.id) ||
-    (!x.referrerChildId && x.referrerNick && x.referrerNick === s.nick)
-  );
-  if(referred.length === 0) return;
-  const now = new Date();
-  const nowKey = now.getFullYear()*100 + (now.getMonth()+1);
-  const START = 202611; // เริ่มหักจริง พ.ย. 2569
-  const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
-  const prevName = MONTHS[MONTH_NUMS.indexOf(prev.getMonth()+1)] || '';
-  const endPrev = new Date(prev.getFullYear(), prev.getMonth()+1, 0, 23, 59, 59);
-
-  let box = '<div class="owed" style="border:1px solid #16A34A;background:#F0FDF4"><div class="owed-cat" style="color:#16A34A">🤝 เพื่อนบ้านชวนเรียน (' + s.nick + ' เป็นผู้แนะนำ)</div>';
-  referred.forEach(c => {
-    let note, eligible = false, amt = 100;
-    if(nowKey <= START){
-      note = '⏳ น้อง ' + c.nick + ' (' + c.cls + ') · โครงการเริ่มหักส่วนลดเดือน พ.ย. 2569';
+  if(isTeacherReferrer(s.referrerName)) return; // ครูผู้แนะนำ = โบนัสในระบบเงินเดือน ไม่ใช่ส่วนลดค่าเทอม
+  if(refReferred(s).length === 0) return;
+  const nowYM = new Date().getFullYear()*100 + (new Date().getMonth()+1);
+  let box = '<div class="owed" style="border:1px solid #16A34A;background:#F0FDF4"><div class="owed-cat" style="color:#16A34A">🤝 เครดิตเพื่อนบ้านชวนเรียน (' + s.nick + ' เป็นผู้แนะนำ)</div>';
+  if(nowYM < REF_START_YM){
+    box += '<div style="padding:8px 10px;font-size:13px;color:#6B7280">⏳ บันทึกผู้แนะนำไว้แล้ว · เริ่มหักส่วนลด พ.ย. 2569</div>';
+  } else {
+    const bal = refCreditBalance(s);
+    if(bal <= 0){
+      box += '<div style="padding:8px 10px;font-size:13px;color:#6B7280">ยังไม่มีเครดิตคงเหลือ · นับเมื่อน้องที่แนะนำจ่ายค่าเทอมตรงเดือน (สะสม ฿' + fmt(refCreditAccrued(s)) + ' · ใช้ไป ฿' + fmt(refCreditRedeemed(s)) + ')</div>';
     } else {
-      // ตรวจว่าน้องจ่ายค่าเทอมเดือนก่อน ภายในเดือนนั้นไหม
-      const ontime = activeTX().some(t => t.studentId === c.id && new Date(t.date) <= endPrev &&
-        t.items.some(it => it.label && it.label.startsWith('ค่าเทอม') && (it.monthsList||[]).includes(prevName)));
-      // เคยให้ส่วนลดของเดือนนี้ไปแล้วหรือยัง
-      const already = activeTX().some(t => t.studentId === s.id &&
-        new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
-        t.items.some(it => it.label && it.label.includes('ส่วนลดเพื่อนบ้านชวนเรียน') && it.label.includes(c.nick)));
-      if(already){
-        note = '✓ น้อง ' + c.nick + ' · ให้ส่วนลดเดือนนี้ไปแล้ว';
-      } else if(ontime){
-        eligible = true;
-        note = '✅ น้อง ' + c.nick + ' จ่ายค่าเทอมเดือน ' + prevName + ' ตรงเวลา · หักส่วนลด 100 บาท';
-      } else {
-        note = '❌ น้อง ' + c.nick + ' ยังไม่จ่าย/จ่ายช้าเดือน ' + prevName + ' · จึงยังไม่ได้ส่วนลดเดือนนี้';
-      }
+      const p = getPriceForClass(s.cls);
+      const monthTuition = (p && s.discount !== 'ฟรี 100%') ? (s.discount === 'ลด 50%' ? p.monthly*0.5 : p.monthly) : 0;
+      const dflt = Math.min(bal, monthTuition > 0 ? monthTuition : bal);
+      owedSelected['refcredit'] = {amount: -dflt, label: 'ส่วนลดเครดิตชวนเรียน (คงเหลือ ฿' + fmt(bal) + ')', months: 0};
+      box += '<div class="owed-row" style="background:#DCFCE7">' +
+        '<label style="display:flex;align-items:center;gap:8px;flex:1"><span style="color:#15803D;font-weight:600">💳 เครดิตคงเหลือ ฿' + fmt(bal) + ' · หักจากใบเสร็จนี้:</span></label>' +
+        '<span style="display:flex;align-items:center;gap:4px;font-weight:700;color:#16A34A">−฿<input type="number" id="refcredit-amt" min="0" max="' + bal + '" step="10" value="' + dflt + '" style="width:88px;padding:4px 6px;border:1px solid #16A34A;border-radius:6px;text-align:right;font-weight:700" oninput="setRefCredit(this)"></span></div>' +
+        '<div style="font-size:11px;color:#16A34A;margin-top:6px">💡 กรอกยอดที่จะหักได้เอง (ไม่เกินเครดิตคงเหลือ) · ส่วนที่ไม่หักเก็บเป็นเครดิตต่อ · ระบบกันยอดสุทธิไม่ให้ติดลบตอนบันทึก</div>';
     }
-    if(eligible){
-      const did = 'refdc_' + c.id;
-      const dlabel = 'ส่วนลดเพื่อนบ้านชวนเรียน (น้อง ' + c.nick + ' จ่ายตรงเดือน ' + prevName + ')';
-      owedSelected[did] = {amount: -amt, label: dlabel, months: 0};
-      box += '<div class="owed-row" data-id="' + did + '" style="background:#DCFCE7">' +
-        '<label style="display:flex;align-items:center;gap:8px;flex:1"><input type="checkbox" class="chk-big" checked data-dlabel="' + dlabel.replace(/"/g,'&quot;') + '" onchange="toggleAutoDisc(this, ' + amt + ')"><span style="color:#15803D;font-weight:600">' + note + '</span></label>' +
-        '<span style="font-weight:700;color:#16A34A">−฿' + fmt(amt) + '</span></div>';
-    } else {
-      box += '<div style="padding:8px 10px;font-size:13px;color:#6B7280;border-bottom:1px solid #E5E7EB">' + note + '</div>';
-    }
-  });
-  box += '<div style="font-size:11px;color:#16A34A;margin-top:6px">💡 แอดมินติ๊กออกได้ถ้าไม่ต้องการหัก · แก้ไข/ลบบันทึกได้ภายหลังที่หน้ารายงาน</div></div>';
+  }
+  box += '</div>';
   $('owed-list').insertAdjacentHTML('beforeend', box);
 }
-function toggleAutoDisc(el, amt){
-  const id = el.closest('.owed-row').dataset.id;
-  if(el.checked){ owedSelected[id] = {amount: -amt, label: el.dataset.dlabel, months: 0}; }
-  else { delete owedSelected[id]; }
+function setRefCredit(el){
+  const s = selStudent; if(!s) return;
+  const bal = refCreditBalance(s);
+  let v = Math.max(0, Number(el.value)||0);
+  if(v > bal){ v = bal; el.value = v; }
+  if(v <= 0){ delete owedSelected['refcredit']; }
+  else { owedSelected['refcredit'] = {amount: -v, label: 'ส่วนลดเครดิตชวนเรียน (คงเหลือ ฿' + fmt(bal) + ')', months: 0}; }
   updateTotal();
 }
 
@@ -3391,24 +3409,15 @@ function renderReferral(){
       return;
     }
     let status;
-    if(nowKey <= START){
+    if(nowKey < START){
       status = '<span class="b b-info">บันทึกชื่อแล้ว · เริ่มนับ พ.ย. 69</span>';
-    } else if(prevKey < START || !prevName){
-      status = '<span class="b b-info">รอประเมินเดือนแรก (ประเมิน พ.ย. ตอนต้น ธ.ค.)</span>';
     } else {
-      const endPrev = new Date(prev.getFullYear(), prev.getMonth()+1, 0, 23, 59, 59);
-      const ontime = activeTX().some(t => t.studentId === s.id && new Date(t.date) <= endPrev &&
-        t.items.some(it => it.label && it.label.startsWith('ค่าเทอม') && (it.monthsList||[]).includes(prevName)));
-      if(!ontime){
-        status = '<span class="b" style="background:#FEE2E2;color:#991B1B">เดือน ' + prevName + ' ไม่เข้าเงื่อนไข</span>';
-      } else {
-        const refChild = activeStudents().find(x => x.id === s.referrerChildId) || activeStudents().find(x => x.nick === s.referrerNick);
-        const given = refChild && activeTX().some(t => t.studentId === refChild.id &&
-          new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
-          t.items.some(it => it.label && it.label.includes('ส่วนลดเพื่อนบ้านชวนเรียน')));
-        status = given ? '<span class="b b-paid">✓ ให้ส่วนลดเดือนนี้แล้ว</span>'
-          : '<span class="b" style="background:#FEF3C7;color:#92400E">⏳ ต้องลด 100 ในใบเสร็จของ ' + (s.referrerNick || '(ไม่ระบุลูกผู้แนะนำ)') + '</span>';
-      }
+      const onTime = refOnTimeMonths(s.id);
+      const refParent = activeStudents().find(x => x.id === s.referrerChildId) || activeStudents().find(x => x.nick === s.referrerNick);
+      const bal = refParent ? refCreditBalance(refParent) : 0;
+      status = '<span class="b b-paid">น้องจ่ายตรง ' + onTime + ' เดือน (สะสม ฿' + fmt(onTime*100) + ')</span>' +
+        (refParent ? ' <span class="b" style="background:#DCFCE7;color:#166534">เครดิตผู้แนะนำคงเหลือ ฿' + fmt(bal) + '</span>'
+                   : ' <span class="b" style="background:#FEF3C7;color:#92400E">ผู้แนะนำไม่ใช่นักเรียน (หักที่ใบเสร็จไม่ได้)</span>');
     }
     rows += '<tr><td style="' + tdS + '"><span class="lnk" onclick="openDetail(' + s.id + ')">' + s.nick + '</span> · ' + s.cls + '</td>' +
       '<td style="' + tdS + '">' + s.referrerName + (s.referrerNick ? ' <span style="color:#6B7280">(ลูก: ' + s.referrerNick + ')</span>' : '') + '</td>' +
@@ -3416,7 +3425,7 @@ function renderReferral(){
   });
   box.innerHTML = '<table style="width:100%;border-collapse:collapse">' +
     '<tr><th style="' + tdS + ';text-align:left;color:#6B7280">เด็กใหม่ที่ถูกแนะนำ</th><th style="' + tdS + ';text-align:left;color:#6B7280">ผู้แนะนำ</th><th style="' + tdS + ';text-align:left;color:#6B7280">สถานะสิทธิ์' + (prevName ? ' (ประเมินเดือน ' + prevName + ')' : '') + '</th></tr>' + rows + '</table>' +
-    '<div style="font-size:11.5px;color:#9CA3AF;margin-top:8px">💡 วิธีให้ส่วนลด: บันทึกรับเงินของลูกผู้แนะนำ → กด "🤝 เพิ่มส่วนลด" → ระบบจะติ๊ก ✓ ให้เองที่นี่</div>';
+    '<div style="font-size:11.5px;color:#9CA3AF;margin-top:8px">💡 เครดิตสะสม: ทุกเดือนที่น้องใหม่จ่ายค่าเทอมตรงเดือน = +100 · เวลาผู้แนะนำมาจ่ายค่าเทอม ระบบจะโชว์ "เครดิตคงเหลือ" ให้หักจากใบเสร็จ (กรอกยอดเองได้ · ส่วนที่เหลือสะสมต่อ)</div>';
 }
 function copyMonthSummary(){
   const period = $('rpt-filter').value;
@@ -4370,19 +4379,19 @@ function savePricing(){
 function addCustomFee(){
   const name = (prompt('ชื่อค่าใหม่ (เช่น ค่าคอมพิวเตอร์, ค่าชุดนักเรียน):')||'').trim();
   if(!name) return;
-  const term = confirm('“'+name+'” คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
+  const term = confirm('\u201c'+name+'\u201d คิดแบบไหน?\n\nกด OK = รายเทอม (เก็บ 2 งวด/ปี)\nกด Cancel = รายปี (เก็บครั้งเดียว/ปี)');
   if(!Array.isArray(SCHOOL.customFees)) SCHOOL.customFees=[];
   SCHOOL.customFees.push({key:'cf'+Date.now(), label:name, type: term?'term':'once'});
   cloudSaveSchool(); renderPricing();
-  toast('เพิ่มประเภท “'+name+'” แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
+  toast('เพิ่มประเภท \u201c'+name+'\u201d แล้ว · กรอกราคาแต่ละชั้นแล้วกดบันทึกราคา');
 }
 function delCustomFee(key){
   const cf=(SCHOOL.customFees||[]).find(x=>x.key===key); if(!cf) return;
-  if(!confirm('ลบประเภท “'+cf.label+'” ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
+  if(!confirm('ลบประเภท \u201c'+cf.label+'\u201d ออกจากทุกชั้น?\n(ประวัติการจ่ายเดิมไม่ถูกลบ)')) return;
   SCHOOL.customFees = (SCHOOL.customFees||[]).filter(x=>x.key!==key);
   (SCHOOL.pricing||[]).forEach(p=>{ if(p.cf) delete p.cf[key]; });
   cloudSaveSchool(); renderPricing();
-  toast('ลบประเภท “'+cf.label+'” แล้ว');
+  toast('ลบประเภท \u201c'+cf.label+'\u201d แล้ว');
 }
 function saveSchool(){
   SCHOOL = {

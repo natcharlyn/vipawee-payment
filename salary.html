@@ -274,12 +274,15 @@ async function autoImportAttendance(){
 async function autoImportBonus(){
   if(!hasMonth()||isClosed())return;
   try{
-    const [by,bm]=MONTH.split('-').map(Number);const gy=by-543;
-    if(gy*100+bm<202611)return; // โครงการเริ่ม พ.ย. 2569 (ตรงกับฝั่งผู้ปกครอง)
+    const [by,bm]=MONTH.split('-').map(Number);
+    // โบนัสของ "เดือนก่อนหน้า" มาเข้าสลิปเดือนนี้ (คำนวณหลังเดือนก่อนปิด — กันเคสเด็กจ่ายค่าเทอมหลังวันจ่ายเงินเดือน)
+    let pby=by,pbm=bm-1;if(pbm===0){pbm=12;pby=by-1;}
+    const gy=pby-543;
+    if(gy*100+pbm<202611)return; // นับสิทธิ์ตั้งแต่เด็กจ่ายตรงเดือน พ.ย. 2569 → โบนัสแรกเข้าสลิป ธ.ค.
     const T_MONTHS=['พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
     const T_NUMS=[5,6,7,8,9,11,12,1,2,3];
-    const idx=T_NUMS.indexOf(bm);if(idx<0)return; // ต.ค. ไม่มีเก็บค่าเทอม
-    const mName=T_MONTHS[idx];const endMonth=new Date(gy,bm,0,23,59,59);
+    const idx=T_NUMS.indexOf(pbm);if(idx<0)return; // เดือนก่อนไม่เก็บค่าเทอม (ต.ค./เม.ย.) → สลิปนี้ไม่มีโบนัส
+    const mName=T_MONTHS[idx];const endMonth=new Date(gy,pbm,0,23,59,59);
     const [studs,txs]=await Promise.all([
       q(sb.from('students').select('id,referrer_name,deleted')),
       q(sb.from('transactions').select('student_id,date,items,voided_at'))

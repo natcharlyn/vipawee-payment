@@ -1106,7 +1106,7 @@ function ensureReceiptNos(){
   saveTX();
 }
 function receiptPrintDual(tx){
-  const stu = (tx.payerName || tx.studentNick) + ' (' + tx.studentNick + ' · ' + tx.studentClass + ')';
+  const stu = (tx.payerName || tx.studentNick) + ' (' + tx.studentNick + (tx.studentName ? ' · ' + tx.studentName : '') + ' · ' + tx.studentClass + ')';
   const dt = new Date(tx.date).toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
   const no = tx.receiptNo || ('#' + tx.id);
   const rows = tx.items.map((it,i) => '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+it.label+'</td><td class="amt">'+fmt2(it.amount)+'</td></tr>').join('');

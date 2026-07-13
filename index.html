@@ -688,7 +688,8 @@ details summary{cursor:pointer;outline:none}
   
   <!-- Detailed transactions -->
   <div class="card">
-    <div class="card-title">🤝 เพื่อนบ้านชวนเรียน · ทะเบียนสิทธิ์ส่วนลด</div>
+    <div class="card-title">🤝 เพื่อนบ้านชวนเรียน · ภาพรวมโครงการ + ทะเบียนสิทธิ์</div>
+    <div id="r-referral-sum"></div>
     <div id="r-referral"></div>
   </div>
 
@@ -3519,6 +3520,39 @@ function pickReferrerTeacher(selEl){
 }
 // ผู้แนะนำคนนี้เป็น "ครู" ในระบบเงินเดือนไหม (ชื่อตรงกับ staff_public)
 function isTeacherReferrer(name){ return !!name && TEACHERS.indexOf(String(name).trim()) >= 0; }
+// ===== 📊 ภาพรวมโครงการเพื่อนบ้านชวนเรียน (สำหรับผู้บริหาร) =====
+function renderReferralSummary(){
+  const box = $('r-referral-sum');
+  if(!box) return;
+  const refs = activeStudents().filter(s => s.referrerName);
+  if(refs.length === 0){ box.innerHTML = ''; return; }
+  const teacherKids = refs.filter(s => isTeacherReferrer(s.referrerName));
+  const parentKids  = refs.filter(s => !isTeacherReferrer(s.referrerName));
+  // ฝั่งครู → โบนัสเงินเดือน (เดือนที่น้องจ่ายตรง × 100)
+  let teacherBonus = 0; const teacherSet = new Set();
+  teacherKids.forEach(k => { teacherBonus += refOnTimeMonths(k.id) * 100; teacherSet.add(String(k.referrerName).trim()); });
+  // ฝั่งผู้ปกครอง → เครดิตส่วนลด (นับ "ลูกของผู้แนะนำ" ที่ไม่ซ้ำ)
+  const parentMap = new Map();
+  parentKids.forEach(k => {
+    const p = activeStudents().find(x => x.id === k.referrerChildId) || activeStudents().find(x => x.nick === k.referrerNick);
+    if(p) parentMap.set(p.id, p);
+  });
+  let acc = 0, red = 0, bal = 0;
+  parentMap.forEach(p => { acc += refCreditAccrued(p); red += refCreditRedeemed(p); bal += refCreditBalance(p); });
+  const totalCost = acc + teacherBonus;
+  const C = 'border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;text-align:center;flex:1;min-width:130px';
+  box.innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+      '<div style="' + C + ';background:#EFF6FF"><div style="font-size:21px;font-weight:800;color:#1D4ED8">' + refs.length + '</div><div style="font-size:11px;color:#6B7280">เด็กใหม่ที่ถูกแนะนำ (คน)</div></div>' +
+      '<div style="' + C + ';background:#F8FAFC"><div style="font-size:21px;font-weight:800">' + parentMap.size + ' / ' + teacherSet.size + '</div><div style="font-size:11px;color:#6B7280">ผู้แนะนำ · ผปค. / ครู (คน)</div></div>' +
+      '<div style="' + C + ';background:#F0FDF4"><div style="font-size:21px;font-weight:800;color:#15803D">฿' + fmt(bal) + '</div><div style="font-size:11px;color:#6B7280">เครดิต ผปค. คงเหลือ (ยังต้องให้)</div></div>' +
+      '<div style="' + C + ';background:#FEF3C7"><div style="font-size:21px;font-weight:800;color:#92400E">฿' + fmt(totalCost) + '</div><div style="font-size:11px;color:#6B7280">ต้นทุนโครงการรวม (เกิดสิทธิ์แล้ว)</div></div>' +
+    '</div>' +
+    '<div style="font-size:12.5px;color:#475569;background:#F9FAFB;border-radius:8px;padding:9px 12px;margin-bottom:10px;line-height:1.7">' +
+      '💰 <b>ฝั่งผู้ปกครอง</b> (ส่วนลดค่าเทอม) — เครดิตสะสม ฿' + fmt(acc) + ' · หักไปแล้ว ฿' + fmt(red) + ' · <b>คงเหลือ ฿' + fmt(bal) + '</b><br>' +
+      '👩‍🏫 <b>ฝั่งครู</b> (โบนัสในเงินเดือน) — ได้สิทธิ์รวม ฿' + fmt(teacherBonus) + ' (จ่ายผ่านระบบเงินเดือน)' +
+    '</div>';
+}
 function renderReferral(){
   const box = $('r-referral');
   if(!box) return;
@@ -3653,7 +3687,7 @@ function renderReport(){
     '<div style="font-size:17px;font-weight:800">' + SCHOOL.name + ' · รายงานสรุปการเงิน</div>' +
     '<div style="font-size:13px;margin-top:2px">ช่วงรายงาน: <b>' + (periodNames[period] || period) + ' · ' + rangeTxt + '</b></div>' +
     '<div style="font-size:12px;color:#444">พิมพ์เมื่อ ' + nw.toLocaleString('th-TH', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'}) + ' น.' + (voidedCount > 0 ? ' · ไม่นับใบเสร็จที่ยกเลิก ' + voidedCount + ' รายการ' : '') + '</div>';
-  if($('r-referral')) renderReferral();
+  if($('r-referral')){ renderReferralSummary(); renderReferral(); }
   const periodPayouts = PAYOUTS.filter(p => inPeriod(p.date, period));
   
   // === Top stats ===
@@ -4601,8 +4635,6 @@ function autoBackupWeekly(){
     const now = Date.now();
     const WEEK = 7 * 24 * 60 * 60 * 1000;
     if(!last || (now - parseInt(last, 10)) >= WEEK){
-      // เบราว์เซอร์บล็อกการดาวน์โหลดอัตโนมัติที่ไม่ได้เกิดจากการคลิก
-      // จึงรอให้ครูคลิกอะไรก็ได้ครั้งแรก แล้วค่อยเซฟ (ครูไม่ต้องกดปุ่มพิเศษ)
       const fn = () => {
         document.removeEventListener('click', fn, true);
         downloadBackup();

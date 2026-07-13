@@ -1671,7 +1671,9 @@ function openRcptById(id){
   const t = TX.find(x => x.id === id);
   if(t) showReceipt(t); else toast('ไม่พบใบเสร็จ', 'error');
 }
+let _refundingRef = false;
 async function refundReferralCredit(key){
+  if(_refundingRef){ toast('⏳ กำลังบันทึกอยู่ · รอสักครู่'); return; }
   const r = refBuildList().find(x => x.key === key);
   if(!r || !r.child || r.balance <= 0){ toast('ไม่มีเครดิตคงเหลือให้คืน', 'error'); return; }
   const receiver = prompt('คืนเงินเครดิต ฿' + fmt(r.balance) + ' ให้ผู้แนะนำ: ' + r.name + '\n\nพิมพ์ชื่อผู้รับเงิน (เป็นหลักฐาน):', r.name);
@@ -1684,8 +1686,10 @@ async function refundReferralCredit(key){
     items: [{ label: 'คืนเงินเครดิตชวนเรียน (จ่ายสด) · ผู้รับ: ' + (receiver || r.name), amount: -r.balance, months: 0 }],
     total: -r.balance, method: 'เงินสด', style: 'F', cashier: cashierName || 'วีรญา'
   };
+  _refundingRef = true;
   toast('⏳ กำลังบันทึกการคืนเงิน...');
   const ok = await cloudSaveNewTx(tx);
+  _refundingRef = false;
   if(!ok){ toast('⚠ บันทึกไม่สำเร็จ · ลองใหม่อีกครั้ง', 'error'); return; }
   TX.unshift(tx);
   toast('💵 คืนเงินเครดิต ฿' + fmt(r.balance) + ' ให้ ' + r.name + ' เรียบร้อย ✓');
@@ -2676,7 +2680,38 @@ function editStu(id){
 
 function closeStuModal(){ $('stu-modal').classList.remove('active'); }
 
-function saveStu(){
+// จองรหัสนักเรียนจากคลาวด์ (authoritative) — กันธุรการ 2 คนเพิ่มพร้อมกันแล้วรหัสชนกัน (เด็กคนหนึ่งจะถูกทับหาย)
+async function cloudNextStudentId(){
+  let mx = 0;
+  try{
+    const { data } = await sb.from('students').select('id').order('id',{ascending:false}).limit(1);
+    if(data && data[0] && data[0].id) mx = Number(data[0].id) || 0;
+  }catch(e){}
+  STUDENTS.forEach(s => { if(Number(s.id) > mx) mx = Number(s.id); });
+  return mx + 1;
+}
+// เพิ่มนักเรียนใหม่แบบ "ยืนยันผล" — ใช้ insert (ไม่ใช่ upsert) เพื่อให้ DB ปฏิเสธถ้ารหัสชน แล้วขอรหัสใหม่
+let _addingStu = false;
+async function cloudAddStudent(data){
+  for(let i=1; i<=4; i++){
+    const id = await cloudNextStudentId();
+    const s = {id: id, ...data};
+    try{
+      const { error } = await sb.from('students').insert(stuToRow(s));
+      if(!error){
+        STUDENTS.push(s);
+        if(_snap['students']) _snap['students'].set(String(id), JSON.stringify(stuToRow(s)));
+        return s;
+      }
+      const msg = String(error.message||'');
+      if(/duplicate|unique|already exists|primary key/i.test(msg)) continue;  // รหัสชน → ขอใหม่
+      if(/JWT|auth|token|expired|denied|policy|row-level/i.test(msg)){ try{ await sb.auth.refreshSession(); }catch(_){} }
+    }catch(e){ /* เน็ตหลุด — ลองใหม่ */ }
+    if(i<4) await new Promise(r=>setTimeout(r, 600*i));
+  }
+  return null;
+}
+async function saveStu(){
   const data = {
     name: $('f-name').value.trim(),
     nick: $('f-nick').value.trim(),
@@ -2732,13 +2767,19 @@ function saveStu(){
       STUDENTS[idx] = {...STUDENTS[idx], ...data};
       toast('แก้ไขข้อมูล ' + data.nick + ' ✓');
     }
+    saveStudents();
   } else {
-    // Add
-    const maxId = STUDENTS.length > 0 ? Math.max(...STUDENTS.map(s => s.id)) : 0;
-    STUDENTS.push({id: maxId + 1, ...data});
-    toast('เพิ่ม ' + data.nick + ' ✓');
+    // Add — จองรหัสจากคลาวด์ + insert จริง (กันรหัสชนกันเมื่อธุรการ 2 คนเพิ่มพร้อมกัน)
+    if(_addingStu) return; _addingStu = true;
+    toast('⏳ กำลังเพิ่มนักเรียนขึ้นคลาวด์...');
+    const added = await cloudAddStudent(data);
+    _addingStu = false;
+    if(!added){
+      toast('⚠ เพิ่มนักเรียนไม่สำเร็จ (เน็ต/คลาวด์/เซสชัน) · ยังไม่บันทึก · กรุณากดบันทึกใหม่', 'error');
+      return;
+    }
+    toast('เพิ่ม ' + data.nick + ' ✓ (รหัส ' + added.id + ')');
   }
-  saveStudents();
   closeStuModal();
   // Refresh views
   renderStudents();

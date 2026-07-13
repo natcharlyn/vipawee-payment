@@ -256,6 +256,7 @@ details summary{cursor:pointer;outline:none}
     <a data-page="settlement"><span class="ico">🤝</span> ส่งเจ้าของรถ</a>
     <a data-page="stock"><span class="ico">📦</span> คลังของขาย</a>
     <a data-page="invoice"><span class="ico">📄</span> ใบแจ้งหนี้</a>
+    <a data-page="msg"><span class="ico">💬</span> ข้อความแจ้ง</a>
     <a data-page="report"><span class="ico">📊</span> รายงาน</a>
     <a data-page="settings"><span class="ico">⚙</span> ตั้งค่า + Backup</a>
     <a onclick="doLogout()" style="opacity:0.8"><span class="ico">🚪</span> ออกจากระบบ</a>
@@ -614,6 +615,16 @@ details summary{cursor:pointer;outline:none}
 </div>
 
 <!-- REPORT -->
+<div class="page" id="page-msg">
+  <div class="topbar">
+    <div>
+      <div class="page-title">💬 ข้อความแจ้ง ผู้ปกครอง / ครู</div>
+      <div class="page-sub">เลือกแบบ → เลือกเดือน → กดคัดลอก → วางในกลุ่ม LINE ได้เลย</div>
+    </div>
+  </div>
+  <div id="msg-area"></div>
+</div>
+
 <div class="page" id="page-report">
 <div class="print-only" id="rpt-print-head" style="margin-bottom:14px;border-bottom:2px solid #000;padding-bottom:8px"></div>
   <div class="topbar">
@@ -1368,9 +1379,109 @@ function goto(page){
   if(page==='settings') renderSettings();
   if(page==='slip') renderSlips();
   if(page==='invoice') renderInvoice();
+  if(page==='msg') renderMsg();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('.menu a[data-page]').forEach(a=>{ a.onclick = ()=>goto(a.dataset.page); });
+
+// ====== 💬 ข้อความแจ้ง ผู้ปกครอง / ครู (5 แบบ · คัดลอกส่ง LINE) ======
+const MSG_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const MSG_TYPES = [
+  {id:'notify',  n:'📄 แจ้งแจกใบแจ้งชำระ'},
+  {id:'remind',  n:'⏰ เตือนค้างชำระ'},
+  {id:'thanks',  n:'🙏 ขอบคุณที่ชำระแล้ว'},
+  {id:'room',    n:'🏠 แยกรายห้อง'},
+  {id:'teacher', n:'👩‍🏫 แจ้งครูมารับใบแจ้ง'}
+];
+let msgType = 'notify';
+function msgFoot(){
+  return '☎️ สอบถามรายละเอียดเพิ่มเติม\nสามารถติดต่อ งานธุรการ ' + (SCHOOL.name||'โรงเรียนอนุบาลวิภาวี') +
+         '\n📞 โทร. ' + (SCHOOL.phone||'081-700-9616') +
+         '\n🕘 ในวันและเวลาทำการเท่านั้น\nวันจันทร์–วันศุกร์ เวลา 08.00–16.30 น.';
+}
+function msgTpl(t, m, y, c){
+  const SN = SCHOOL.name || 'โรงเรียนอนุบาลวิภาวี';
+  if(t === 'notify') return '📢 ประชาสัมพันธ์ถึงผู้ปกครองนักเรียน\n🏫 ' + SN +
+    '\nเรื่อง : ใบแจ้งชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n📝 ' + SN + ' ขอเรียนแจ้งให้ทราบว่า ในวันนี้ทางโรงเรียนได้ดำเนินการแจก ใบแจ้งชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y + ' ให้แก่นักเรียนเพื่อนำส่งผู้ปกครองเรียบร้อยแล้ว' +
+    '\n\n💳 จึงใคร่ขอความกรุณาผู้ปกครองโปรดตรวจสอบรายละเอียดในใบแจ้งชำระ และดำเนินการชำระค่าเล่าเรียนภายในกำหนด เพื่อให้การบริหารจัดการของโรงเรียนเป็นไปด้วยความเรียบร้อย' +
+    '\n\n' + msgFoot() +
+    '\n\n🙏 ' + SN + ' ขอขอบพระคุณผู้ปกครองทุกท่านที่ให้ความร่วมมือ และให้การสนับสนุนการดำเนินงานของโรงเรียนด้วยดีเสมอมา';
+  if(t === 'remind') return '📢 ประชาสัมพันธ์ถึงผู้ปกครองนักเรียน\n🏫 ' + SN +
+    '\nเรื่อง : ขอความอนุเคราะห์ชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n📝 ตามที่โรงเรียนได้แจกใบแจ้งชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y + ' ให้แก่นักเรียนนำส่งผู้ปกครองไปแล้วนั้น ขณะนี้ยังมีผู้ปกครองบางท่านที่ยังมิได้ดำเนินการชำระ' +
+    '\n\n💳 จึงใคร่ขอความกรุณาผู้ปกครองโปรดดำเนินการชำระค่าเล่าเรียนภายในกำหนด เพื่อให้การบริหารจัดการของโรงเรียนเป็นไปด้วยความเรียบร้อย' +
+    '\n\n🙏 หากท่านได้ชำระเรียบร้อยแล้ว โรงเรียนขอขอบพระคุณ และต้องขออภัยที่แจ้งซ้ำมา ณ ที่นี้' +
+    '\n\n' + msgFoot() +
+    '\n\n🙏 ' + SN + ' ขอขอบพระคุณผู้ปกครองทุกท่านที่ให้ความร่วมมือด้วยดีเสมอมา';
+  if(t === 'thanks') return '📢 ประชาสัมพันธ์ถึงผู้ปกครองนักเรียน\n🏫 ' + SN +
+    '\nเรื่อง : ขอขอบพระคุณผู้ปกครองที่ชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n🙏 ' + SN + ' ขอขอบพระคุณผู้ปกครองทุกท่าน ที่ได้ดำเนินการชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y + ' เรียบร้อยแล้ว' +
+    '\n\n💙 ความร่วมมือของท่านมีส่วนสำคัญอย่างยิ่ง ต่อการพัฒนาคุณภาพการเรียนการสอน และการดูแลนักเรียนของโรงเรียน' +
+    '\n\n📌 สำหรับผู้ปกครองที่ยังมิได้ชำระ สามารถติดต่อชำระได้ที่งานธุรการ ในวันและเวลาทำการ' +
+    '\n\n' + msgFoot() +
+    '\n\n🙏 ขอขอบพระคุณผู้ปกครองทุกท่านที่ให้การสนับสนุนโรงเรียนด้วยดีเสมอมา';
+  if(t === 'room') return '🙏 เรียน ผู้ปกครองนักเรียนชั้น ' + c + ' ทุกท่าน\n🏫 ' + SN +
+    '\nเรื่อง : ค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n📝 ขณะนี้ยังมีนักเรียนชั้น ' + c + ' บางท่าน ที่ยังมิได้ดำเนินการชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n💳 จึงขอความกรุณาผู้ปกครองโปรดตรวจสอบใบแจ้งชำระที่นักเรียนนำส่ง และดำเนินการชำระภายในกำหนดด้วยค่ะ' +
+    '\n\n🙏 หากท่านได้ชำระเรียบร้อยแล้ว ขอขอบพระคุณ และต้องขออภัยที่แจ้งซ้ำค่ะ' +
+    '\n\n' + msgFoot() +
+    '\n\n💙 ขอบพระคุณผู้ปกครองทุกท่านค่ะ';
+  if(t === 'teacher') return '📢 แจ้งคุณครูทุกท่าน\n🏫 ' + SN +
+    '\nเรื่อง : ขอเชิญรับใบแจ้งชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y +
+    '\n\n📝 งานธุรการได้จัดทำ ใบแจ้งชำระค่าเล่าเรียน ประจำเดือน' + m + ' พ.ศ. ' + y + ' เรียบร้อยแล้ว' +
+    '\n\n🙏 ขอความกรุณาคุณครูประจำชั้นทุกท่าน มารับใบแจ้งชำระได้ที่ห้องธุรการ เพื่อนำไปแจกให้นักเรียนนำส่งผู้ปกครอง' +
+    '\n\n📌 ขอความกรุณาตรวจสอบจำนวนใบแจ้งให้ครบตามจำนวนนักเรียนในห้องด้วยนะคะ หากไม่ครบหรือมีข้อสงสัย แจ้งงานธุรการได้ทันที' +
+    '\n\n☎️ สอบถามเพิ่มเติม : งานธุรการ\n📞 โทร. ' + (SCHOOL.phone||'081-700-9616') +
+    '\n🕘 วันจันทร์–วันศุกร์ เวลา 08.00–16.30 น.' +
+    '\n\n🙏 ขอบคุณคุณครูทุกท่านค่ะ 💙';
+  return '';
+}
+function renderMsg(){
+  const now = new Date();
+  const by = now.getFullYear() + 543;
+  const yrs = [by-1, by, by+1, by+2];
+  const classes = [...new Set(activeStudents().map(s=>s.cls).filter(Boolean))].sort();
+  const CARD = 'background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:12px';
+  const LB = 'font-weight:700;color:#2E75B6;margin-bottom:8px';
+  let h = '<div style="'+CARD+'"><div style="'+LB+'">1) เลือกแบบข้อความ</div>' +
+    '<div id="msg-types" style="display:flex;flex-wrap:wrap;gap:8px">' +
+    MSG_TYPES.map(t => '<button class="btn'+(t.id===msgType?' btn-primary':'')+'" data-mt="'+t.id+'" onclick="setMsgType(\''+t.id+'\')">'+t.n+'</button>').join('') +
+    '</div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">' +
+    '<div style="flex:1;min-width:150px"><label style="font-size:13px;color:#6B7280">เดือน</label><select class="select" id="msg-mo" onchange="buildMsg()">' +
+      MSG_MONTHS.map((m,i)=>'<option value="'+i+'"'+(i===now.getMonth()?' selected':'')+'>'+m+'</option>').join('') + '</select></div>' +
+    '<div style="flex:1;min-width:120px"><label style="font-size:13px;color:#6B7280">ปี (พ.ศ.)</label><select class="select" id="msg-yr" onchange="buildMsg()">' +
+      yrs.map(y=>'<option'+(y===by?' selected':'')+'>'+y+'</option>').join('') + '</select></div>' +
+    '<div id="msg-cls-wrap" style="flex:1;min-width:150px;display:'+(msgType==='room'?'block':'none')+'"><label style="font-size:13px;color:#6B7280">ห้องเรียน</label><select class="select" id="msg-cls" onchange="buildMsg()">' +
+      classes.map(c=>'<option>'+c+'</option>').join('') + '</select></div>' +
+    '</div></div>';
+  h += '<div style="'+CARD+'"><div style="'+LB+'">2) ข้อความที่ได้ (แก้ไขเพิ่มเองได้ก่อนคัดลอก)</div>' +
+    '<textarea id="msg-out" style="width:100%;min-height:330px;padding:12px;border:1.5px solid #D1D5DB;border-radius:10px;font-size:14px;line-height:1.75;font-family:inherit;background:#FAFBFC"></textarea>' +
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">' +
+    '<button class="btn btn-primary" onclick="copyMsg()">📋 คัดลอกข้อความ</button>' +
+    '<button class="btn" onclick="buildMsg()">↺ สร้างใหม่</button></div>' +
+    '<div style="background:#EFF6FF;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#1D4ED8;margin-top:10px">💡 คัดลอกแล้วนำไปวางในกลุ่ม LINE ได้เลย · เดือน/ปี ระบบเลือกเดือนปัจจุบันให้อัตโนมัติ</div></div>';
+  $('msg-area').innerHTML = h;
+  buildMsg();
+}
+function setMsgType(id){
+  msgType = id;
+  document.querySelectorAll('#msg-types [data-mt]').forEach(b => b.classList.toggle('btn-primary', b.dataset.mt === id));
+  const w = $('msg-cls-wrap'); if(w) w.style.display = (id === 'room') ? 'block' : 'none';
+  buildMsg();
+}
+function buildMsg(){
+  const mo = $('msg-mo'), yr = $('msg-yr'), cl = $('msg-cls'), out = $('msg-out');
+  if(!mo || !yr || !out) return;
+  out.value = msgTpl(msgType, MSG_MONTHS[+mo.value], yr.value, cl ? cl.value : '');
+}
+function copyMsg(){
+  const t = $('msg-out'); if(!t) return;
+  navigator.clipboard.writeText(t.value)
+    .then(()=> toast('📋 คัดลอกข้อความแล้ว ✓ · นำไปวางในกลุ่ม LINE ได้เลย'))
+    .catch(()=>{ t.select(); document.execCommand('copy'); toast('📋 คัดลอกแล้ว ✓'); });
+}
 
 // === RECORD: Search ===
 let selStudent = null;

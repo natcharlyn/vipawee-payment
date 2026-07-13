@@ -751,6 +751,15 @@ function renderLine(){
   document.getElementById('content').innerHTML=h;drawLine();
 }
 function setLineMode(m){lineMode=m;renderLine();}
+// เดือน "ต้นทาง" ของโบนัสชวนเรียนในสลิปเดือนนี้ (= เดือนก่อนหน้า ที่น้องจ่ายค่าเทอม)
+function bonusSrcMonthName(){
+  const [by,bm]=MONTH.split('-').map(Number);
+  let pbm=bm-1;if(pbm===0)pbm=12;
+  const T_MONTHS=['พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
+  const T_NUMS=[5,6,7,8,9,11,12,1,2,3];
+  const idx=T_NUMS.indexOf(pbm);
+  return idx>=0 ? T_MONTHS[idx] : '';
+}
 function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSel').value);const r=refundAmt(s);const A=refAcct();const ML=monthLabel(MONTH);
   let msg;
   if(lineMode==='confirm'){
@@ -768,6 +777,13 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
     const att = L.length?`\n\n📋 บันทึกเวลาเดือนนี้\n`+L.join('\n'):`\n\n✓ เดือนนี้มาเต็มเวลา ไม่มีขาด/ลา/มาสาย`;
     msg = `เรียน ${s.n}\n\nแจ้งเงินเดือนประจำเดือน ${ML}\n${payOf(s)==='เงินสด'?'รับเป็นเงินสดที่ฝ่ายการเงินได้เลยค่ะ':'โอนเข้าบัญชีเรียบร้อยแล้วค่ะ'}`;
     msg += att;
+    // 🤝 โบนัสเพื่อนบ้านชวนเรียน (ถ้ามี) — มาจากน้องที่ครูแนะนำ จ่ายค่าเทอมตรงเดือนก่อนหน้า
+    const refB = Number(it.bonusRef||0);
+    if(refB > 0){
+      const nKid = Math.round(refB/100);
+      const src = bonusSrcMonthName();
+      msg += `\n\n🤝 โบนัสเพื่อนบ้านชวนเรียน +฿${f(refB)}\n• น้องที่ครูแนะนำ ${nKid} คน จ่ายค่าเทอม${src?'เดือน '+src:''} ตรงเวลา\n(รวมอยู่ในเงินเดือนเดือนนี้แล้วค่ะ)\nขอบคุณที่ช่วยแนะนำน้องมาเรียนนะคะ 🙏`;
+    }
     if(r>0) msg += `\n\n🔸 เดือนนี้มียอดต้องโอนคืน ฿${f(r)}\nโอนเข้า: ${A.bank} ${A.no} (${A.name})\nโอนแล้วส่งสลิปให้ฝ่ายการเงินทาง LINE ได้เลยค่ะ`;
   }
   let groupCard='';

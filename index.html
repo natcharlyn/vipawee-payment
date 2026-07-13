@@ -2345,9 +2345,28 @@ function saveStu(){
       if(!confirm('มีเด็กชื่อเล่น "'+data.nick+'" อยู่แล้ว · เพิ่มใหม่หรือไม่?')) return;
     }
   }
+  // ===== 🤝 ตรวจผู้แนะนำ (เพื่อนบ้านชวนเรียน) · กันเคลมซ้ำ / กรอกผิด =====
+  if(data.referrerName){
+    // 1) กันแนะนำตัวเอง (ลูกของผู้แนะนำ = เด็กคนนี้เอง)
+    if(editingStudentId && data.referrerChildId === editingStudentId){
+      toast('⚠ ผู้แนะนำต้องไม่ใช่ตัวเด็กเอง · เลือก "ลูกของผู้แนะนำ" ใหม่', 'error'); return;
+    }
+    // 2) ผู้แนะนำเป็นผู้ปกครอง (ไม่ใช่ครู) แต่ยังไม่ได้เลือกลูกของผู้แนะนำ → หักส่วนลดที่ใบเสร็จไม่ได้
+    if(!isTeacherReferrer(data.referrerName) && !data.referrerChildId){
+      if(!confirm('⚠ ระบุผู้แนะนำ "' + data.referrerName + '" แต่ยังไม่ได้เลือก "ลูกของผู้แนะนำ"\n\nระบบจะหักส่วนลดที่ใบเสร็จไม่ได้ (ไม่รู้ว่าต้องหักให้ลูกคนไหน)\n\nต้องการบันทึกต่อไหม?')) return;
+    }
+    // 3) กันเคลมซ้ำ: เด็กคนนี้มีผู้แนะนำเดิมอยู่แล้ว แต่กำลังเปลี่ยนเป็นคนใหม่
+    if(editingStudentId){
+      const _old = STUDENTS.find(s => s.id === editingStudentId);
+      const _oldName = ((_old && _old.referrerName) || '').trim();
+      if(_oldName && _oldName !== data.referrerName){
+        if(!confirm('⚠ น้อง "' + data.nick + '" มีผู้แนะนำอยู่แล้ว\n\nเดิม: ' + _oldName + '\nใหม่: ' + data.referrerName + '\n\nเด็ก 1 คน มีผู้แนะนำได้คนเดียว · สิทธิ์/เครดิตจะย้ายไปผู้แนะนำคนใหม่\n\nยืนยันเปลี่ยนผู้แนะนำไหม?')) return;
+      }
+    }
+  }
   // Auto-clear busCode if not using bus
   if(data.useBus === 'ไม่ใช้'){ data.busCode = ''; data.payBus = '-'; }
-  
+
   if(editingStudentId){
     // Edit
     const idx = STUDENTS.findIndex(s => s.id === editingStudentId);

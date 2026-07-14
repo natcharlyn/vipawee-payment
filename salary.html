@@ -323,6 +323,10 @@ function isClosed(m){return (CONFIG.closed_months||[]).includes(m===undefined?MO
 function canEdit(){return hasMonth()&&!isClosed();}
 async function openMonth(){
   if(hasMonth()){toast('เดือนนี้เปิดอยู่แล้ว');return;}
+  return salGuard('เปิดเดือน', _openMonth);
+}
+async function _openMonth(){
+  if(hasMonth()){toast('เดือนนี้เปิดอยู่แล้ว');return;}   // เช็คซ้ำ กันกดรัวสองครั้งติด
   const prev=MONTHS.filter(x=>x<MONTH).sort().pop();
   let prevEnt={};
   if(prev){(await q(sb.from('payroll_entries').select('*').eq('month',prev))).forEach(r=>prevEnt[r.staff_id]=r);}
@@ -349,18 +353,26 @@ async function openMonth(){
   await loadMonth(MONTH);toast('เปิดเดือน '+monthLabel(MONTH)+' แล้ว ✓ (คัดลอกฐาน+หักตายตัวจากเดือนก่อน)');go('entry');
 }
 async function closeMonth(){
+  if(isClosed()){toast('เดือนนี้ปิดงวดไปแล้ว 🔒');return;}
   const neg=allIn().filter(s=>netRaw(s)<0);
   if(neg.length&&!confirm('⚠ มี '+neg.length+' คนที่ยอดหักเกินเงินเดือน (สุทธิติดลบ):\n'+neg.map(s=>'• '+s.n+' เกิน ฿'+f(-netRaw(s))).join('\n')+'\n\nระบบจะจ่ายเป็น ฿0 ให้คนเหล่านี้ · แนะนำแก้ก่อนปิดงวด (ลดยอดหักมัดจำเดือนนี้)\n\nยืนยันปิดงวดทั้งที่ยังติดลบ?'))return;
   if(!confirm('ปิดงวดเดือน '+monthLabel(MONTH)+'?\n\nหลังปิด: แก้ตัวเลขไม่ได้ จนกว่าจะกดปลดล็อก\nแนะนำ: กด "สำรองข้อมูล" ก่อนปิด'))return;
-  const cm=CONFIG.closed_months||[];if(!cm.includes(MONTH))cm.push(MONTH);
-  await saveConfig('closed_months',cm);toast('ปิดงวด '+monthLabel(MONTH)+' แล้ว 🔒');go('home');
+  return salGuard('ปิดงวด', async ()=>{
+    if(isClosed())return;                                   // กันกดรัวสองครั้งติด
+    const cm=CONFIG.closed_months||[];if(!cm.includes(MONTH))cm.push(MONTH);
+    await saveConfig('closed_months',cm);toast('ปิดงวด '+monthLabel(MONTH)+' แล้ว 🔒');go('home');
+  });
 }
 async function reopenMonth(){
+  if(!isClosed()){toast('เดือนนี้ไม่ได้ปิดงวดอยู่');return;}
   const why=prompt('ปลดล็อกเดือน '+monthLabel(MONTH)+' — พิมพ์เหตุผล (บันทึกไว้กันลืม):');if(why===null)return;
-  const cm=(CONFIG.closed_months||[]).filter(x=>x!==MONTH);
-  await saveConfig('closed_months',cm);
-  await saveConfig('reopen_log',[...(CONFIG.reopen_log||[]),{m:MONTH,why,at:new Date().toISOString()}]);
-  toast('ปลดล็อกแล้ว — แก้ไขได้');go('home');
+  return salGuard('ปลดล็อก', async ()=>{
+    if(!isClosed())return;                                  // กันกดรัวสองครั้งติด
+    const cm=(CONFIG.closed_months||[]).filter(x=>x!==MONTH);
+    await saveConfig('closed_months',cm);
+    await saveConfig('reopen_log',[...(CONFIG.reopen_log||[]),{m:MONTH,why,at:new Date().toISOString()}]);
+    toast('ปลดล็อกแล้ว — แก้ไขได้');go('home');
+  });
 }
 async function saveConfig(key,value){CONFIG[key]=value;await q(sb.from('payroll_config').upsert({key,value},{onConflict:'key'}));}
 
@@ -394,15 +406,25 @@ const allIn=()=>STAFF.filter(s=>inMonth(s));
 const payOf=s=>{const e=ent(s);return (e&&e.note==='เงินสด')||(!e&&s.g==='ครู-เงินสด')?'เงินสด':'โอน';};
 
 // ---------- บันทึกขึ้นคลาวด์ ----------
+// 🔒 ตัวล็อกกันกดซ้ำ (กดรัว / เน็ตช้าแล้วกดใหม่) — ใช้ร่วมกันทุกปุ่มที่เขียนข้อมูล
+let _salBusy=false;
+async function salGuard(name,fn){
+  if(_salBusy){toast('⏳ กำลัง'+name+'อยู่ · รอสักครู่ค่ะ');return;}
+  _salBusy=true;
+  try{ return await fn(); }
+  finally{ _salBusy=false; }
+}
 async function saveEntries(groupOnly){
-  const rows=allIn().filter(s=>!groupOnly||ent(s).g===groupOnly).map(s=>{const e=ent(s);
-    return {month:MONTH,staff_id:s.id,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:net(s),note:e.note||''};});
-  await q(sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'}));
-  // sync net เข้าตารางโอนคืน
-  const refRows=Object.keys(REFUNDS).map(sid=>{const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];
-    return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''};});
-  if(refRows.length)await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
-  toast('บันทึกขึ้นคลาวด์แล้ว ✓');
+  return salGuard('บันทึก', async ()=>{
+    const rows=allIn().filter(s=>!groupOnly||ent(s).g===groupOnly).map(s=>{const e=ent(s);
+      return {month:MONTH,staff_id:s.id,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:net(s),note:e.note||''};});
+    await q(sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'}));
+    // sync net เข้าตารางโอนคืน
+    const refRows=Object.keys(REFUNDS).map(sid=>{const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];
+      return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''};});
+    if(refRows.length)await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
+    toast('บันทึกขึ้นคลาวด์แล้ว ✓');
+  });
 }
 async function saveRefund(sid){
   const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];if(!r)return;

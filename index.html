@@ -1125,12 +1125,17 @@ function nextReceiptNo(){
   });
   return prefix + String(mx+1).padStart(5,'0');
 }
-function ensureReceiptNos(){
+// เติมเลขใบเสร็จให้ใบที่ยังไม่มีเลข (ใช้ตอนกู้คืน backup)
+// จองเลขจาก "คลาวด์" ทีละใบ — กันเลขซ้ำถ้ามีธุรการอีกคนกำลังบันทึกอยู่พร้อมกัน
+async function ensureReceiptNos(){
   const missing = TX.filter(tt => !tt.receiptNo);
   if(missing.length === 0) return;
   missing.sort((a,b) => new Date(a.date) - new Date(b.date));
-  missing.forEach(tt => { tt.receiptNo = nextReceiptNo(); });
+  for(const tt of missing){
+    tt.receiptNo = await cloudNextReceiptNo();   // ถามคลาวด์ทุกใบ (ไม่ใช่นับจากเครื่อง)
+  }
   saveTX();
+  toast('🧾 เติมเลขใบเสร็จให้ ' + missing.length + ' ใบเรียบร้อย (จองเลขจากคลาวด์)');
 }
 function receiptPrintDual(tx){
   const stu = (tx.payerName || tx.studentNick) + ' (' + tx.studentNick + (tx.studentName ? ' · ' + tx.studentName : '') + ' · ' + tx.studentClass + ')';
@@ -1312,7 +1317,7 @@ async function afterLogin(){
   try{
     await cloudLoadAll();
     startRealtime();
-    ensureReceiptNos();
+    await ensureReceiptNos();
     $('login-overlay').style.display = 'none';
     document.querySelectorAll('.ay-label').forEach(el => el.textContent = AY);
     renderHome();
@@ -2680,6 +2685,45 @@ function editStu(id){
 
 function closeStuModal(){ $('stu-modal').classList.remove('active'); }
 
+// ===== 🔄 กันธุรการ 2 คนแก้ข้อมูลเด็กคนเดียวกันแล้วทับกันเงียบๆ =====
+// ก่อนบันทึกการแก้ไข → ดึงข้อมูลล่าสุดจากคลาวด์มาเทียบกับที่เครื่องเราถืออยู่
+// ถ้าไม่ตรง = มีคนอื่นแก้ไปแล้วหลังจากเราเปิดหน้านี้ → เตือนให้ครูตัดสินใจ (ไม่ทับเงียบๆ)
+const STU_FIELDS = [
+  ['name','ชื่อ-สกุล'], ['nick','ชื่อเล่น'], ['cls','ชั้น'], ['village','หมู่บ้าน'],
+  ['useBus','ใช้รถ'], ['busCode','รหัสสาย'], ['payTuition','รูปแบบจ่ายค่าเทอม'], ['payBus','รูปแบบจ่ายค่ารถ'],
+  ['status','สถานะ'], ['discount','ส่วนลด'], ['discountReason','เหตุผลส่วนลด'], ['note','หมายเหตุ'],
+  ['referrerName','ผู้แนะนำ'], ['referrerNick','ชื่อเล่นผู้แนะนำ'], ['referrerChildId','ลูกของผู้แนะนำ'],
+  ['startMonth','เดือนเริ่มเรียน'], ['deleted','อยู่ในถังขยะ']
+];
+async function checkStuConflict(id){
+  const local = STUDENTS.find(s => s.id === id);
+  if(!local) return true;
+  let cloud = null;
+  try{
+    const { data, error } = await sb.from('students').select('*').eq('id', id).limit(1);
+    if(error) throw error;
+    if(data && data[0]) cloud = rowToStu(data[0]);
+  }catch(e){
+    // อ่านคลาวด์ไม่ได้ (เน็ต) — ไม่บล็อกครู แต่เตือนให้รู้ตัว
+    return confirm('⚠ เช็คข้อมูลล่าสุดจากคลาวด์ไม่ได้ (เน็ตมีปัญหา)\n\nถ้าบันทึกต่อ อาจทับข้อมูลที่คนอื่นเพิ่งแก้ได้\n\nต้องการบันทึกต่อไหม?');
+  }
+  if(!cloud) return true;
+  const diffs = [];
+  STU_FIELDS.forEach(([k, label]) => {
+    const a = local[k] == null ? '' : String(local[k]);
+    const b = cloud[k] == null ? '' : String(cloud[k]);
+    if(a !== b) diffs.push('• ' + label + ':  ของครูเห็น "' + (a||'(ว่าง)') + '"  →  ในคลาวด์ตอนนี้ "' + (b||'(ว่าง)') + '"');
+  });
+  if(diffs.length === 0) return true;   // ไม่มีใครแก้ — บันทึกได้เลย
+  return confirm(
+    '⚠ ข้อมูลของน้อง "' + local.nick + '" ถูก "คนอื่นแก้ไป" หลังจากครูเปิดหน้านี้\n\n' +
+    diffs.slice(0,8).join('\n') + (diffs.length>8 ? '\n... และอีก '+(diffs.length-8)+' ช่อง' : '') +
+    '\n\n──────────────\n' +
+    'กด OK  = บันทึกทับด้วยข้อมูลของครู (ของคนอื่นจะหาย)\n' +
+    'กด Cancel = ยกเลิก · แนะนำให้ปิดหน้าต่างแล้วรีเฟรช (F5) เพื่อดูข้อมูลล่าสุดก่อน'
+  );
+}
+
 // จองรหัสนักเรียนจากคลาวด์ (authoritative) — กันธุรการ 2 คนเพิ่มพร้อมกันแล้วรหัสชนกัน (เด็กคนหนึ่งจะถูกทับหาย)
 async function cloudNextStudentId(){
   let mx = 0;
@@ -2761,7 +2805,9 @@ async function saveStu(){
   if(data.useBus === 'ไม่ใช้'){ data.busCode = ''; data.payBus = '-'; }
 
   if(editingStudentId){
-    // Edit
+    // Edit — เช็คก่อนว่าคนอื่นเพิ่งแก้ข้อมูลคนนี้ไปหรือยัง (กันทับกันเงียบๆ)
+    const _ok = await checkStuConflict(editingStudentId);
+    if(!_ok) return;
     const idx = STUDENTS.findIndex(s => s.id === editingStudentId);
     if(idx >= 0){
       STUDENTS[idx] = {...STUDENTS[idx], ...data};
@@ -5069,7 +5115,7 @@ function restoreBackup(input){
           await cloudSync('slips');
           await cloudSync('payouts');
           await cloudSaveSchool();
-          ensureReceiptNos();
+          await ensureReceiptNos();
           toast('☁ อัปโหลดขึ้นคลาวด์ครบ ✓');
           renderHome();
         } catch(e){ toast('⚠ อัปโหลดไม่ครบ: '+(e.message||e), 'error'); }

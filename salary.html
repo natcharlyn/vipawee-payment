@@ -144,7 +144,11 @@
     <input type="text" class="txt-input" id="pw" placeholder="กรอกรหัสผ่านทุกครั้ง" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" style="-webkit-text-security:disc;text-security:disc" spellcheck="false" name="np_field" data-lpignore="true" data-form-type="other">
     <div class="login-err" id="loginErr"></div>
     <button class="btn-login" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
-    <div class="login-hint">ปิดหน้าต่าง = ออกจากระบบอัตโนมัติ</div>
+    <label style="display:flex;align-items:flex-start;gap:9px;justify-content:center;margin-top:14px;font-size:13.5px;color:#475569;cursor:pointer;line-height:1.4">
+      <input type="checkbox" id="rememberDevice" style="width:19px;height:19px;flex-shrink:0;margin-top:1px;cursor:pointer">
+      <span>จำการเข้าสู่ระบบบนเครื่องนี้<br><b style="color:#1F4E78">✓ ติ๊กเฉพาะเครื่องส่วนตัว (เช่น iPad ของครู) — ไม่ต้องพิมพ์รหัสทุกครั้ง</b></span>
+    </label>
+    <div class="login-hint">ถ้าไม่ติ๊ก: ปิดหน้าต่าง = ออกจากระบบอัตโนมัติ (ปลอดภัยสำหรับเครื่องที่ใช้ร่วมกัน)</div>
   </div>
 </div>
 <div class="shell hidden" id="app">
@@ -177,7 +181,17 @@
 // ============ CLOUD LAYER (Supabase · project เดียวกับระบบค่าเทอม · ตารางแยก) ============
 const SB_URL = 'https://npeithnldwlxablzqnlk.supabase.co';
 const SB_KEY = 'sb_publishable_4XkPqQEtVClyu03d3pGPjw_0WIsZde0';
-const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storage: window.sessionStorage } }); // ปิดหน้าต่าง = ออกจากระบบ
+// ===== ตัวเลือก "จำการเข้าสู่ระบบเฉพาะเครื่องนี้" (สำหรับ iPad / เครื่องส่วนตัวของครู) =====
+// ค่าเริ่มต้น = ไม่จำ → ใช้ sessionStorage (ปิดหน้าต่าง = ออก · ปลอดภัยสำหรับเครื่องที่โรงเรียน)
+// ถ้าครูติ๊ก "จำเครื่องนี้" → ใช้ localStorage (เปิดใหม่ไม่ต้องล็อกอินซ้ำ) · ตั้งเฉพาะเครื่องนั้น ไม่กระทบเครื่องอื่น
+const REMEMBER_KEY = 'salary_remember_device';
+function isRemember(){ return localStorage.getItem(REMEMBER_KEY) === '1'; }
+const authStorage = {
+  getItem:(k)=> (isRemember()?localStorage:sessionStorage).getItem(k),
+  setItem:(k,v)=> (isRemember()?localStorage:sessionStorage).setItem(k,v),
+  removeItem:(k)=> { try{localStorage.removeItem(k);}catch(e){} try{sessionStorage.removeItem(k);}catch(e){} }
+};
+const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storage: authStorage, persistSession:true, autoRefreshToken:true } });
 
 const GROUPS=['ครู-ผบร','ครู','พี่เลี้ยง','ครู-เงินสด'];
 const THM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -455,6 +469,9 @@ function maybeAutoBackup(){
 // ---------- Auth ----------
 async function doLogin(){
   const em=document.getElementById('email').value.trim(),pw=document.getElementById('pw').value;
+  // ตั้งค่า "จำเครื่องนี้" ก่อนล็อกอิน — เพื่อให้ session ถูกเก็บในที่ที่ถูก (localStorage=จำ / sessionStorage=ไม่จำ)
+  const _cb=document.getElementById('rememberDevice');
+  if(_cb && _cb.checked) localStorage.setItem(REMEMBER_KEY,'1'); else localStorage.removeItem(REMEMBER_KEY);
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='กำลังเข้าสู่ระบบ…';
   const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
   btn.disabled=false;btn.textContent='เข้าสู่ระบบ';
@@ -469,6 +486,7 @@ async function enterApp(em){
 }
 async function logout(){refundUnlocked=false;await sb.auth.signOut();location.reload();}
 window.addEventListener('DOMContentLoaded',async()=>{
+  const _cb=document.getElementById('rememberDevice'); if(_cb) _cb.checked=isRemember();  // สะท้อนสถานะจำ/ไม่จำของเครื่องนี้
   const {data}=await sb.auth.getSession();
   if(data&&data.session){await enterApp(data.session.user.email);}
   else document.getElementById('pw').focus();

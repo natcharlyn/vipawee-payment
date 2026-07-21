@@ -699,7 +699,13 @@ details summary{cursor:pointer;outline:none}
       <tbody id="r-by-class"></tbody>
     </table>
   </div>
-  
+
+  <!-- ยอดค้างค่าเทอมรายเดือน (ไว้วางแผนรายจ่าย) -->
+  <div class="card">
+    <div class="card-title">📊 ยอดค้างค่าเทอมรายเดือน · ผปค.ยังไม่จ่าย (ไว้วางแผนรายจ่าย)</div>
+    <div id="r-tuition-owed"></div>
+  </div>
+
   <!-- Per-bus payout summary -->
   <div class="card">
     <div class="card-title">🚐 รายจ่าย · ส่งคนขับ A1-A4</div>
@@ -4232,6 +4238,40 @@ function inPeriod(dateStr, period){
 
 const CLASS_ORDER = ['เนอร์เซอรี่','เตรียมอนุบาล','อ.1','อ.2','อ.3/1','อ.3/2','ป.1/1','ป.1/2','ป.2/1','ป.2/2','ป.3/1','ป.3/2','ป.4','ป.5','ป.6'];
 
+// ===== 📊 ยอดค้างค่าเทอมรายเดือน (ผปค.ยังไม่จ่าย) · ไว้วางแผนรายจ่าย =====
+// นับเฉพาะ "ค่าเทอม" · ข้ามเด็กเรียนฟรี 100% · เฉพาะเดือนอดีต-ปัจจุบันที่ถึงกำหนดแล้ว
+function renderTuitionOwedByMonth(){
+  const box = $('r-tuition-owed'); if(!box) return;
+  const rows = MONTHS.map(m => {
+    let owe = 0, cnt = 0;
+    activeStudents().forEach(s => {
+      if(s.discount === 'ฟรี 100%') return;
+      const p = getPriceForClass(s.cls); if(!p) return;
+      const od = getOverdueMonths(s);
+      if((od.tuition||[]).includes(m)){
+        owe += (s.discount === 'ลด 50%' ? p.monthly*0.5 : p.monthly);
+        cnt++;
+      }
+    });
+    return { m, cnt, owe: Math.round(owe) };
+  }).filter(r => r.cnt > 0);
+  const totalOwe = rows.reduce((a,r)=>a+r.owe, 0);
+  const kidSet = new Set();
+  activeStudents().forEach(s => { if(s.discount==='ฟรี 100%') return; const od=getOverdueMonths(s); if((od.tuition||[]).length>0) kidSet.add(s.id); });
+  if(rows.length === 0){
+    box.innerHTML = '<div style="padding:14px;text-align:center;color:#16A34A;font-weight:700">✅ เก็บค่าเทอมครบทุกเดือนแล้ว ไม่มีค้าง</div>';
+    return;
+  }
+  box.innerHTML =
+    '<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:11px 14px;margin-bottom:10px;font-size:14px">' +
+      '💰 <b>ยอดค้างค่าเทอมรวมทั้งหมด <span style="color:#DC2626;font-size:17px">฿' + fmt(totalOwe) + '</span></b> · จากเด็ก ' + kidSet.size + ' คน ' +
+      '<span style="color:#6B7280;font-size:12.5px">(ยอดนี้คือเงินที่ยังไม่เข้า — เอาไปหักตอนวางแผนจ่ายเงินเดือน/หนี้ได้)</span></div>' +
+    '<table class="tbl"><thead><tr><th>เดือน</th><th style="text-align:center">ค้าง (คน)</th><th style="text-align:right">ยอดค้าง (บาท)</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td><b>' + r.m + '</b></td><td style="text-align:center">' + r.cnt + '</td><td style="text-align:right;font-weight:700;color:#DC2626">฿' + fmt(r.owe) + '</td></tr>').join('') +
+    '<tr style="background:#F9FAFB;font-weight:800"><td>รวม</td><td style="text-align:center">' + kidSet.size + ' คน</td><td style="text-align:right;color:#DC2626">฿' + fmt(totalOwe) + '</td></tr>' +
+    '</tbody></table>' +
+    '<div style="font-size:12px;color:#9CA3AF;margin-top:8px">* เฉพาะค่าเทอม (ไม่รวมค่ารถ/ค่าอื่น) · ข้ามเด็กเรียนฟรี · เดือนที่ยังไม่ถึงกำหนดเก็บ ยังไม่นับ · อัปเดตสดตามการรับเงินจริง</div>';
+}
 function renderReport(){
   const period = $('rpt-filter').value;
   const listAll = TX.filter(t => inPeriod(t.date, period));
@@ -4253,6 +4293,7 @@ function renderReport(){
     '<div style="font-size:13px;margin-top:2px">ช่วงรายงาน: <b>' + (periodNames[period] || period) + ' · ' + rangeTxt + '</b></div>' +
     '<div style="font-size:12px;color:#444">พิมพ์เมื่อ ' + nw.toLocaleString('th-TH', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'}) + ' น.' + (voidedCount > 0 ? ' · ไม่นับใบเสร็จที่ยกเลิก ' + voidedCount + ' รายการ' : '') + '</div>';
   if($('r-referral')){ renderReferralSummary(); renderReferral(); }
+  if($('r-tuition-owed')) renderTuitionOwedByMonth();
   const periodPayouts = PAYOUTS.filter(p => inPeriod(p.date, period));
   
   // === Top stats ===

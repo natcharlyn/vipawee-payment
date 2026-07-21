@@ -287,6 +287,10 @@ details summary{cursor:pointer;outline:none}
     <div class="stat"><div class="stat-num" id="h-tx-month">0</div><div class="stat-lbl">บันทึกเดือนนี้</div></div>
     <div class="stat"><div class="stat-num" id="h-amount-month">฿0</div><div class="stat-lbl">รับเงินเดือนนี้</div></div>
   </div>
+  <div class="card" id="h-breakdown-card" style="border-left:4px solid #10B981">
+    <div class="card-title">💰 รับเงินเดือนนี้ · แยกประเภท</div>
+    <div id="h-amount-breakdown"></div>
+  </div>
   <div class="card">
     <div class="card-title">🕐 บันทึกล่าสุด <a class="lnk" style="margin-left:auto;font-size:13px" onclick="goto('report')">ดูทั้งหมด →</a></div>
     <table class="tbl">
@@ -2635,6 +2639,39 @@ function printRcpt(){
 }
 
 // === RENDERS ===
+// ===== 💰 รับเงินเดือนนี้ · แยกประเภท (ค่าเทอม / ค่ารถรายสาย / อื่นๆ) =====
+function renderHomeBreakdown(monthTx){
+  const box = $('h-amount-breakdown'); if(!box) return;
+  let tuition=0, busTotal=0, other=0;
+  const busBySai = {};
+  monthTx.forEach(t => {
+    const stu = STUDENTS.find(s=>s.id===t.studentId);
+    const code = (stu && stu.busCode) ? stu.busCode : '(ไม่ระบุสาย)';
+    (t.items||[]).forEach(it => {
+      const amt = Number(it.amount||0); const lb = String(it.label||'');
+      if(lb.startsWith('ค่าเทอม')) tuition += amt;
+      else if(lb.startsWith('ค่ารถ')){ busTotal += amt; busBySai[code] = (busBySai[code]||0) + amt; }
+      else other += amt;
+    });
+  });
+  const total = tuition + busTotal + other;
+  const bar = (label, val, color, sub) =>
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #F3F4F6">' +
+      '<span style="font-size:14px">' + label + (sub?' <span style="font-size:12px;color:#9CA3AF">'+sub+'</span>':'') + '</span>' +
+      '<span style="font-size:15.5px;font-weight:700;color:' + color + '">฿' + fmt(Math.round(val)) + '</span></div>';
+  const saiRows = Object.keys(busBySai).sort().map(code =>
+    '<div style="display:flex;justify-content:space-between;padding:6px 0 6px 22px;font-size:13px;color:#475569">' +
+      '<span>🚐 ค่ารถ สาย ' + code + '</span><span style="font-weight:600;color:#B45309">฿' + fmt(Math.round(busBySai[code])) + '</span></div>'
+  ).join('');
+  box.innerHTML =
+    bar('📖 <b>เฉพาะค่าเทอม</b>', tuition, '#16A34A') +
+    bar('🚐 <b>ค่ารถ (รวมทุกสาย)</b>', busTotal, '#B45309', Object.keys(busBySai).length + ' สาย') +
+    (saiRows ? '<div style="background:#FFFBEB;border-radius:8px;margin:2px 0 6px">' + saiRows + '</div>' : '') +
+    (other>0 ? bar('📦 <b>ค่าอื่นๆ</b> (คอร์ส/ชุด/หนี้เก่า ฯลฯ)', other, '#6B7280') : '') +
+    '<div style="display:flex;justify-content:space-between;padding:11px 0 2px;border-top:2px solid #E5E7EB;margin-top:4px">' +
+      '<span style="font-size:15px;font-weight:800">รวมรับเดือนนี้</span>' +
+      '<span style="font-size:18px;font-weight:800;color:#1F4E78">฿' + fmt(Math.round(total)) + '</span></div>';
+}
 function renderHome(){
   $('today-date').textContent = today();
   $('h-students').textContent = activeStudents().length;
@@ -2646,6 +2683,7 @@ function renderHome(){
   });
   $('h-tx-month').textContent = monthTx.length;
   $('h-amount-month').textContent = '฿' + fmt(monthTx.reduce((s,t)=>s+t.total,0));
+  renderHomeBreakdown(monthTx);
   $('badge-students').textContent = activeStudents().length;
   
   const pendingSlips = SLIPS.filter(s => !s.matched).length;

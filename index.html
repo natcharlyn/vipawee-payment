@@ -1781,6 +1781,7 @@ function roomOwedKids(cls, monthNameTh){
   const mShort = si >= 0 ? MONTHS[si] : null;              // เดือนการศึกษาแบบย่อ (พ.ค.-มี.ค.)
   if(!mShort) return [];                                    // ต.ค./เม.ย. ปิดเทอม ไม่เก็บค่าเทอม
   return activeStudents().filter(s => s.cls === cls).filter(s => {
+    if(s.discount === 'ฟรี 100%') return false;             // เรียนฟรี = ไม่มีค่าเทอมให้ค้าง (ค่ารถคิดแยก)
     const od = getOverdueMonths(s);
     return od.tuition && od.tuition.includes(mShort);
   });

@@ -3635,7 +3635,10 @@ function copyBusOverdueLine(code){
   const monthName = (mv==='all') ? 'ที่ค้างอยู่' : ('เดือน'+MONTHS[parseInt(mv,10)]);
   const rows = busOverdueData()[code] || [];
   if(!rows.length){ toast('สายนี้ไม่มีเด็กค้าง', 'error'); return; }
-  const lines = rows.map(r => '• ' + r.nick + ' (' + r.cls + ') ' + fmt(r.owe)).join('\n');
+  const lines = rows.map(r => {
+    const mTxt = r.months.length > 1 ? ('ค้าง ' + r.months.join(', ') + ' (' + r.months.length + ' เดือน)') : ('ค้าง ' + r.months.join(', '));
+    return '• ' + r.nick + ' (' + r.cls + ') — ' + mTxt + ' · ' + fmt(r.owe) + ' บาท';
+  }).join('\n');
   const msg = '📢 แจ้งค่ารถรับ-ส่ง · สาย ' + code + '\n\n' +
     'เรียนผู้ปกครอง น้องที่ยังไม่ได้ชำระค่ารถ' + monthName + ' มีดังนี้ค่ะ 🙏\n' +
     lines + '\n\nรวมค้างชำระ ' + rows.length + ' ราย · กรุณาชำระที่คุณครูธุรการ หรือโอนแล้วส่งสลิปในไลน์นะคะ\n🙏 หากชำระแล้วต้องขออภัยด้วยค่ะ';

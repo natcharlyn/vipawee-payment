@@ -550,6 +550,14 @@ details summary{cursor:pointer;outline:none}
       <div class="page-sub">8 สาย · A1-A4 (โรงเรียนเก็บ) + B5-B8 (คนขับเก็บเอง)</div>
     </div>
   </div>
+  <div class="card no-print" style="margin-bottom:14px;border:2px solid #FCA5A5">
+    <div class="card-title" style="color:#DC2626">🔍 เช็คเด็กค้างค่ารถ · รายสาย รายเดือน</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 4px">
+      <select id="bo-route" class="select" style="max-width:200px" onchange="renderBusOverdue()"></select>
+      <select id="bo-month" class="select" style="max-width:240px" onchange="renderBusOverdue()"></select>
+    </div>
+    <div id="bo-result"></div>
+  </div>
   <div id="bus-list"></div>
 </div>
 
@@ -3547,6 +3555,92 @@ function renderBus(){
     </div>`;
   });
   $('bus-list').innerHTML = html;
+  initBusOverdue();
+}
+
+// ===== 🔍 เช็คเด็กค้างค่ารถ · รายสาย รายเดือน =====
+function initBusOverdue(){
+  const rSel = $('bo-route'), mSel = $('bo-month');
+  if(!rSel || !mSel) return;
+  if(rSel.children.length === 0){
+    // เฉพาะสายที่โรงเรียนเก็บ (type A) — B คนขับเก็บเอง ไม่ต้องเช็ค
+    const codesA = DATA.buses.filter(b => b.type==='A' && b.code).map(b => b.code);
+    rSel.innerHTML = '<option value="all">🚐 ทุกสาย (โรงเรียนเก็บ)</option>' +
+      codesA.map(c => `<option value="${c}">สาย ${c}</option>`).join('');
+  }
+  if(mSel.children.length === 0){
+    mSel.innerHTML = '<option value="all">📆 ทุกเดือนที่ค้าง (ถึงปัจจุบัน)</option>' +
+      MONTHS.map((m,i) => `<option value="${i}">เฉพาะเดือน ${m}</option>`).join('');
+  }
+  renderBusOverdue();
+}
+function busOverdueData(){
+  const rv = $('bo-route').value, mv = $('bo-month').value;
+  const codesA = DATA.buses.filter(b => b.type==='A' && b.code).map(b => b.code);
+  const codes = (rv==='all') ? codesA : [rv];
+  const monthIdx = (mv==='all') ? -1 : parseInt(mv,10);
+  const out = {};
+  codes.forEach(code => {
+    const kids = activeStudents().filter(s => s.busCode===code && s.useBus && s.useBus!=='ไม่ใช้');
+    const rows = [];
+    kids.forEach(s => {
+      const od = getOverdueMonths(s);
+      let months = od.bus || [];
+      if(monthIdx >= 0){                         // เลือกเดือนเจาะจง → เฉพาะคนที่ค้างเดือนนั้น
+        months = months.filter(m => m === MONTHS[monthIdx]);
+      }
+      if(months.length === 0) return;
+      const bp = getBusPrice(s.village);
+      const perMonth = s.useBus==='ไป-กลับ' ? bp : Math.round(bp/2);
+      rows.push({ nick:s.nick, cls:s.cls, village:s.village||'-', months, owe: perMonth*months.length });
+    });
+    rows.sort((a,b)=>b.owe-a.owe);
+    out[code] = rows;
+  });
+  return out;
+}
+function renderBusOverdue(){
+  const box = $('bo-result'); if(!box) return;
+  const mv = $('bo-month').value;
+  const monthName = (mv==='all') ? 'ทุกเดือนที่ค้าง' : ('เดือน'+MONTHS[parseInt(mv,10)]);
+  const data = busOverdueData();
+  let html = '', grandN = 0, grandB = 0;
+  Object.keys(data).forEach(code => {
+    const rows = data[code];
+    const sumB = rows.reduce((a,r)=>a+r.owe,0);
+    grandN += rows.length; grandB += sumB;
+    html += '<div style="border:1px solid #E5E7EB;border-radius:10px;margin-top:10px;overflow:hidden">' +
+      '<div style="background:#FEF2F2;padding:8px 12px;font-weight:700;color:#991B1B;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">' +
+        '<span>🚐 สาย ' + code + ' — ค้าง ' + rows.length + ' คน</span>' +
+        '<span>รวม ฿' + fmt(sumB) + (rows.length ? ' · <span class="lnk" style="color:#2563EB" onclick="copyBusOverdueLine(\''+code+'\')">📋 คัดลอกข้อความไลน์</span>' : '') + '</span>' +
+      '</div>';
+    if(rows.length === 0){
+      html += '<div style="padding:10px 12px;color:#16A34A;font-size:13px">✓ ไม่มีเด็กค้างค่ารถ' + (mv==='all'?'':' '+monthName) + '</div>';
+    } else {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        rows.map((r,i)=>'<tr style="border-top:1px solid #F3F4F6">' +
+          '<td style="padding:6px 12px;color:#9CA3AF;width:26px">'+(i+1)+'</td>' +
+          '<td style="padding:6px 4px"><b>'+esc(r.nick)+'</b> <span style="color:#6B7280">'+esc(r.cls)+' · '+esc(r.village)+'</span>' + (mv==='all' && r.months.length>1 ? ' <span style="color:#B45309;font-size:11.5px">('+r.months.join(',')+')</span>' : '') + '</td>' +
+          '<td style="padding:6px 12px;text-align:right;font-weight:700;color:#DC2626;white-space:nowrap">฿'+fmt(r.owe)+'</td>' +
+        '</tr>').join('') + '</table>';
+    }
+    html += '</div>';
+  });
+  const head = '<div style="background:#F9FAFB;border-radius:8px;padding:9px 12px;font-size:13.5px;margin-top:4px">' +
+    '📊 <b>' + monthName + '</b> · ค้างรวม <b style="color:#DC2626">' + grandN + ' คน · ฿' + fmt(grandB) + '</b></div>';
+  box.innerHTML = head + html;
+}
+function copyBusOverdueLine(code){
+  const mv = $('bo-month').value;
+  const monthName = (mv==='all') ? 'ที่ค้างอยู่' : ('เดือน'+MONTHS[parseInt(mv,10)]);
+  const rows = busOverdueData()[code] || [];
+  if(!rows.length){ toast('สายนี้ไม่มีเด็กค้าง', 'error'); return; }
+  const lines = rows.map(r => '• ' + r.nick + ' (' + r.cls + ') ' + fmt(r.owe)).join('\n');
+  const msg = '📢 แจ้งค่ารถรับ-ส่ง · สาย ' + code + '\n\n' +
+    'เรียนผู้ปกครอง น้องที่ยังไม่ได้ชำระค่ารถ' + monthName + ' มีดังนี้ค่ะ 🙏\n' +
+    lines + '\n\nรวมค้างชำระ ' + rows.length + ' ราย · กรุณาชำระที่คุณครูธุรการ หรือโอนแล้วส่งสลิปในไลน์นะคะ\n🙏 หากชำระแล้วต้องขออภัยด้วยค่ะ';
+  navigator.clipboard.writeText(msg).then(()=> toast('📋 คัดลอกข้อความสาย ' + code + ' แล้ว · วางในกลุ่มไลน์ได้เลย ✓'))
+    .catch(()=> toast('คัดลอกไม่สำเร็จ ลองใหม่', 'error'));
 }
 
 // === SETTLEMENT ===

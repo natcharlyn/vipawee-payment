@@ -1014,9 +1014,13 @@ async function restoreStaff(id){const s=STAFF.find(x=>x.id==id);
 async function _depSums(){const rows=await q(sb.from('payroll_entries').select('staff_id,items,month'));
   const m={};rows.forEach(r=>{const v=Number((r.items||{}).deposit||0);if(v>0){if(!m[r.staff_id])m[r.staff_id]={sum:0,ms:[]};m[r.staff_id].sum+=v;m[r.staff_id].ms.push(monthLabel(r.month)+': ฿'+f(v));}});return m;}
 function renderDeposit(){document.getElementById('content').innerHTML='<div class="panel">⏳ กำลังโหลดข้อมูลเงินมัดจำ…</div>';_renderDeposit();}
+let depMode='manage';
+function setDepMode(m){depMode=m;renderDeposit();}
 async function _renderDeposit(){
   const dep=await _depSums();
-  let h=printHead('เงินมัดจำ')+`<div class="tip check">💰 <b>กติกา:</b> ครูใหม่วางมัดจำ 10,000 — วางสดทีเดียว หรือให้หักจากเงินเดือน (เดือนแรก 5,000 → เดือนละ 500 จนครบ) · ระบบ<b>หักให้อัตโนมัติตอนเปิดเดือนใหม่</b> · ทำงานครบ 1 ปีการศึกษาแล้วลาออก ได้รับคืนเต็มจำนวน</div>`;
+  let h=`<div class="tabs print-hide"><button class="tab ${depMode!=='sheet'?'active':''}" onclick="setDepMode('manage')">🗂 ทะเบียนมัดจำ (จัดการ)</button><button class="tab ${depMode==='sheet'?'active':''}" onclick="setDepMode('sheet')">🖨 ใบสรุปให้ครูเซ็น</button></div>`;
+  if(depMode==='sheet'){document.getElementById('content').innerHTML=h+_depSheetHTML(dep);return;}
+  h+=printHead('เงินมัดจำ')+`<div class="tip check">💰 <b>กติกา:</b> ครูใหม่วางมัดจำ 10,000 — วางสดทีเดียว หรือให้หักจากเงินเดือน (เดือนแรก 5,000 → เดือนละ 500 จนครบ) · ระบบ<b>หักให้อัตโนมัติตอนเปิดเดือนใหม่</b> · ทำงานครบ 1 ปีการศึกษาแล้วลาออก ได้รับคืนเต็มจำนวน</div>`;
   const list=STAFF.filter(s=>s.depT||(s.depUp||0)>0||dep[s.id]||!s.resigned);
   h+=`<div class="etable-wrap"><table class="entry"><thead><tr><th>ชื่อ-สกุล</th><th class="num">เป้าหมาย</th><th class="num">วางสด/ยกยอด</th><th class="num">หักจากเงินเดือนแล้ว</th><th class="num">รวมวางแล้ว</th><th class="num">คงเหลือ</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>`;
   let cnt=0;
@@ -1048,11 +1052,45 @@ async function depUpfront(id){const s=STAFF.find(x=>x.id==id);
 async function depReturn(id){const s=STAFF.find(x=>x.id==id);
   if(!confirm('บันทึกว่า "คืนเงินมัดจำแล้ว" ให้ '+s.n+'?\n(ระบบจะหยุดหักตั้งแต่เดือนที่เปิดใหม่ถัดไป)'))return;
   await q(sb.from('staff').update({deposit_returned:thToday()}).eq('id',id));await loadAll();renderDeposit();toast('บันทึกคืนเงินแล้ว ✓');}
+// ใบสรุปเงินมัดจำสำหรับครูเซ็น (รูปแบบตามไฟล์ Excel เดิม)
+function _depSheetRows(dep){
+  const rows=[];
+  STAFF.forEach(s=>{const d=dep[s.id]||{sum:0,ms:[]};const total=(s.depUp||0)+d.sum;
+    if(!(s.depT||(s.depUp||0)>0||d.sum>0)||total<=0)return;
+    const m=(s.depNote||'').match(/เริ่มหัก\s*([^()]+?)(?:\s*\(|$)/);
+    const start=m?m[1].trim():(d.ms.length?d.ms[0].split(':')[0]:'—');
+    const target=s.depT||10000;const rem=Math.max(0,target-total);
+    const note=s.depRet?('คืนแล้ว '+s.depRet):(rem<=0?'ครบ':'กำลังหัก (เหลือ '+f(rem)+')');
+    rows.push({n:s.n,start,mc:d.ms.length?d.ms.length:null,total,note});});
+  return rows;
+}
+function _depSheetHTML(dep){
+  const rows=_depSheetRows(dep);let tn=0,body='';
+  rows.forEach((r,i)=>{tn+=r.total;
+    body+=`<tr><td class="num">${i+1}</td><td>${r.n}</td><td>${esc(r.start)}</td><td class="num">${r.mc!==null?r.mc:'—'}</td><td class="num">${f(r.total)}</td><td style="height:30px;width:120px"></td><td>${esc(r.note)}</td></tr>`;});
+  return `<div class="panel"><div style="text-align:center;margin-bottom:12px;font-size:18px;font-weight:800;color:#000">สรุปยอดเงินมัดจำ ${monthLabel(MONTH)} (สำหรับครูที่จ่ายเงินมัดจำ)</div>
+  <div class="etable-wrap"><table><thead><tr><th>ที่</th><th>ชื่อ-สกุล</th><th>เดือนแรกที่เริ่มหัก</th><th class="num">จำนวนเดือน</th><th class="num">จำนวนเงิน</th><th style="width:130px">ลงชื่อ</th><th>หมายเหตุ</th></tr></thead><tbody>${body}
+  <tr class="totalrow"><td colspan="4" style="text-align:right">รวม</td><td class="num">${f(tn)}</td><td></td><td></td></tr></tbody></table></div>
+  <div style="font-size:12px;color:#64748B;margin-top:6px" class="print-hide">"จำนวนเดือน" นับเฉพาะเดือนที่หักผ่านระบบ (ประวัติก่อนมีระบบดูจากทะเบียนเดิม) · "จำนวนเงิน" = วางสด/ยกยอด + หักสะสมทั้งหมด</div>
+  <div class="save-bar print-hide"><button class="btn btn-ghost" onclick="exportDepExcel()">⬇️ ส่งออก Excel</button><button class="btn btn-primary" onclick="window.print()">🖨 พิมพ์หน้านี้</button></div></div>`;
+}
+async function exportDepExcel(){
+  const dep=await _depSums();const rows=_depSheetRows(dep);let tn=0,body='';
+  rows.forEach((r,i)=>{tn+=r.total;
+    body+=`<tr><td class="n">${i+1}</td><td>${esc(r.n)}</td><td>${esc(r.start)}</td><td class="n">${r.mc!==null?r.mc:''}</td><td class="n">${r.total}</td><td style="width:120pt"></td><td>${esc(r.note)}</td></tr>`;});
+  const h=`<table><tr><td colspan="7" style="border:none;font-size:16pt;font-weight:bold;text-align:center">สรุปยอดเงินมัดจำ ${monthLabel(MONTH)} (สำหรับครูที่จ่ายเงินมัดจำ)</td></tr>
+    <tr><th>ที่</th><th>ชื่อ-สกุล</th><th>เดือนแรกที่เริ่มหัก</th><th>จำนวนเดือน</th><th>จำนวนเงิน</th><th>ลงชื่อ</th><th>หมายเหตุ</th></tr>${body}
+    <tr style="background:#FCE4D6;font-weight:bold"><td colspan="4" style="text-align:right">รวม</td><td class="n">${tn}</td><td></td><td></td></tr></table>`;
+  const blob=new Blob(['﻿<html><head><meta charset="UTF-8"><style>table{border-collapse:collapse}td,th{border:.5pt solid #999;font-family:"TH SarabunPSK","Sarabun",sans-serif;font-size:13pt;padding:2px 6px}th{background:#DDEBF7;font-weight:bold}td.n{text-align:right;mso-number-format:"#\\,##0"}</style></head><body>',h,'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='เงินมัดจำ_'+monthLabel(MONTH).replace(/\s+/g,'')+'.xls';a.click();
+  toast('⬇️ ดาวน์โหลดไฟล์ Excel เงินมัดจำแล้ว ✓');
+}
 
 function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.7 (ส่งออก Excel ใบเซ็นรับเงิน) · 3 ก.ค. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.8 (ใบสรุปเงินมัดจำให้ครูเซ็น พิมพ์+Excel) · 15 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

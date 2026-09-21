@@ -441,11 +441,11 @@ details summary{cursor:pointer;outline:none}
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
-    💡 ราคาคอร์ส/รอบ: เนอร์ส 1,500 · เตรียม 1,400 · อ.1–ป.6 = 1,000 · ค่ารถคิดเท่าปกติ · จ่ายทีหลัง/บางส่วนได้
+    💡 ราคาคอร์ส/รอบ: เนอร์ส 1,500 · เตรียม 1,400 · อ.1–ป.6 = 1,000 · ค่ารถคิดเท่าปกติ · จ่ายทีหลัง/บางส่วนได้ · <b>ช่องค่าคอร์ส/ค่ารถ/หมายเหตุ แก้ได้รายคน</b> (เช่น นักเต้น ลดค่าเรียน 50% · รร.ออกค่ารถให้ใส่ 0) — ช่องที่แก้จากราคาปกติจะเป็นพื้นเหลือง และหมายเหตุจะขึ้นในใบเสร็จ/ใบแจ้งด้วย
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
     <table class="tbl">
-      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส</th><th style="text-align:right">ค่ารถ</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th></th></tr></thead>
+      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
       <tbody id="ext-tbody"></tbody>
     </table>
   </div>
@@ -2949,8 +2949,21 @@ function coursePaid(s, roundKey){
   return activeTX().filter(t => t.studentId===s.id && inCurrentAY(t.date))
     .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('คอร์ส')>=0 && it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0), 0);
 }
-function courseTotal(s){ return courseFee(s.cls) + courseBus(s); }
-function courseOwed(s, roundKey){ return Math.max(0, courseTotal(s) - coursePaid(s, roundKey)); }
+// ---- ค่าคอร์ส/ค่ารถ แก้เองได้รายคน-รายรอบ + หมายเหตุ (เพิ่ม ก.ย.69: รองรับเด็กซ้อมเต้น ลดค่าเรียน/รร.ซัพพอร์ตค่ารถ) ----
+function courseOvGet(s, roundKey){ return (s.courseOv && s.courseOv[roundKey]) || {}; }
+function courseFeeEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.fee===''||o.fee===undefined||o.fee===null) ? courseFee(s.cls) : +o.fee; }
+function courseBusEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.bus===''||o.bus===undefined||o.bus===null) ? courseBus(s) : +o.bus; }
+function courseNote(s, roundKey){ return courseOvGet(s,roundKey).note || ''; }
+function setCourseOv(id, field, val){
+  const s = STUDENTS.find(x=>x.id===id); if(!s) return;
+  s.courseOv = s.courseOv || {};
+  s.courseOv[curRound] = s.courseOv[curRound] || {};
+  if(field==='note') s.courseOv[curRound].note = val;
+  else s.courseOv[curRound][field] = (val==='' ? '' : +val);
+  saveStudents(); renderSpecial();
+}
+function courseTotal(s, roundKey){ return courseFeeEff(s, roundKey) + courseBusEff(s, roundKey); }
+function courseOwed(s, roundKey){ return Math.max(0, courseTotal(s, roundKey) - coursePaid(s, roundKey)); }
 function courseMembers(roundKey){ return STUDENTS.filter(s => !s.deleted && Array.isArray(s.specialEnroll) && s.specialEnroll.includes(roundKey)); }
 function renderSpecial(){
   const rsel = $('round-sel');
@@ -2961,22 +2974,25 @@ function renderSpecial(){
   $('ext-count').textContent = all.length;
   $('course-owed-sum').textContent = '฿' + fmt(all.reduce((sum,s)=>sum+courseOwed(s,curRound),0));
   if(list.length === 0){
-    $('ext-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
+    $('ext-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
   list.sort((a,b)=> courseOwed(b,curRound)-courseOwed(a,curRound));
   $('ext-tbody').innerHTML = list.map(s => {
-    const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+    const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+    const note = courseNote(s,curRound);
+    const feeDef = courseFee(s.cls), busDef = courseBus(s);
     const typeBadge = s.external ? '<span class="b b-info">เด็กนอก</span>' : '<span class="b" style="background:#EDE9FE;color:#5B21B6">เด็กใน</span>';
     return `<tr>
       <td><strong>${s.nick}</strong></td>
       <td>${s.name}${s.external&&s.extSchool?'<br><span style="font-size:11px;color:#9CA3AF">'+s.extSchool+'</span>':''}</td>
       <td>${s.cls}</td>
       <td>${typeBadge}</td>
-      <td style="text-align:right">฿${fmt(fee)}</td>
-      <td style="text-align:right">${bus?('฿'+fmt(bus)):'-'}</td>
+      <td style="text-align:right"><input type="number" value="${fee}" onchange="setCourseOv(${s.id},'fee',this.value)" title="ราคาปกติ ฿${fmt(feeDef)} · แก้ได้ เช่น นักเต้นลดครึ่ง" style="width:72px;text-align:right;padding:3px 5px;border:1px solid ${fee!==feeDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${fee!==feeDef?'#FFFBEB':'#fff'}"></td>
+      <td style="text-align:right"><input type="number" value="${bus}" onchange="setCourseOv(${s.id},'bus',this.value)" title="ตามหมู่บ้าน ฿${fmt(busDef)} · แก้ได้ · 0 = รร.ออกให้/ไม่ใช้รถ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${bus!==busDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${bus!==busDef?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
       <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
+      <td><input type="text" value="${(note||'').replace(/"/g,'&quot;')}" onchange="setCourseOv(${s.id},'note',this.value)" placeholder="เช่น นักเต้น ลด 50%" style="width:128px;padding:3px 6px;border:1px solid #E5E7EB;border-radius:6px"></td>
       <td style="white-space:nowrap"><button class="btn btn-sm btn-primary" onclick="openCoursePay(${s.id})" title="เก็บเงิน">💰</button> <button class="btn btn-sm" onclick="printCourseInvoice(${s.id})" title="ใบแจ้งค่าเรียน">📄</button> ${s.external?`<button class="btn btn-sm" onclick="editExternal(${s.id})" title="แก้ข้อมูล">✏</button> `:''}<button class="btn btn-sm btn-danger" onclick="unenroll(${s.id})" title="ถอนออกจากคอร์ส">✖</button></td>
     </tr>`;
   }).join('');
@@ -3026,9 +3042,10 @@ let coursePayId = null;
 function openCoursePay(id){
   const s = STUDENTS.find(x=>x.id===id); if(!s) return;
   coursePayId = id;
-  const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+  const note = courseNote(s,curRound);
   $('cp-name').textContent = s.nick + ' (' + s.cls + ') · ' + roundLabel(curRound);
-  $('cp-detail').innerHTML = `ค่าคอร์ส ฿${fmt(fee)}${bus?(' · ค่ารถ ฿'+fmt(bus)):''} · รวม ฿${fmt(fee+bus)}<br>จ่ายแล้ว <span style="color:#10B981">฿${fmt(paid)}</span> · ค้าง <strong style="color:#DC2626">฿${fmt(owed)}</strong>`;
+  $('cp-detail').innerHTML = `ค่าคอร์ส ฿${fmt(fee)}${bus?(' · ค่ารถ ฿'+fmt(bus)):''} · รวม ฿${fmt(fee+bus)}${note?('<br>📝 '+note):''}<br>จ่ายแล้ว <span style="color:#10B981">฿${fmt(paid)}</span> · ค้าง <strong style="color:#DC2626">฿${fmt(owed)}</strong>`;
   $('cp-amount').value = owed;
   $('cp-method').value = 'เงินสด';
   $('coursepay-modal').classList.add('active');
@@ -3038,14 +3055,16 @@ async function saveCoursePay(){
   const s = STUDENTS.find(x=>x.id===coursePayId); if(!s) return;
   const amt = +$('cp-amount').value || 0;
   if(amt <= 0){ toast('ใส่จำนวนเงินมากกว่า 0 บาท', 'error'); return; }
-  const fee = courseFee(s.cls), bus = courseBus(s), total = fee + bus, owed = courseOwed(s,curRound);
+  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), total = fee + bus, owed = courseOwed(s,curRound);
   const lbl = roundLabel(curRound);
+  const note = courseNote(s,curRound);
+  const noteSfx = note ? ' · ' + note : '';
   let items;
   if(amt >= total && coursePaid(s,curRound) === 0){
-    items = [{label:'ค่าคอร์สเรียนพิเศษ ('+lbl+')', amount: fee, months:0}];
+    items = [{label:'ค่าคอร์สเรียนพิเศษ ('+lbl+')'+noteSfx, amount: fee, months:0}];
     if(bus>0) items.push({label:'ค่าคอร์ส-ค่ารถ ('+lbl+')', amount: bus, months:0});
   } else {
-    items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')', amount: amt, months:0}];
+    items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')'+noteSfx, amount: amt, months:0}];
   }
   if(_savingTx) return; _savingTx = true;
   const tx = {
@@ -3064,11 +3083,13 @@ async function saveCoursePay(){
 }
 function printCourseInvoice(id){
   const s = STUDENTS.find(x=>x.id===id); if(!s) return;
-  const fee = courseFee(s.cls), bus = courseBus(s), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
   const lbl = roundLabel(curRound);
+  const note = courseNote(s,curRound);
   let rows = `<tr><td>ค่าคอร์สเรียนพิเศษ</td><td style="text-align:right">฿${fmt(fee)}</td></tr>`;
   if(bus>0) rows += `<tr><td>ค่ารถรับ-ส่ง</td><td style="text-align:right">฿${fmt(bus)}</td></tr>`;
   if(paid>0) rows += `<tr><td style="color:#10B981">หัก จ่ายแล้ว</td><td style="text-align:right;color:#10B981">-฿${fmt(paid)}</td></tr>`;
+  if(note) rows += `<tr><td colspan="2" style="color:#6B7280">📝 หมายเหตุ: ${note}</td></tr>`;
   const w = window.open('', '_blank');
   w.document.write(`<html><head><title>ใบแจ้งค่าเรียนพิเศษ</title><meta charset="utf-8"><style>body{font-family:'Sarabun',sans-serif;padding:24px;max-width:420px;margin:0 auto;color:#1F2937}table{width:100%;border-collapse:collapse;margin:12px 0}td{padding:7px 0;border-bottom:1px dashed #E5E7EB;font-size:15px}.tot{font-size:21px;font-weight:700;color:#DC2626}</style></head><body>
     <div style="text-align:center"><img src="${LOGO_SRC}" style="width:60px;height:60px;object-fit:contain"><h2 style="margin:4px 0">${SCHOOL.name}</h2><div style="font-size:12px;color:#6B7280">${SCHOOL.addr}</div></div>

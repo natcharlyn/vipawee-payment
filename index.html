@@ -438,6 +438,7 @@ details summary{cursor:pointer;outline:none}
       <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:170px" oninput="renderSpecial()">
       <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
+      <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
@@ -445,7 +446,7 @@ details summary{cursor:pointer;outline:none}
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
     <table class="tbl">
-      <thead><tr><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
+      <thead><tr><th>ที่</th><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
       <tbody id="ext-tbody"></tbody>
     </table>
   </div>
@@ -472,11 +473,21 @@ details summary{cursor:pointer;outline:none}
   <div class="modal" style="max-width:460px">
     <h3>💰 เก็บเงินคอร์ส · <span id="cp-name"></span></h3>
     <div id="cp-detail" style="font-size:14px;line-height:1.9;margin:6px 0 12px;background:#F8FAFC;border-radius:8px;padding:10px 12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="field"><label>จำนวนเงินที่รับ (บาท)</label><input class="input" id="cp-amount" type="number"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="field"><label>ค่าคอร์ส (บาท)</label><input class="input" id="cp-fee" type="number" oninput="cpRecalc()"></div>
+      <div class="field"><label>ค่ารถ (บาท)</label><input class="input" id="cp-bus" type="number" oninput="cpRecalc()"></div>
+      <div class="field"><label>ส่วนลด (บาท)</label><input class="input" id="cp-disc" type="number" oninput="cpRecalc()"></div>
+    </div>
+    <div class="field" style="margin:10px 0"><label>หมายเหตุ (ขึ้นในใบเสร็จ/ใบแจ้ง)</label><input class="input" id="cp-note" placeholder="เช่น นักเต้น ลด 50% · รร.ออกค่ารถให้"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="field"><label>ชื่อผู้จ่ายเงิน</label><input class="input" id="cp-payer" placeholder="เช่น ชื่อผู้ปกครอง"></div>
+      <div class="field"><label>ชื่อผู้รับเงิน</label><input class="input" id="cp-cashier" placeholder="เช่น วีรญา"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>จำนวนเงินที่รับ (บาท)</label><input class="input" id="cp-amount" type="number" style="font-weight:700"></div>
       <div class="field"><label>วิธีจ่าย</label><select class="select" id="cp-method"><option>เงินสด</option><option>โอน</option></select></div>
     </div>
-    <div style="font-size:12px;color:#6B7280;margin-top:4px">💡 จ่ายบางส่วนได้ · ใส่จำนวนน้อยกว่ายอดค้างแล้วระบบจะคิดยอดค้างที่เหลือให้</div>
+    <div style="font-size:12px;color:#6B7280;margin-top:4px">💡 แก้ค่าคอร์ส/ค่ารถ/ส่วนลด/หมายเหตุตรงนี้ ระบบจะจำไว้ให้เด็กคนนี้เลย · จ่ายบางส่วนได้ ใส่จำนวนน้อยกว่ายอดค้างแล้วระบบคิดยอดค้างที่เหลือให้</div>
     <div class="modal-actions">
       <button class="btn" onclick="closeCoursePay()">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveCoursePay()">บันทึก + ออกใบเสร็จ</button>
@@ -2954,6 +2965,7 @@ function courseOvGet(s, roundKey){ return (s.courseOv && s.courseOv[roundKey]) |
 function courseFeeEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.fee===''||o.fee===undefined||o.fee===null) ? courseFee(s.cls) : +o.fee; }
 function courseBusEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.bus===''||o.bus===undefined||o.bus===null) ? courseBus(s) : +o.bus; }
 function courseNote(s, roundKey){ return courseOvGet(s,roundKey).note || ''; }
+function courseDiscEff(s, roundKey){ const o=courseOvGet(s,roundKey); return +(o.disc||0); }
 function setCourseOv(id, field, val){
   const s = STUDENTS.find(x=>x.id===id); if(!s) return;
   s.courseOv = s.courseOv || {};
@@ -2962,7 +2974,7 @@ function setCourseOv(id, field, val){
   else s.courseOv[curRound][field] = (val==='' ? '' : +val);
   saveStudents(); renderSpecial();
 }
-function courseTotal(s, roundKey){ return courseFeeEff(s, roundKey) + courseBusEff(s, roundKey); }
+function courseTotal(s, roundKey){ return Math.max(0, courseFeeEff(s, roundKey) + courseBusEff(s, roundKey) - courseDiscEff(s, roundKey)); }
 function courseOwed(s, roundKey){ return Math.max(0, courseTotal(s, roundKey) - coursePaid(s, roundKey)); }
 function courseMembers(roundKey){ return STUDENTS.filter(s => !s.deleted && Array.isArray(s.specialEnroll) && s.specialEnroll.includes(roundKey)); }
 function renderSpecial(){
@@ -2974,16 +2986,17 @@ function renderSpecial(){
   $('ext-count').textContent = all.length;
   $('course-owed-sum').textContent = '฿' + fmt(all.reduce((sum,s)=>sum+courseOwed(s,curRound),0));
   if(list.length === 0){
-    $('ext-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
+    $('ext-tbody').innerHTML = '<tr><td colspan="11" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
-  list.sort((a,b)=> courseOwed(b,curRound)-courseOwed(a,curRound));
-  $('ext-tbody').innerHTML = list.map(s => {
+  list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  $('ext-tbody').innerHTML = list.map((s,ROWI) => {
     const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
     const note = courseNote(s,curRound);
     const feeDef = courseFee(s.cls), busDef = courseBus(s);
     const typeBadge = s.external ? '<span class="b b-info">เด็กนอก</span>' : '<span class="b" style="background:#EDE9FE;color:#5B21B6">เด็กใน</span>';
     return `<tr>
+      <td style="color:#6B7280">${ROWI+1}</td>
       <td><strong>${s.nick}</strong></td>
       <td>${s.name}${s.external&&s.extSchool?'<br><span style="font-size:11px;color:#9CA3AF">'+s.extSchool+'</span>':''}</td>
       <td>${s.cls}</td>
@@ -3042,27 +3055,41 @@ let coursePayId = null;
 function openCoursePay(id){
   const s = STUDENTS.find(x=>x.id===id); if(!s) return;
   coursePayId = id;
-  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
-  const note = courseNote(s,curRound);
+  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), disc = courseDiscEff(s,curRound), paid = coursePaid(s,curRound);
   $('cp-name').textContent = s.nick + ' (' + s.cls + ') · ' + roundLabel(curRound);
-  $('cp-detail').innerHTML = `ค่าคอร์ส ฿${fmt(fee)}${bus?(' · ค่ารถ ฿'+fmt(bus)):''} · รวม ฿${fmt(fee+bus)}${note?('<br>📝 '+note):''}<br>จ่ายแล้ว <span style="color:#10B981">฿${fmt(paid)}</span> · ค้าง <strong style="color:#DC2626">฿${fmt(owed)}</strong>`;
-  $('cp-amount').value = owed;
+  $('cp-detail').innerHTML = `จ่ายแล้ว <span style="color:#10B981">฿${fmt(paid)}</span> · ยอดค้างคำนวณจากช่องด้านล่าง แก้ได้ทุกช่อง (เหมาะกับเด็กนอกที่มาทีหลัง กำหนดราคาเองได้เลย)`;
+  $('cp-fee').value = fee; $('cp-bus').value = bus; $('cp-disc').value = disc || '';
+  $('cp-note').value = courseNote(s,curRound);
+  $('cp-payer').value = s.nick;
+  $('cp-cashier').value = cashierName || 'วีรญา';
   $('cp-method').value = 'เงินสด';
+  cpRecalc();
   $('coursepay-modal').classList.add('active');
+}
+function cpRecalc(){
+  const s = STUDENTS.find(x=>x.id===coursePayId); if(!s) return;
+  const fee=+$('cp-fee').value||0, bus=+$('cp-bus').value||0, disc=+$('cp-disc').value||0;
+  const paid = coursePaid(s,curRound);
+  $('cp-amount').value = Math.max(0, fee+bus-disc-paid);
 }
 function closeCoursePay(){ $('coursepay-modal').classList.remove('active'); }
 async function saveCoursePay(){
   const s = STUDENTS.find(x=>x.id===coursePayId); if(!s) return;
   const amt = +$('cp-amount').value || 0;
   if(amt <= 0){ toast('ใส่จำนวนเงินมากกว่า 0 บาท', 'error'); return; }
-  const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), total = fee + bus, owed = courseOwed(s,curRound);
+  // บันทึกค่าที่แก้ในหน้าต่างนี้ลงทะเบียนเด็กคนนี้ (จำไว้ตลอดรอบ)
+  const fee=+$('cp-fee').value||0, bus=+$('cp-bus').value||0, disc=+$('cp-disc').value||0;
+  const note = ($('cp-note').value||'').trim();
+  s.courseOv = s.courseOv || {}; s.courseOv[curRound] = {fee:fee, bus:bus, disc:disc, note:note};
+  saveStudents();
+  const total = Math.max(0, fee + bus - disc);
   const lbl = roundLabel(curRound);
-  const note = courseNote(s,curRound);
   const noteSfx = note ? ' · ' + note : '';
   let items;
-  if(amt >= total && coursePaid(s,curRound) === 0){
+  if(amt >= total - coursePaid(s,curRound) && coursePaid(s,curRound) === 0){
     items = [{label:'ค่าคอร์สเรียนพิเศษ ('+lbl+')'+noteSfx, amount: fee, months:0}];
     if(bus>0) items.push({label:'ค่าคอร์ส-ค่ารถ ('+lbl+')', amount: bus, months:0});
+    if(disc>0) items.push({label:'ค่าคอร์ส-ส่วนลด ('+lbl+')', amount: -disc, months:0});
   } else {
     items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')'+noteSfx, amount: amt, months:0}];
   }
@@ -3070,9 +3097,9 @@ async function saveCoursePay(){
   const tx = {
     id: Date.now(), date: new Date().toISOString(),
     studentId: s.id, studentName: s.name, studentNick: s.nick, studentClass: s.cls,
-    payerName: s.nick, items: items, total: items.reduce((a,it)=>a+it.amount,0),
+    payerName: ($('cp-payer').value || s.nick).trim(), items: items, total: items.reduce((a,it)=>a+it.amount,0),
     method: $('cp-method').value, style: 'F',
-    cashier: cashierName || 'วีรญา'
+    cashier: ($('cp-cashier').value || cashierName || 'วีรญา').trim()
   };
   toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
   const ok = await cloudSaveNewTx(tx);
@@ -3086,8 +3113,10 @@ function printCourseInvoice(id){
   const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
   const lbl = roundLabel(curRound);
   const note = courseNote(s,curRound);
+  const disc = courseDiscEff(s,curRound);
   let rows = `<tr><td>ค่าคอร์สเรียนพิเศษ</td><td style="text-align:right">฿${fmt(fee)}</td></tr>`;
   if(bus>0) rows += `<tr><td>ค่ารถรับ-ส่ง</td><td style="text-align:right">฿${fmt(bus)}</td></tr>`;
+  if(disc>0) rows += `<tr><td style="color:#0a7c46">ส่วนลด</td><td style="text-align:right;color:#0a7c46">-฿${fmt(disc)}</td></tr>`;
   if(paid>0) rows += `<tr><td style="color:#10B981">หัก จ่ายแล้ว</td><td style="text-align:right;color:#10B981">-฿${fmt(paid)}</td></tr>`;
   if(note) rows += `<tr><td colspan="2" style="color:#6B7280">📝 หมายเหตุ: ${note}</td></tr>`;
   const w = window.open('', '_blank');
@@ -3101,6 +3130,49 @@ function printCourseInvoice(id){
   </body></html>`);
   w.document.close();
   setTimeout(()=>w.print(), 500);
+}
+// พิมพ์ใบแจ้งเฉพาะคนที่ค้างทั้งรอบ · 2 คนต่อ 1 แผ่น A4 (มีเส้นประให้ตัดแบ่ง)
+function printCourseInvoicesOwed(){
+  const lbl = roundLabel(curRound);
+  const list = courseMembers(curRound).filter(s=>courseOwed(s,curRound)>0)
+    .sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  if(!list.length){ toast('ไม่มีคนค้างชำระในรอบนี้ 🎉'); return; }
+  const blocks = list.map((s,i)=>{
+    const fee=courseFeeEff(s,curRound), bus=courseBusEff(s,curRound), disc=courseDiscEff(s,curRound), paid=coursePaid(s,curRound), owed=courseOwed(s,curRound), note=courseNote(s,curRound);
+    let rows=`<tr><td>ค่าคอร์สเรียนพิเศษ</td><td style="text-align:right">฿${fmt(fee)}</td></tr>`;
+    if(bus>0) rows+=`<tr><td>ค่ารถรับ-ส่ง</td><td style="text-align:right">฿${fmt(bus)}</td></tr>`;
+    if(disc>0) rows+=`<tr><td style="color:#0a7c46">ส่วนลด</td><td style="text-align:right;color:#0a7c46">-฿${fmt(disc)}</td></tr>`;
+    if(paid>0) rows+=`<tr><td style="color:#10B981">หัก จ่ายแล้ว</td><td style="text-align:right;color:#10B981">-฿${fmt(paid)}</td></tr>`;
+    if(note) rows+=`<tr><td colspan="2" style="color:#6B7280">📝 ${note}</td></tr>`;
+    return `<div class="inv">
+      <div class="hd"><img src="${LOGO_SRC}"><div><b>${SCHOOL.name}</b><div class="sm">${SCHOOL.addr}</div></div></div>
+      <div class="tt">📄 ใบแจ้งค่าเรียนพิเศษ · ${lbl} <span class="no">ลำดับที่ ${i+1}/${list.length}</span></div>
+      <div class="stu"><strong>${s.nick}</strong> (${s.name}) · ${s.cls}${s.external?' · เด็กนอก'+(s.extSchool?' '+s.extSchool:''):''}</div>
+      <table>${rows}</table>
+      <div class="tot"><span>ยอดค้างชำระ</span><span class="amt">฿${fmt(owed)}</span></div>
+      <div class="bank">💳 ${SCHOOL.bank} ${SCHOOL.bankNo} · ${SCHOOL.bankName} · 📞 ${SCHOOL.phone}</div>
+    </div>`;
+  }).join('');
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><meta charset="utf-8"><title>ใบแจ้งค่าคอร์ส ${lbl} (${list.length} คน)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
+    @page{size:A4 portrait;margin:8mm}
+    body{font-family:'Sarabun',sans-serif;color:#1F2937;margin:0}
+    .inv{height:138mm;box-sizing:border-box;padding:6mm 8mm;border-bottom:2px dashed #bbb;page-break-inside:avoid}
+    .inv:nth-child(2n){page-break-after:always;border-bottom:none}
+    .hd{display:flex;gap:10px;align-items:center}.hd img{width:44px;height:44px;object-fit:contain}
+    .sm{font-size:11px;color:#6B7280}
+    .tt{background:#FEF3C7;border-radius:8px;padding:4px 10px;margin:6px 0;font-weight:700}
+    .no{float:right;color:#6B7280;font-weight:400;font-size:12px}
+    .stu{font-size:14px;margin-bottom:4px}
+    table{width:100%;border-collapse:collapse}td{padding:4px 0;border-bottom:1px dashed #E5E7EB;font-size:13.5px}
+    .tot{display:flex;justify-content:space-between;padding:5px 0;font-weight:700}
+    .amt{font-size:19px;color:#DC2626}
+    .bank{font-size:11.5px;background:#F0F9FF;padding:6px 10px;border-radius:8px;margin-top:5px}
+    .sigs{display:flex;justify-content:space-around;margin-top:10mm;text-align:center;font-size:12.5px}
+  </style></head><body>${blocks}</body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
 }
 function extBusToggle(){
   const on = $('ef-usebus').value !== 'ไม่ใช้';

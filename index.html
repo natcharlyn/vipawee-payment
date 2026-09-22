@@ -435,6 +435,7 @@ details summary{cursor:pointer;outline:none}
     </div>
     <div class="tools">
       <select class="select" id="round-sel" onchange="changeRound(this.value)" style="max-width:150px"></select>
+      <select class="select" id="ext-class" style="max-width:140px" onchange="renderSpecial()"></select>
       <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:170px" oninput="renderSpecial()">
       <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
@@ -2982,7 +2983,16 @@ function renderSpecial(){
   if(rsel && rsel.options.length === 0){ rsel.innerHTML = COURSE_ROUNDS.map(r=>`<option value="${r.key}">${r.label}</option>`).join(''); rsel.value = curRound; }
   const q = ($('ext-filter').value||'').trim().toLowerCase();
   const all = courseMembers(curRound);
+  // ดรอปดาวน์เลือกดูทีละชั้น (รวมชั้นแปลกๆ ของเด็กนอกด้วย)
+  const csel = $('ext-class');
+  if(csel){
+    const cur = csel.value;
+    const extra = [...new Set(all.map(s=>s.cls))].filter(c=>c && !CLASS_ORDER.includes(c));
+    csel.innerHTML = '<option value="">ทุกชั้น</option>' + CLASS_ORDER.concat(extra).map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  }
   let list = q ? all.filter(s => (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)) : all.slice();
+  const cf = csel ? csel.value : '';
+  if(cf) list = list.filter(s => s.cls === cf);
   $('ext-count').textContent = all.length;
   $('course-owed-sum').textContent = '฿' + fmt(all.reduce((sum,s)=>sum+courseOwed(s,curRound),0));
   if(list.length === 0){

@@ -431,10 +431,12 @@ details summary{cursor:pointer;outline:none}
   <div class="topbar">
     <div>
       <div class="page-title">⭐ คอร์สเรียนพิเศษ</div>
-      <div class="page-sub">รอบนี้มี <span id="ext-count">0</span> คน · ค้างรวม <span id="course-owed-sum" style="color:#DC2626;font-weight:600">฿0</span> · เด็กใน+เด็กนอก รวมกัน</div>
+      <div class="page-sub">รอบนี้มี <span id="ext-count">0</span> คน · ค้างรวม <span id="course-owed-sum" style="color:#DC2626;font-weight:600">฿0</span></div>
+      <div class="page-sub" id="ext-summary" style="margin-top:2px"></div>
     </div>
     <div class="tools">
       <select class="select" id="round-sel" onchange="changeRound(this.value)" style="max-width:150px"></select>
+      <select class="select" id="ext-type" style="max-width:120px" onchange="renderSpecial()"><option value="">ทั้งหมด</option><option value="in">เด็กใน</option><option value="out">เด็กนอก</option></select>
       <select class="select" id="ext-class" style="max-width:140px" onchange="renderSpecial()"></select>
       <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:170px" oninput="renderSpecial()">
       <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
@@ -2993,13 +2995,22 @@ function renderSpecial(){
   let list = q ? all.filter(s => (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)) : all.slice();
   const cf = csel ? csel.value : '';
   if(cf) list = list.filter(s => s.cls === cf);
+  const tf = $('ext-type') ? $('ext-type').value : '';
+  if(tf==='in') list = list.filter(s => !s.external);
+  if(tf==='out') list = list.filter(s => s.external);
   $('ext-count').textContent = all.length;
   $('course-owed-sum').textContent = '฿' + fmt(all.reduce((sum,s)=>sum+courseOwed(s,curRound),0));
+  // สรุปแยกเด็กใน/เด็กนอก
+  const _in = all.filter(s=>!s.external), _out = all.filter(s=>s.external);
+  const _inOwed = _in.reduce((x,s)=>x+courseOwed(s,curRound),0), _outOwed = _out.reduce((x,s)=>x+courseOwed(s,curRound),0);
+  if($('ext-summary')) $('ext-summary').innerHTML =
+    `<span style="background:#EDE9FE;color:#5B21B6;border-radius:99px;padding:2px 10px">เด็กใน ${_in.length} คน · ค้าง ฿${fmt(_inOwed)}</span> &nbsp;` +
+    `<span style="background:#DBEAFE;color:#1D4ED8;border-radius:99px;padding:2px 10px">เด็กนอก ${_out.length} คน · ค้าง ฿${fmt(_outOwed)}</span>`;
   if(list.length === 0){
     $('ext-tbody').innerHTML = '<tr><td colspan="11" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
-  list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  list.sort((a,b)=> ((a.external?1:0)-(b.external?1:0)) || (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   $('ext-tbody').innerHTML = list.map((s,ROWI) => {
     const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
     const note = courseNote(s,curRound);

@@ -450,7 +450,7 @@ details summary{cursor:pointer;outline:none}
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
     <table class="tbl">
-      <thead><tr><th>ที่</th><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
+      <thead><tr><th>ที่</th><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">ส่วนลด ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
       <tbody id="ext-tbody"></tbody>
     </table>
   </div>
@@ -3008,12 +3008,12 @@ function renderSpecial(){
     `<span style="background:#EDE9FE;color:#5B21B6;border-radius:99px;padding:2px 10px">เด็กใน ${_in.length} คน · ค้าง ฿${fmt(_inOwed)}</span> &nbsp;` +
     `<span style="background:#DBEAFE;color:#1D4ED8;border-radius:99px;padding:2px 10px">เด็กนอก ${_out.length} คน · ค้าง ฿${fmt(_outOwed)}</span>`;
   if(list.length === 0){
-    $('ext-tbody').innerHTML = '<tr><td colspan="11" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
+    $('ext-tbody').innerHTML = '<tr><td colspan="12" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
   list.sort((a,b)=> ((a.external?1:0)-(b.external?1:0)) || (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   $('ext-tbody').innerHTML = list.map((s,ROWI) => {
-    const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
+    const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), disc = courseDiscEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
     const note = courseNote(s,curRound);
     const feeDef = courseFee(s.cls), busDef = courseBus(s);
     const typeBadge = s.external ? '<span class="b b-info">เด็กนอก</span>' : '<span class="b" style="background:#EDE9FE;color:#5B21B6">เด็กใน</span>';
@@ -3025,6 +3025,7 @@ function renderSpecial(){
       <td>${typeBadge}</td>
       <td style="text-align:right"><input type="number" value="${fee}" onchange="setCourseOv(${s.id},'fee',this.value)" title="ราคาปกติ ฿${fmt(feeDef)} · แก้ได้ เช่น นักเต้นลดครึ่ง" style="width:72px;text-align:right;padding:3px 5px;border:1px solid ${fee!==feeDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${fee!==feeDef?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right"><input type="number" value="${bus}" onchange="setCourseOv(${s.id},'bus',this.value)" title="ตามหมู่บ้าน ฿${fmt(busDef)} · แก้ได้ · 0 = รร.ออกให้/ไม่ใช้รถ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${bus!==busDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${bus!==busDef?'#FFFBEB':'#fff'}"></td>
+      <td style="text-align:right"><input type="number" value="${disc||''}" placeholder="0" onchange="setCourseOv(${s.id},'disc',this.value)" title="ส่วนลด (บาท) เช่น นักเต้นลดครึ่ง ใส่ 500 · แสดงในใบแจ้ง/ใบเสร็จ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${disc>0?'#16A34A':'#E5E7EB'};border-radius:6px;background:${disc>0?'#F0FDF4':'#fff'};color:${disc>0?'#0a7c46':'inherit'}"></td>
       <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
       <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
       <td><input type="text" value="${(note||'').replace(/"/g,'&quot;')}" onchange="setCourseOv(${s.id},'note',this.value)" placeholder="เช่น นักเต้น ลด 50%" style="width:128px;padding:3px 6px;border:1px solid #E5E7EB;border-radius:6px"></td>

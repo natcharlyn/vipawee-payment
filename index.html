@@ -442,6 +442,7 @@ details summary{cursor:pointer;outline:none}
       <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
       <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
+      <button class="btn" style="background:#DCFCE7" onclick="copyCourseOwedMsg()">💬 ข้อความแจ้งรายห้อง</button>
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
@@ -3151,6 +3152,28 @@ function printCourseInvoice(id){
   </body></html>`);
   w.document.close();
   setTimeout(()=>w.print(), 500);
+}
+// 💬 ข้อความแจ้งค่าคอร์สค้าง รายห้อง (คัดลอกไปวางไลน์กลุ่มห้อง) — ใช้ห้องที่เลือกในดรอปดาวน์ ext-class
+function copyCourseOwedMsg(){
+  const lbl = roundLabel(curRound);
+  const cf = $('ext-class') ? $('ext-class').value : '';
+  let list = courseMembers(curRound).filter(s => courseOwed(s,curRound) > 0);
+  if(cf) list = list.filter(s => s.cls === cf);
+  if(!list.length){ toast('ไม่มีคนค้างชำระ' + (cf ? (' ห้อง ' + cf) : '') + ' 🎉'); return; }
+  list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  let msg = '📢 แจ้งยอดค่าเรียนพิเศษ (รอบ ' + lbl + ')' + (cf ? (' · ห้อง ' + cf) : '') + '\n';
+  msg += 'เรียนผู้ปกครองนักเรียนที่ลงคอร์สเรียนพิเศษ ขออนุญาตแจ้งยอดคงค้างดังนี้ค่ะ\n\n';
+  let curCls = '', n = 0;
+  list.forEach(s => {
+    if(!cf && s.cls !== curCls){ curCls = s.cls; n = 0; msg += '── ห้อง ' + curCls + ' ──\n'; }
+    n++;
+    msg += n + '. น้อง' + s.nick + ' ค้าง ' + fmt(courseOwed(s,curRound)) + ' บาท\n';
+  });
+  msg += '\nชำระเงินสดได้ที่ห้องธุรการ หรือโอน ' + SCHOOL.bank + ' ' + SCHOOL.bankNo + ' (' + SCHOOL.bankName + ') แล้วส่งสลิปมาทางไลน์ได้เลยค่ะ ขอบคุณค่ะ 🙏';
+  navigator.clipboard.writeText(msg).then(
+    () => toast('คัดลอกข้อความแล้ว (' + list.length + ' คน) วางในไลน์กลุ่มห้องได้เลย ✓'),
+    () => { prompt('คัดลอกข้อความด้านล่างนี้:', msg); }
+  );
 }
 // พิมพ์ใบแจ้งเฉพาะคนที่ค้างทั้งรอบ · 2 คนต่อ 1 แผ่น A4 (มีเส้นประให้ตัดแบ่ง)
 function printCourseInvoicesOwed(){

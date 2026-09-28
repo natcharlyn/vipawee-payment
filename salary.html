@@ -205,7 +205,7 @@ function curThaiMonth(){const d=new Date();return (d.getFullYear()+543)+'-'+Stri
 function monthLabel(m){if(!m)return '';const [y,mm]=m.split('-');return THM[+mm-1]+' '+y;}
 function prevMonthKey(m){let [y,mm]=m.split('-').map(Number);mm--;if(mm<1){mm=12;y--;}return y+'-'+String(mm).padStart(2,'0');}
 function nextMonthKey(m){let [y,mm]=m.split('-').map(Number);mm++;if(mm>12){mm=1;y++;}return y+'-'+String(mm).padStart(2,'0');}
-const AY_START='2569-05'; // เดือนแรกของปีการศึกษานี้
+const AY_START='2569-05'; // เดือนแรกที่เริ่มใช้ระบบ (คงที่ตลอด — รายการเดือนจะงอกต่อเองทุกปี ไม่ต้องแก้ตอนขึ้นปีการศึกษาใหม่)
 
 // ---------- state ----------
 let STAFF=[];            // ทะเบียนบุคลากร (ทุกสถานะ)
@@ -329,7 +329,7 @@ async function autoImportBonus(){
 function renderMonthSel(){
   const sel=document.getElementById('monthSel');
   const set=new Set(MONTHS);const cur=curThaiMonth();
-  let m=AY_START,guard=0;while(m<=cur&&guard<60){set.add(m);m=nextMonthKey(m);guard++;}
+  let m=AY_START,guard=0;while(m<=cur&&guard<240){set.add(m);m=nextMonthKey(m);guard++;}
   const opts=[...set].sort();
   sel.innerHTML=opts.map(m=>`<option value="${m}" ${m===MONTH?'selected':''}>📅 ${monthLabel(m)}${isClosed(m)?' 🔒':''}${hasMonth(m)?'':' (ยังไม่เปิด)'}</option>`).join('');
 }
@@ -1091,6 +1091,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.8 (ใบสรุปเงินมัดจำให้ครูเซ็น พิมพ์+Excel) · 15 ก.ย. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v1.9 (รายการเดือนงอกข้ามปีอัตโนมัติ 20 ปี ไม่ต้องแก้ตอนขึ้นปีการศึกษา) · 28 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

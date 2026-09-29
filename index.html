@@ -3124,7 +3124,17 @@ async function saveCoursePay(){
     if(bus>0) items.push({label:'ค่าคอร์ส-ค่ารถ ('+lbl+')', amount: bus, months:0});
     if(disc>0) items.push({label:'ค่าคอร์ส-ส่วนลด ('+lbl+')', amount: -disc, months:0});
   } else {
-    items = [{label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')'+noteSfx, amount: amt, months:0}];
+    // จ่ายบางส่วน/จ่ายปิดยอด: นับเงินเป็น "ค่าคอร์ส" ก่อนจนครบ (หลังหักส่วนลด) ส่วนที่เกินคือ "ค่ารถ"
+    // เพื่อให้ใบเซ็นรับค่ารถรายวันเห็นเงินค่ารถครบทุกกรณี
+    const feeNet = Math.max(0, fee - disc);
+    const busPaidSoFar = courseBusPaid(s,curRound);
+    const feePaidSoFar = Math.max(0, coursePaid(s,curRound) - busPaidSoFar);
+    const feePart = Math.min(amt, Math.max(0, feeNet - feePaidSoFar));
+    const busPart = Math.min(amt - feePart, Math.max(0, bus - busPaidSoFar));
+    const extra = amt - feePart - busPart; // กรณีจ่ายเกิน (แทบไม่เกิด) เก็บไว้ฝั่งค่าคอร์ส
+    items = [];
+    if(feePart + extra > 0 || busPart === 0) items.push({label:'ค่าคอร์สเรียนพิเศษ - บางส่วน ('+lbl+')'+noteSfx, amount: feePart + extra, months:0});
+    if(busPart > 0) items.push({label:'ค่าคอร์ส-ค่ารถ ('+lbl+')', amount: busPart, months:0});
   }
   if(_savingTx) return; _savingTx = true;
   const tx = {

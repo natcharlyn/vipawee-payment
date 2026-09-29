@@ -443,7 +443,7 @@ details summary{cursor:pointer;outline:none}
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
       <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
       <button class="btn" style="background:#DCFCE7" onclick="copyCourseOwedMsg()">💬 ข้อความแจ้งรายห้อง</button>
-      <button class="btn" style="background:#E0E7FF" onclick="printCourseBusSheets()">🖊 ใบเซ็นรับค่ารถ (แยกสาย)</button>
+      <button class="btn" style="background:#E0E7FF" onclick="openCourseBusSheet()">🖊 ใบเซ็นรับค่ารถ (ตามวันจ่าย)</button>
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
@@ -3164,51 +3164,99 @@ function printCourseInvoice(id){
   w.document.close();
   setTimeout(()=>w.print(), 500);
 }
-// 🖊 ใบเซ็นรับค่ารถคอร์สพิเศษ แยกตามสายรถ (สายละแผ่น) — ให้คนขับสายนั้นเซ็นรับเงินค่ารถที่เก็บได้
-function printCourseBusSheets(){
-  const lbl = roundLabel(curRound);
-  const list = courseMembers(curRound).filter(s => courseBusEff(s,curRound) > 0);
-  if(!list.length){ toast('รอบนี้ยังไม่มีเด็กที่มีค่ารถ'); return; }
-  const groups = {};
-  list.forEach(s => {
-    const line = courseLine(s,curRound) || 'ไม่ระบุสาย';
-    (groups[line] = groups[line] || []).push(s);
+// 🖊 ใบเซ็นรับค่ารถคอร์ส — ดึงเฉพาะคนที่ "จ่ายค่ารถ" ในวันที่เลือก จัดสายรายคน แล้วพิมพ์ให้คนขับเซ็นรับ
+function busPaymentsOn(dateStr){
+  const lbl=roundLabel(curRound); const out=[];
+  activeTX().forEach(t=>{
+    const d=new Date(t.date);
+    const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(ds!==dateStr) return;
+    const amt=(t.items||[]).filter(it=>it.label&&it.label.indexOf('ค่าคอร์ส-ค่ารถ')>=0&&it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0);
+    if(amt>0){ const s2=STUDENTS.find(x=>x.id===t.studentId); if(s2&&!s2.deleted) out.push({s:s2, amt:amt, rc:t.receiptNo||('#'+t.id), method:t.method||''}); }
   });
-  const lineNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'th'));
-  const today = new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
-  let pages = '';
-  lineNames.forEach(line => {
-    const kids = groups[line].sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
-    let rows = '', totBus = 0, totPaid = 0;
-    kids.forEach((s,i) => {
-      const bus = courseBusEff(s,curRound), bp = courseBusPaid(s,curRound);
-      const paidOk = bp >= bus;
-      totBus += bus; totPaid += Math.min(bp,bus);
-      rows += `<tr><td style="text-align:center">${i+1}</td><td><b>${s.nick}</b></td><td>${s.name}</td><td style="text-align:center">${s.cls}</td><td style="text-align:center">${s.external?('เด็กนอก'+(s.extSchool?' '+s.extSchool:'')):(s.village||'-')}</td><td style="text-align:right">${fmt(bus)}</td><td style="text-align:center;${paidOk?'color:#0a7c46;font-weight:700':'color:#DC2626'}">${paidOk?'✓ จ่ายแล้ว':(bp>0?('จ่าย '+fmt(bp)):'ค้าง')}</td></tr>`;
-    });
-    pages += `<div class="pg">
+  out.sort((a,b)=>(CLASS_ORDER.indexOf(a.s.cls)-CLASS_ORDER.indexOf(b.s.cls))||(a.s.nick||'').localeCompare(b.s.nick||'','th'));
+  return out;
+}
+function knownBusLines(){
+  const set=new Set(['A1','A2','A3','ครูเอก']);
+  STUDENTS.forEach(s2=>{ if(s2.busCode) set.add(s2.busCode); if(s2.courseOv){Object.values(s2.courseOv).forEach(o=>{if(o&&o.line)set.add(o.line);});} });
+  return [...set];
+}
+function openCourseBusSheet(){
+  let bg=document.getElementById('bussheet-back');
+  if(!bg){
+    bg=document.createElement('div'); bg.id='bussheet-back';
+    bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+    bg.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:780px;width:100%;max-height:88vh;overflow:auto;padding:18px">
+      <h3 style="margin-bottom:6px">🖊 ใบเซ็นรับค่ารถ · <span id="bs-round"></span></h3>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:10px">เลือกวันที่ → ระบบดึงเฉพาะคนที่<b>จ่ายค่ารถ</b>วันนั้น → จัดสายรถของแต่ละคน (ระบบจำสายให้) → ติ๊กเลือกแล้วกดพิมพ์ให้คนขับแต่ละสายเซ็นรับเงิน</div>
+      <div style="margin-bottom:10px"><label style="font-size:13px;color:#6B7280">วันที่จ่ายเงิน </label><input type="date" id="bs-date" class="input" style="max-width:170px" onchange="renderBusSheetList()"></div>
+      <table class="tbl" style="width:100%"><thead><tr><th></th><th>เด็ก</th><th>ใบเสร็จ</th><th style="text-align:right">ค่ารถที่จ่าย</th><th>สายรถ ✏</th></tr></thead><tbody id="bs-body"></tbody></table>
+      <div id="bs-sum" style="margin:8px 0;font-size:14px;font-weight:600"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button class="btn" onclick="document.getElementById('bussheet-back').style.display='none'">ปิด</button>
+        <button class="btn btn-primary" onclick="printBusSheetSelected()">🖨 พิมพ์ใบเซ็นแยกสาย</button>
+      </div>
+      <datalist id="bs-lines"></datalist>
+    </div>`;
+    document.body.appendChild(bg);
+  }
+  bg.style.display='flex';
+  $('bs-round').textContent=roundLabel(curRound);
+  const t=new Date();
+  $('bs-date').value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  $('bs-lines').innerHTML=knownBusLines().map(l=>`<option value="${l}">`).join('');
+  renderBusSheetList();
+}
+function renderBusSheetList(){
+  const rows=busPaymentsOn($('bs-date').value);
+  window._bsRows=rows;
+  if(!rows.length){ $('bs-body').innerHTML='<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:20px">วันที่เลือกยังไม่มีใครจ่ายค่ารถคอร์ส</td></tr>'; $('bs-sum').textContent=''; return; }
+  $('bs-body').innerHTML=rows.map((r,i)=>`<tr>
+    <td><input type="checkbox" class="bs-ck" data-i="${i}" checked onchange="bsSum()"></td>
+    <td><b>${r.s.nick}</b> · ${r.s.name} <span style="color:#9CA3AF">(${r.s.cls}${r.s.external?' · เด็กนอก':''})</span></td>
+    <td style="font-size:12.5px">${r.rc}<br><span style="color:#9CA3AF">${r.method}</span></td>
+    <td style="text-align:right;font-weight:700">฿${fmt(r.amt)}</td>
+    <td><input type="text" list="bs-lines" value="${(courseLine(r.s,curRound)||'').replace(/"/g,'&quot;')}" onchange="setCourseOv(${r.s.id},'line',this.value)" style="width:110px;padding:4px 6px;border:1px solid #D1D5DB;border-radius:6px"></td>
+  </tr>`).join('');
+  bsSum();
+}
+function bsSum(){
+  const rows=window._bsRows||[]; let n=0,sum=0;
+  document.querySelectorAll('.bs-ck').forEach(ck=>{ if(ck.checked){ n++; sum+=rows[+ck.dataset.i].amt; } });
+  $('bs-sum').textContent='เลือก '+n+' คน · รวมค่ารถที่จะส่งมอบ ฿'+fmt(sum);
+}
+function printBusSheetSelected(){
+  const rows=window._bsRows||[]; const lbl=roundLabel(curRound);
+  const picked=[]; document.querySelectorAll('.bs-ck').forEach(ck=>{ if(ck.checked) picked.push(rows[+ck.dataset.i]); });
+  if(!picked.length){ toast('ยังไม่ได้เลือกใครเลย'); return; }
+  const groups={};
+  picked.forEach(r=>{ const line=courseLine(r.s,curRound)||'ไม่ระบุสาย'; (groups[line]=groups[line]||[]).push(r); });
+  const dsel=$('bs-date').value.split('-');
+  const dTh=new Date(+dsel[0],+dsel[1]-1,+dsel[2]).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
+  let pages='';
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,'th')).forEach(line=>{
+    const kids=groups[line]; let tot=0;
+    const trs=kids.map((r,i)=>{ tot+=r.amt; return `<tr><td style="text-align:center">${i+1}</td><td><b>${r.s.nick}</b></td><td>${r.s.name}</td><td style="text-align:center">${r.s.cls}</td><td style="text-align:center">${r.rc}</td><td style="text-align:right">${fmt(r.amt)}</td></tr>`; }).join('');
+    pages+=`<div class="pg">
       <div class="hd"><img src="${LOGO_SRC}"><div><b>${SCHOOL.name}</b><div class="sm">${SCHOOL.addr}</div></div></div>
-      <div class="tt">🚌 ใบสรุป-เซ็นรับเงินค่ารถ คอร์สเรียนพิเศษ · รอบ ${lbl}</div>
-      <div class="ln">สายรถ: <b>${line}</b> · จำนวน ${kids.length} คน · จัดทำวันที่ ${today}</div>
-      <table><tr><th style="width:9mm">ที่</th><th style="width:20mm">ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th style="width:16mm">ชั้น</th><th style="width:30mm">หมู่บ้าน/ที่มา</th><th style="width:22mm">ค่ารถ (บาท)</th><th style="width:24mm">สถานะ</th></tr>${rows}
-      <tr class="tot"><td colspan="5" style="text-align:right">รวมค่ารถทั้งสาย</td><td style="text-align:right">${fmt(totBus)}</td><td></td></tr>
-      <tr class="tot"><td colspan="5" style="text-align:right;color:#0a7c46">เก็บแล้ว-พร้อมส่งมอบ</td><td style="text-align:right;color:#0a7c46">${fmt(totPaid)}</td><td></td></tr>
-      ${totBus-totPaid>0?`<tr class="tot"><td colspan="5" style="text-align:right;color:#DC2626">ยังค้างเก็บ</td><td style="text-align:right;color:#DC2626">${fmt(totBus-totPaid)}</td><td></td></tr>`:''}
-      </table>
-      <div class="recv">ข้าพเจ้าได้รับเงินค่ารถรับ-ส่ง คอร์สเรียนพิเศษรอบ ${lbl} จำนวน ..................... บาท ไว้ถูกต้องแล้ว</div>
+      <div class="tt">🚌 ใบส่งมอบ-เซ็นรับเงินค่ารถ คอร์สเรียนพิเศษ · รอบ ${lbl}</div>
+      <div class="ln">สายรถ: <b>${line}</b> · เงินค่ารถที่เก็บได้ประจำวันที่ <b>${dTh}</b> · จำนวน ${kids.length} คน</div>
+      <table><tr><th style="width:9mm">ที่</th><th style="width:22mm">ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th style="width:16mm">ชั้น</th><th style="width:28mm">เลขที่ใบเสร็จ</th><th style="width:24mm">ค่ารถ (บาท)</th></tr>${trs}
+      <tr class="tot"><td colspan="5" style="text-align:right">รวมส่งมอบ</td><td style="text-align:right">${fmt(tot)}</td></tr></table>
+      <div class="recv">ข้าพเจ้าได้รับเงินค่ารถรับ-ส่ง จำนวน <b>${fmt(tot)}</b> บาท (${bahtText(tot)}) ไว้ถูกต้องแล้ว</div>
       <div class="sigs">
         <div>ลงชื่อ....................................................<br>ผู้ส่งมอบเงิน (ธุรการ)<br>วันที่ ............................</div>
         <div>ลงชื่อ....................................................<br>ผู้รับเงิน (คนขับรถสาย ${line})<br>วันที่ ............................</div>
       </div>
     </div>`;
   });
-  const w = window.open('','_blank');
-  w.document.write(`<html><head><meta charset="utf-8"><title>ใบเซ็นรับค่ารถคอร์ส ${lbl} (${lineNames.length} สาย)</title>
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><meta charset="utf-8"><title>ใบเซ็นรับค่ารถ ${dTh}</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
     @page{size:A4 portrait;margin:12mm}
     body{font-family:'Sarabun',sans-serif;color:#1F2937;margin:0}
-    .pg{page-break-after:always;padding:2mm 0}
-    .pg:last-child{page-break-after:auto}
+    .pg{page-break-after:always;padding:2mm 0}.pg:last-child{page-break-after:auto}
     .hd{display:flex;gap:12px;align-items:center}.hd img{width:52px;height:52px;object-fit:contain}
     .hd b{font-size:18px}.sm{font-size:13px;color:#6B7280}
     .tt{background:#E0E7FF;border-radius:10px;padding:7px 14px;margin:8px 0 4px;font-weight:700;font-size:17px}

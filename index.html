@@ -443,6 +443,7 @@ details summary{cursor:pointer;outline:none}
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
       <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
       <button class="btn" style="background:#DCFCE7" onclick="copyCourseOwedMsg()">💬 ข้อความแจ้งรายห้อง</button>
+      <button class="btn" style="background:#E0E7FF" onclick="printCourseBusSheets()">🖊 ใบเซ็นรับค่ารถ (แยกสาย)</button>
     </div>
   </div>
   <div class="card" style="background:#FFFBEB;border:1px solid #FCD34D;font-size:13px;color:#92400E">
@@ -450,7 +451,7 @@ details summary{cursor:pointer;outline:none}
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
     <table class="tbl">
-      <thead><tr><th>ที่</th><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th style="text-align:right">ส่วนลด ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
+      <thead><tr><th>ที่</th><th>ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th>ชั้น</th><th>ประเภท</th><th style="text-align:right">ค่าคอร์ส ✏</th><th style="text-align:right">ค่ารถ ✏</th><th>สายรถ ✏</th><th style="text-align:right">ส่วนลด ✏</th><th style="text-align:right">จ่ายแล้ว</th><th style="text-align:right">ค้าง</th><th>หมายเหตุ ✏</th><th></th></tr></thead>
       <tbody id="ext-tbody"></tbody>
     </table>
   </div>
@@ -2970,11 +2971,19 @@ function courseFeeEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.f
 function courseBusEff(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.bus===''||o.bus===undefined||o.bus===null) ? courseBus(s) : +o.bus; }
 function courseNote(s, roundKey){ return courseOvGet(s,roundKey).note || ''; }
 function courseDiscEff(s, roundKey){ const o=courseOvGet(s,roundKey); return +(o.disc||0); }
+// สายรถช่วงคอร์ส (แก้ได้รายคน เช่น เด็ก A1 ไปขึ้นรถครูเอกช่วง ต.ค. / เด็กนอกขึ้นสายร่วมภายนอก) — ค่าเริ่มต้น = สายปกติของเด็ก
+function courseLine(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.line!==undefined&&o.line!==null&&o.line!=='') ? o.line : (s.busCode||''); }
+// ยอด "ค่ารถ" ของคอร์สที่จ่ายแล้วจริง (นับเฉพาะรายการ ค่าคอร์ส-ค่ารถ ในใบเสร็จ)
+function courseBusPaid(s, roundKey){
+  const lbl = roundLabel(roundKey);
+  return activeTX().filter(t => t.studentId===s.id && inCurrentAY(t.date))
+    .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('ค่าคอร์ส-ค่ารถ')>=0 && it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0), 0);
+}
 function setCourseOv(id, field, val){
   const s = STUDENTS.find(x=>x.id===id); if(!s) return;
   s.courseOv = s.courseOv || {};
   s.courseOv[curRound] = s.courseOv[curRound] || {};
-  if(field==='note') s.courseOv[curRound].note = val;
+  if(field==='note' || field==='line') s.courseOv[curRound][field] = val;
   else s.courseOv[curRound][field] = (val==='' ? '' : +val);
   saveStudents(); renderSpecial();
 }
@@ -3008,7 +3017,7 @@ function renderSpecial(){
     `<span style="background:#EDE9FE;color:#5B21B6;border-radius:99px;padding:2px 10px">เด็กใน ${_in.length} คน · ค้าง ฿${fmt(_inOwed)}</span> &nbsp;` +
     `<span style="background:#DBEAFE;color:#1D4ED8;border-radius:99px;padding:2px 10px">เด็กนอก ${_out.length} คน · ค้าง ฿${fmt(_outOwed)}</span>`;
   if(list.length === 0){
-    $('ext-tbody').innerHTML = '<tr><td colspan="12" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
+    $('ext-tbody').innerHTML = '<tr><td colspan="13" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
   list.sort((a,b)=> ((a.external?1:0)-(b.external?1:0)) || (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
@@ -3025,6 +3034,7 @@ function renderSpecial(){
       <td>${typeBadge}</td>
       <td style="text-align:right"><input type="number" value="${fee}" onchange="setCourseOv(${s.id},'fee',this.value)" title="ราคาปกติ ฿${fmt(feeDef)} · แก้ได้ เช่น นักเต้นลดครึ่ง" style="width:72px;text-align:right;padding:3px 5px;border:1px solid ${fee!==feeDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${fee!==feeDef?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right"><input type="number" value="${bus}" onchange="setCourseOv(${s.id},'bus',this.value)" title="ตามหมู่บ้าน ฿${fmt(busDef)} · แก้ได้ · 0 = รร.ออกให้/ไม่ใช้รถ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${bus!==busDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${bus!==busDef?'#FFFBEB':'#fff'}"></td>
+      <td><input type="text" value="${(courseLine(s,curRound)||'').replace(/"/g,'&quot;')}" placeholder="-" onchange="setCourseOv(${s.id},'line',this.value)" title="สายรถช่วงคอร์ส · แก้ได้ เช่น เด็ก A1 ขึ้นรถครูเอกช่วง ต.ค. พิมพ์ ครูเอก / เด็กนอกพิมพ์ชื่อสายร่วม" style="width:64px;padding:3px 5px;border:1px solid ${courseOvGet(s,curRound).line?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${courseOvGet(s,curRound).line?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right"><input type="number" value="${disc||''}" placeholder="0" onchange="setCourseOv(${s.id},'disc',this.value)" title="ส่วนลด (บาท) เช่น นักเต้นลดครึ่ง ใส่ 500 · แสดงในใบแจ้ง/ใบเสร็จ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${disc>0?'#16A34A':'#E5E7EB'};border-radius:6px;background:${disc>0?'#F0FDF4':'#fff'};color:${disc>0?'#0a7c46':'inherit'}"></td>
       <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
       <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
@@ -3153,6 +3163,65 @@ function printCourseInvoice(id){
   </body></html>`);
   w.document.close();
   setTimeout(()=>w.print(), 500);
+}
+// 🖊 ใบเซ็นรับค่ารถคอร์สพิเศษ แยกตามสายรถ (สายละแผ่น) — ให้คนขับสายนั้นเซ็นรับเงินค่ารถที่เก็บได้
+function printCourseBusSheets(){
+  const lbl = roundLabel(curRound);
+  const list = courseMembers(curRound).filter(s => courseBusEff(s,curRound) > 0);
+  if(!list.length){ toast('รอบนี้ยังไม่มีเด็กที่มีค่ารถ'); return; }
+  const groups = {};
+  list.forEach(s => {
+    const line = courseLine(s,curRound) || 'ไม่ระบุสาย';
+    (groups[line] = groups[line] || []).push(s);
+  });
+  const lineNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'th'));
+  const today = new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
+  let pages = '';
+  lineNames.forEach(line => {
+    const kids = groups[line].sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+    let rows = '', totBus = 0, totPaid = 0;
+    kids.forEach((s,i) => {
+      const bus = courseBusEff(s,curRound), bp = courseBusPaid(s,curRound);
+      const paidOk = bp >= bus;
+      totBus += bus; totPaid += Math.min(bp,bus);
+      rows += `<tr><td style="text-align:center">${i+1}</td><td><b>${s.nick}</b></td><td>${s.name}</td><td style="text-align:center">${s.cls}</td><td style="text-align:center">${s.external?('เด็กนอก'+(s.extSchool?' '+s.extSchool:'')):(s.village||'-')}</td><td style="text-align:right">${fmt(bus)}</td><td style="text-align:center;${paidOk?'color:#0a7c46;font-weight:700':'color:#DC2626'}">${paidOk?'✓ จ่ายแล้ว':(bp>0?('จ่าย '+fmt(bp)):'ค้าง')}</td></tr>`;
+    });
+    pages += `<div class="pg">
+      <div class="hd"><img src="${LOGO_SRC}"><div><b>${SCHOOL.name}</b><div class="sm">${SCHOOL.addr}</div></div></div>
+      <div class="tt">🚌 ใบสรุป-เซ็นรับเงินค่ารถ คอร์สเรียนพิเศษ · รอบ ${lbl}</div>
+      <div class="ln">สายรถ: <b>${line}</b> · จำนวน ${kids.length} คน · จัดทำวันที่ ${today}</div>
+      <table><tr><th style="width:9mm">ที่</th><th style="width:20mm">ชื่อเล่น</th><th>ชื่อ-นามสกุล</th><th style="width:16mm">ชั้น</th><th style="width:30mm">หมู่บ้าน/ที่มา</th><th style="width:22mm">ค่ารถ (บาท)</th><th style="width:24mm">สถานะ</th></tr>${rows}
+      <tr class="tot"><td colspan="5" style="text-align:right">รวมค่ารถทั้งสาย</td><td style="text-align:right">${fmt(totBus)}</td><td></td></tr>
+      <tr class="tot"><td colspan="5" style="text-align:right;color:#0a7c46">เก็บแล้ว-พร้อมส่งมอบ</td><td style="text-align:right;color:#0a7c46">${fmt(totPaid)}</td><td></td></tr>
+      ${totBus-totPaid>0?`<tr class="tot"><td colspan="5" style="text-align:right;color:#DC2626">ยังค้างเก็บ</td><td style="text-align:right;color:#DC2626">${fmt(totBus-totPaid)}</td><td></td></tr>`:''}
+      </table>
+      <div class="recv">ข้าพเจ้าได้รับเงินค่ารถรับ-ส่ง คอร์สเรียนพิเศษรอบ ${lbl} จำนวน ..................... บาท ไว้ถูกต้องแล้ว</div>
+      <div class="sigs">
+        <div>ลงชื่อ....................................................<br>ผู้ส่งมอบเงิน (ธุรการ)<br>วันที่ ............................</div>
+        <div>ลงชื่อ....................................................<br>ผู้รับเงิน (คนขับรถสาย ${line})<br>วันที่ ............................</div>
+      </div>
+    </div>`;
+  });
+  const w = window.open('','_blank');
+  w.document.write(`<html><head><meta charset="utf-8"><title>ใบเซ็นรับค่ารถคอร์ส ${lbl} (${lineNames.length} สาย)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
+    @page{size:A4 portrait;margin:12mm}
+    body{font-family:'Sarabun',sans-serif;color:#1F2937;margin:0}
+    .pg{page-break-after:always;padding:2mm 0}
+    .pg:last-child{page-break-after:auto}
+    .hd{display:flex;gap:12px;align-items:center}.hd img{width:52px;height:52px;object-fit:contain}
+    .hd b{font-size:18px}.sm{font-size:13px;color:#6B7280}
+    .tt{background:#E0E7FF;border-radius:10px;padding:7px 14px;margin:8px 0 4px;font-weight:700;font-size:17px}
+    .ln{font-size:15.5px;margin-bottom:6px}
+    table{width:100%;border-collapse:collapse;font-size:14.5px}
+    th,td{border:1px solid #9CA3AF;padding:5px 8px}
+    th{background:#F3F4F6;font-weight:700}
+    .tot td{font-weight:700;font-size:15px;background:#FAFAFA}
+    .recv{margin-top:8mm;font-size:15px}
+    .sigs{display:flex;justify-content:space-around;margin-top:12mm;text-align:center;font-size:14px;line-height:2}
+  </style></head><body>${pages}</body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
 }
 // 💬 ข้อความแจ้งค่าคอร์สค้าง รายห้อง (คัดลอกไปวางไลน์กลุ่มห้อง) — ใช้ห้องที่เลือกในดรอปดาวน์ ext-class
 function copyCourseOwedMsg(){

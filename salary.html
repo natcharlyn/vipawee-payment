@@ -1038,7 +1038,7 @@ async function _renderDeposit(){
       <td class="num" style="font-weight:800">฿${f(total)}</td>
       <td class="num" style="color:${rem>0?'var(--red)':'var(--green)'};font-weight:800">฿${f(rem)}</td>
       <td>${st}</td>
-      <td style="white-space:nowrap">${s.depRet?'':`<button class="btn btn-sm" onclick="depUpfront(${s.id})">✏️ วางสด</button> <button class="btn btn-sm" onclick="depReturn(${s.id})">↩ คืนเงิน</button>`}</td></tr>`;
+      <td style="white-space:nowrap">${s.depRet?`<button class="btn btn-sm" onclick="depReprint(${s.id})">🖨 พิมพ์ใบรับคืน</button>`:`<button class="btn btn-sm" onclick="depUpfront(${s.id})">✏️ วางสด</button> <button class="btn btn-sm" onclick="depReturn(${s.id})">↩ คืนเงิน</button>`}</td></tr>`;
   });
   h+=`</tbody></table></div><div style="margin-top:8px;color:#475569">อยู่ในโครงการมัดจำ <b>${cnt}</b> คน · แถว "ไม่ได้เก็บ" กดปุ่ม ▶ เมื่อมีครูใหม่เข้าโครงการ · ยอด "หักจากเงินเดือนแล้ว" ชี้เมาส์ค้างเพื่อดูรายเดือน</div>`;
   document.getElementById('content').innerHTML=h;
@@ -1049,9 +1049,51 @@ async function depStart(id){const s=STAFF.find(x=>x.id==id);
 async function depUpfront(id){const s=STAFF.find(x=>x.id==id);
   const v=prompt('ยอดที่วางสด/ยกยอดมาแล้ว (บาท):',s.depUp||0);if(v===null)return;
   await q(sb.from('staff').update({deposit_upfront:Number(v||0),deposit_target:s.depT||10000}).eq('id',id));await loadAll();renderDeposit();toast('บันทึกแล้ว ✓');}
+// คืนเงินมัดจำ + พิมพ์ใบรับคืนให้ครูเซ็น (30 ก.ย. 69)
 async function depReturn(id){const s=STAFF.find(x=>x.id==id);
-  if(!confirm('บันทึกว่า "คืนเงินมัดจำแล้ว" ให้ '+s.n+'?\n(ระบบจะหยุดหักตั้งแต่เดือนที่เปิดใหม่ถัดไป)'))return;
-  await q(sb.from('staff').update({deposit_returned:thToday()}).eq('id',id));await loadAll();renderDeposit();toast('บันทึกคืนเงินแล้ว ✓');}
+  const dep=await _depSums();const d=dep[s.id]||{sum:0,ms:[]};const total=(s.depUp||0)+d.sum;
+  if(total<=0){alert(s.n+' ยังไม่มียอดเงินมัดจำสะสม');return;}
+  if(!confirm('คืนเงินมัดจำให้ '+s.n+'\nยอดคืน ฿'+f(total)+'\n\nกด OK แล้วเลือกวิธีคืนเงิน จากนั้นระบบจะเปิดใบรับคืนให้พิมพ์'))return;
+  const mth=prompt('คืนด้วยวิธีไหน? พิมพ์ 1 = เงินสด หรือ 2 = โอนเข้าบัญชี','1');if(mth===null)return;
+  const method=String(mth).trim()==='2'?'โอน':'เงินสด';
+  const stamp=thToday()+' · '+method+' ฿'+f(total);
+  await q(sb.from('staff').update({deposit_returned:stamp}).eq('id',id));
+  await loadAll();renderDeposit();toast('บันทึกคืนเงินมัดจำแล้ว ✓');
+  depPrintReceipt(id,dep);}
+async function depReprint(id){depPrintReceipt(id,await _depSums());}
+function _bahtText(n){n=Math.round(Number(n||0));if(n===0)return 'ศูนย์บาทถ้วน';
+  const D=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],P=['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  const grp=x=>{let s='',str=String(x),L=str.length;for(let i=0;i<L;i++){const dg=+str[i],pos=L-i-1;if(!dg)continue;
+    if(pos===1&&dg===1)s+='สิบ';else if(pos===1&&dg===2)s+='ยี่สิบ';else if(pos===0&&dg===1&&L>1)s+='เอ็ด';else s+=D[dg]+P[pos];}return s;};
+  let out='',m=Math.floor(n/1000000),r=n%1000000;if(m)out+=grp(m)+'ล้าน';if(r)out+=grp(r);return out+'บาทถ้วน';}
+function depPrintReceipt(id,dep){const s=STAFF.find(x=>x.id==id);const d=dep[s.id]||{sum:0,ms:[]};const up=s.depUp||0;const total=up+d.sum;
+  const ret=s.depRet||'';const method=/โอน/.test(ret)?'โอน':'เงินสด';const dt=(ret.split('·')[0]||thToday()).trim();
+  let rows='',i=0;
+  if(up>0)rows+=`<tr><td style="text-align:center">${++i}</td><td>วางเงินสด / ยอดยกมา</td><td class="n">${f(up)}</td></tr>`;
+  d.ms.forEach(t=>{const p=t.split(': ฿');rows+=`<tr><td style="text-align:center">${++i}</td><td>หักจากเงินเดือน ${p[0]}</td><td class="n">${p[1]||''}</td></tr>`;});
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><meta charset="utf-8"><title>ใบรับคืนเงินมัดจำ ${s.n}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><style>
+  @page{size:A4 portrait;margin:14mm}body{font-family:'Sarabun',sans-serif;color:#111;font-size:16px}
+  .copy{border:1.5px solid #000;padding:8mm 10mm;margin-bottom:6mm;position:relative}
+  .tag{position:absolute;top:6mm;right:8mm;border:1.4px solid #000;padding:1px 10px;font-weight:700;font-size:14px}
+  h2{text-align:center;margin:0 0 2mm;font-size:21px}.sub{text-align:center;font-size:14px;color:#333;margin-bottom:4mm}
+  table{width:100%;border-collapse:collapse;margin:3mm 0}th,td{border:1px solid #000;padding:4px 8px}th{background:#eee}
+  .n{text-align:right}.tot td{font-weight:800}
+  .sigs{display:flex;justify-content:space-around;margin-top:12mm;text-align:center;line-height:2}
+  .cut{text-align:center;color:#666;font-size:12px;border-top:1.5px dashed #888;margin:0 0 6mm;padding-top:1mm}</style></head><body>
+  ${['ต้นฉบับ · ครูเก็บ','สำเนา · โรงเรียนเก็บ'].map((tag,k)=>`${k?'<div class="cut">✂ ตัดตามรอยประ</div>':''}<div class="copy"><div class="tag">${tag}</div>
+    <h2>ใบรับคืนเงินมัดจำ</h2><div class="sub">โรงเรียนอนุบาลวิภาวี · วันที่ ${dt}</div>
+    <div>ข้าพเจ้า <b>${s.n}</b> ตำแหน่ง/กลุ่ม ${s.g}${s.resigned&&s.resignDate?' · ลาออกวันที่ '+s.resignDate:''}</div>
+    <div style="margin-top:2mm">ได้รับเงินมัดจำคืนจากโรงเรียนอนุบาลวิภาวี ตามรายละเอียดดังนี้</div>
+    <table><tr><th style="width:12mm">ที่</th><th>รายการเงินมัดจำที่วางไว้</th><th style="width:40mm">จำนวนเงิน (บาท)</th></tr>${rows}
+    <tr class="tot"><td colspan="2" style="text-align:right">รวมเงินมัดจำที่ได้รับคืน</td><td class="n">${f(total)}</td></tr></table>
+    <div>จำนวนเงิน (ตัวอักษร): <b>${_bahtText(total)}</b></div>
+    <div style="margin-top:2mm">รับคืนโดย: ${method==='เงินสด'?'☑':'☐'} เงินสด &nbsp;&nbsp; ${method==='โอน'?'☑':'☐'} โอนเข้าบัญชี ${s.acc?esc(s.acc):'.............................'}</div>
+    <div class="sigs"><div>ลงชื่อ..................................................<br>ผู้รับเงิน<br>( ${s.n} )</div>
+      <div>ลงชื่อ..................................................<br>ผู้จ่ายเงิน (การเงิน)<br>(..................................................)</div></div>
+  </div>`).join('')}</body></html>`);
+  w.document.close();setTimeout(()=>w.print(),600);}
 // ใบสรุปเงินมัดจำสำหรับครูเซ็น (รูปแบบตามไฟล์ Excel เดิม)
 function _depSheetRows(dep){
   const rows=[];
@@ -1091,6 +1133,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v1.9 (รายการเดือนงอกข้ามปีอัตโนมัติ 20 ปี ไม่ต้องแก้ตอนขึ้นปีการศึกษา) · 28 ก.ย. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v2.0 (คืนเงินมัดจำ+พิมพ์ใบรับคืนให้ครูเซ็น) · 30 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

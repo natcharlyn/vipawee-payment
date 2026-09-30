@@ -333,7 +333,7 @@ function renderMonthSel(){
   const opts=[...set].sort();
   sel.innerHTML=opts.map(m=>`<option value="${m}" ${m===MONTH?'selected':''}>📅 ${monthLabel(m)}${isClosed(m)?' 🔒':''}${hasMonth(m)?'':' (ยังไม่เปิด)'}</option>`).join('');
 }
-async function switchMonth(m){await loadMonth(m);go(curPage);}
+async function switchMonth(m){await flushAutoSave();await loadMonth(m);go(curPage);}
 
 // ---------- เดือน: เปิด/ปิดงวด ----------
 function hasMonth(m){return MONTHS.includes(m===undefined?MONTH:m);}
@@ -441,9 +441,42 @@ async function saveEntries(groupOnly){
     const refRows=Object.keys(REFUNDS).map(sid=>{const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];
       return {month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''};});
     if(refRows.length)await q(sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'}));
+    _dirty.clear();_asStatus('saved');
     toast('บันทึกขึ้นคลาวด์แล้ว ✓');
   });
 }
+// ---------- 💾 บันทึกอัตโนมัติ (30 ก.ย. 69) — พิมพ์แล้วหยุด 1.5 วิ บันทึกขึ้นคลาวด์เอง · กันข้อมูลหายตอนรีเฟรช/เปลี่ยนหน้า ----------
+const _dirty=new Set();let _asTimer=null,_asRunning=false;
+function _asStatus(st){let el=document.getElementById('asPill');
+  if(!el){el=document.createElement('div');el.id='asPill';el.className='print-hide';
+    el.style.cssText='position:fixed;right:14px;bottom:14px;z-index:9999;padding:7px 14px;border-radius:99px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.18);transition:opacity .3s';
+    document.body.appendChild(el);}
+  const t=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  if(st==='dirty'){el.style.background='#FEF3C7';el.style.color='#92400E';el.textContent='✏️ มีการแก้ไข · กำลังจะบันทึก…';}
+  else if(st==='saving'){el.style.background='#DBEAFE';el.style.color='#1E40AF';el.textContent='⏳ กำลังบันทึกขึ้นคลาวด์…';}
+  else if(st==='error'){el.style.background='#FEE2E2';el.style.color='#991B1B';el.textContent='⚠ บันทึกไม่สำเร็จ · จะลองใหม่อัตโนมัติ (อย่าเพิ่งปิดหน้า)';}
+  else {el.style.background='#DCFCE7';el.style.color='#166534';el.textContent='✓ บันทึกอัตโนมัติแล้ว '+t+' น.';}
+  el.style.opacity='1';}
+function markDirty(id){if(typeof canEdit==='function'&&!canEdit())return;_dirty.add(Number(id));_asStatus('dirty');
+  clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,1500);}
+async function _autoSave(){
+  if(!_dirty.size)return;
+  if(_asRunning||_salBusy){clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,800);return;}
+  _asRunning=true;const ids=[..._dirty];_dirty.clear();_asStatus('saving');
+  try{
+    const rows=ids.map(id=>{const s=STAFF.find(x=>x.id==id);const e=ENTRIES[id];if(!s||!e)return null;
+      return {month:MONTH,staff_id:s.id,pay_group:e.g,base_salary:Number(e.items.base||0),items:e.items,net:net(s),note:e.note||''};}).filter(Boolean);
+    if(rows.length){const r=await sb.from('payroll_entries').upsert(rows,{onConflict:'month,staff_id'});if(r.error)throw r.error;}
+    const refRows=ids.filter(id=>REFUNDS[id]).map(id=>{const s=STAFF.find(x=>x.id==id);const r=REFUNDS[id];
+      return {month:MONTH,staff_id:+id,state_amount:r.rate||null,net:s?net(s):0,refund_due:s?refundAmt(s):0,refund_received:(r.st==='โอนแล้ว'),status:r.st||'ยังไม่โอน',received_date:r.date||null,note:r.note||''};});
+    if(refRows.length){const r2=await sb.from('payroll_refunds').upsert(refRows,{onConflict:'month,staff_id'});if(r2.error)throw r2.error;}
+    _asStatus(_dirty.size?'dirty':'saved');
+  }catch(err){console.error('autosave',err);ids.forEach(i=>_dirty.add(i));_asStatus('error');clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,4000);}
+  finally{_asRunning=false;}
+  if(_dirty.size){clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,1500);}
+}
+async function flushAutoSave(){clearTimeout(_asTimer);let g=0;while((_dirty.size||_asRunning)&&g<40){if(!_asRunning)await _autoSave();else await new Promise(r=>setTimeout(r,250));g++;}}
+window.addEventListener('beforeunload',e=>{if(_dirty.size||_asRunning){e.preventDefault();e.returnValue='ยังบันทึกข้อมูลไม่เสร็จ';return e.returnValue;}});
 async function saveRefund(sid){
   const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];if(!r)return;
   await q(sb.from('payroll_refunds').upsert({month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,
@@ -561,7 +594,7 @@ function renderCheck(){
   document.getElementById('content').innerHTML=h;
 }
 function setGroupC(g){curGroup=g;renderCheck();}
-function setNote(id,v){ENTRIES[id].items.leaveNote=String(v||'');}
+function setNote(id,v){ENTRIES[id].items.leaveNote=String(v||'');markDirty(id);}
 async function importAttendance(){
   if(!canEdit()){toast('เดือนนี้ปิดงวดแล้ว');return;}
   const rows=await q(sb.from('attendance').select('*').eq('month',MONTH));
@@ -600,8 +633,8 @@ function setGroup(g){curGroup=g;renderEntry();}
 async function changeGroup(id,g){const s=STAFF.find(x=>x.id==id);const e=ent(s);const old=e.g;if(g===old)return;
   e.g=g;colsG(g).forEach(c=>{if(e.items[c.key]===undefined)e.items[c.key]=0;});
   await saveEntries();renderEntry();toast('ย้าย '+s.n+' จาก '+old+' → '+g+' แล้ว ✓');}
-function setPay(id,el){const e=ENTRIES[id];e.note=el.value;el.className='paysel '+(el.value==='เงินสด'?'cash':'bank');}
-function setV(id,key,v){const e=ENTRIES[id];e.items[key]=Number(v||0);
+function setPay(id,el){const e=ENTRIES[id];e.note=el.value;el.className='paysel '+(el.value==='เงินสด'?'cash':'bank');markDirty(id);}
+function setV(id,key,v){const e=ENTRIES[id];e.items[key]=Number(v||0);markDirty(id);
   const s=STAFF.find(x=>x.id==id);
   const rn=document.getElementById('rn_'+id);if(rn)rn.innerHTML=netRaw(s)<0?`<span style="color:var(--red);font-weight:800" title="หักเกินเงินเดือน ฿${f(-netRaw(s))}">⚠ ฿0</span>`:'฿'+f(net(s));
   const nb=document.getElementById('negBanner');if(nb)nb.innerHTML=negBannerHTML(act(curGroup));
@@ -1133,6 +1166,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v2.0 (คืนเงินมัดจำ+พิมพ์ใบรับคืนให้ครูเซ็น) · 30 ก.ย. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v2.1 (บันทึกอัตโนมัติหน้ากรอกเงินเดือน/ลา-ขาด-สาย + เตือนก่อนออก) · 30 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

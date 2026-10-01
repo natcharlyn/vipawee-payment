@@ -1986,7 +1986,7 @@ function paidState(s){
 }
 function unpaidFeeItems(s){
   const p = getPriceForClass(s.cls);
-  if(!p || s.discount==='ฟรี 100%') return [];
+  if(!p) return [];   // เด็กฟรี 100% = ฟรีเฉพาะค่าเทอมรายเดือน · ค่าหนังสือ/ประกัน/รายเทอม จ่ายเองปกติ (ครูแนทยืนยัน 1 ต.ค. 69)
   const ps = paidState(s);
   const items = [];
   if(p.book && !ps.annual.has('ค่าหนังสือ')) items.push({label:'ค่าหนังสือ (ปี '+AY+')', amount:p.book});
@@ -5175,7 +5175,7 @@ function fullYearOwed(s){
     let due = 0; for(let i=startI; i<=cap; i++){ if(!ps.bus.has(MONTHS[i])) due++; }
     est += perMonth * due;
   }
-  if(s.discount !== 'ฟรี 100%'){
+  {  // ค่ารายปี/รายเทอม: เด็กฟรี 100% ก็ต้องจ่าย (ฟรีเฉพาะค่าเทอมรายเดือน)
     if(p.book && !ps.annual.has('ค่าหนังสือ')) est += p.book;
     if(p.insurance && !ps.annual.has('ค่าประกันอุบัติเหตุ')) est += p.insurance;
     [['ค่าสระว่ายน้ำ',p.pool],['ค่าดนตรี',p.music],['ค่าภาษาอังกฤษ',p.english]].forEach(pair => {

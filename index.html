@@ -3243,7 +3243,7 @@ function renderBusSheetList(){
     <td><b>${r.s.nick}</b> · ${r.s.name} <span style="color:#9CA3AF">(${r.s.cls}${r.s.external?' · เด็กนอก':''})</span></td>
     <td style="font-size:12.5px">${r.rc}<br><span style="color:#9CA3AF">${r.method}</span></td>
     <td style="text-align:right;font-weight:700">฿${fmt(r.amt)}</td>
-    <td><input type="text" list="bs-lines" value="${(courseLine(r.s,curRound)||'').replace(/"/g,'&quot;')}" onchange="setCourseOv(${r.s.id},'line',this.value)" style="width:110px;padding:4px 6px;border:1px solid #D1D5DB;border-radius:6px"></td>
+    <td><input type="text" class="bs-line" data-i="${i}" list="bs-lines" value="${(courseLine(r.s,curRound)||'').replace(/"/g,'&quot;')}" onchange="setCourseOv(${r.s.id},'line',this.value.trim())" style="width:110px;padding:4px 6px;border:1px solid #D1D5DB;border-radius:6px"></td>
   </tr>`).join('');
   bsSum();
 }
@@ -3254,10 +3254,15 @@ function bsSum(){
 }
 function printBusSheetSelected(){
   const rows=window._bsRows||[]; const lbl=roundLabel(curRound);
-  const picked=[]; document.querySelectorAll('.bs-ck').forEach(ck=>{ if(ck.checked) picked.push(rows[+ck.dataset.i]); });
+  // ใช้ชื่อสายตามที่เห็นในช่องตอนกดพิมพ์ (กันกรณีเพิ่งพิมพ์แก้แล้วกดพิมพ์ทันที) และบันทึกค่าที่เปลี่ยนไว้ให้ด้วย
+  const lineOf={}; let dirty=false;
+  document.querySelectorAll('.bs-line').forEach(inp=>{ const r=rows[+inp.dataset.i]; if(!r) return; const v=(inp.value||'').trim(); lineOf[+inp.dataset.i]=v;
+    if(v!==(courseLine(r.s,curRound)||'')){ r.s.courseOv=r.s.courseOv||{}; r.s.courseOv[curRound]=r.s.courseOv[curRound]||{}; r.s.courseOv[curRound].line=v; dirty=true; } });
+  if(dirty){ saveStudents(); renderSpecial(); }
+  const picked=[]; document.querySelectorAll('.bs-ck').forEach(ck=>{ if(ck.checked) picked.push(Object.assign({}, rows[+ck.dataset.i], {line: lineOf[+ck.dataset.i]})); });
   if(!picked.length){ toast('ยังไม่ได้เลือกใครเลย'); return; }
   const groups={};
-  picked.forEach(r=>{ const line=courseLine(r.s,curRound)||'ไม่ระบุสาย'; (groups[line]=groups[line]||[]).push(r); });
+  picked.forEach(r=>{ const line=(r.line!==undefined?r.line:(courseLine(r.s,curRound)||'')).trim()||'ไม่ระบุสาย'; (groups[line]=groups[line]||[]).push(r); });
   const dsel=$('bs-date').value.split('-');
   const dTh=new Date(+dsel[0],+dsel[1]-1,+dsel[2]).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'});
   let pages='';

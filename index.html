@@ -2329,7 +2329,7 @@ function updMonths(id, baseAmt, label, chk){
   if(chk){
     chk.closest('.mchip').classList.toggle('active', chk.checked);
   }
-  const checked = Array.from(document.querySelectorAll('.mchk-'+id+':checked')).map(c=>c.value);
+  const checked = Array.from(document.querySelectorAll('.mchk-'+id+':checked:not(:disabled)')).map(c=>c.value); // ไม่นับเดือนที่จ่ายแล้ว
   if(checked.length === 0){
     // uncheck main
     const mainChk = document.querySelector('.owed-row[data-id="'+id+'"] input[type=checkbox]');
@@ -2413,9 +2413,10 @@ function toggleTermRow(id, el, baseAmt, label){
   if(el.checked){
     picker.classList.add('show');
     el.closest('.owed-row').classList.add('checked');
-    // auto-tick current term
-    const chk = picker.querySelector(`.tchk-${id}[value="${CUR_TERM}"]`);
-    if(chk){ chk.checked = true; chk.closest('.tchip').classList.add('active'); }
+    // auto-tick เทอมปัจจุบัน · ถ้าเทอมนั้นจ่ายแล้ว (ปุ่มถูกล็อก) ห้ามติ๊ก → ติ๊กเทอมแรกที่ยังไม่จ่ายแทน (กันเก็บเงินเทอมที่จ่ายแล้วซ้ำ)
+    let chk = picker.querySelector(`.tchk-${id}[value="${CUR_TERM}"]`);
+    if(!chk || chk.disabled) chk = picker.querySelector(`.tchk-${id}:not(:disabled)`);
+    if(chk && !chk.disabled){ chk.checked = true; chk.closest('.tchip').classList.add('active'); }
     updTerms(id, baseAmt, label, null);
   } else {
     picker.classList.remove('show');
@@ -2428,7 +2429,7 @@ function toggleTermRow(id, el, baseAmt, label){
 }
 function updTerms(id, baseAmt, label, chk){
   if(chk){ chk.closest('.tchip').classList.toggle('active', chk.checked); }
-  const checked = Array.from(document.querySelectorAll('.tchk-'+id+':checked')).map(c=>c.value);
+  const checked = Array.from(document.querySelectorAll('.tchk-'+id+':checked:not(:disabled)')).map(c=>c.value); // ไม่นับเทอมที่จ่ายแล้ว
   if(checked.length === 0){
     const mainChk = document.querySelector('.owed-row[data-id="'+id+'"] input[type=checkbox]');
     if(mainChk && mainChk.checked){

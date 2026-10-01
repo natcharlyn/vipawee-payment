@@ -1383,6 +1383,8 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 const today = () => new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
 const MONTHS = ['พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
 const MONTH_NUMS = [5,6,7,8,9,11,12,1,2,3]; // skip October (closed)
+// เดือนล่าสุดที่ถึงกำหนดจ่ายแล้ว (index ใน MONTHS) · ต.ค. (ปิดเทอม) = ถึง ก.ย. · เม.ย. (ปิดเทอม) = ถึง มี.ค. — แก้บั๊ก 1 ต.ค. 69 ยอดค้างหายหมดช่วงปิดเทอม
+function dueMonthIdx(d){ const m=(d||new Date()).getMonth()+1; const i=MONTH_NUMS.indexOf(m); if(i>=0) return i; if(m===10) return MONTH_NUMS.indexOf(9); if(m===4) return MONTH_NUMS.indexOf(3); return 0; }
 function getAcademicYear(){
   const now = new Date();
   const m = now.getMonth() + 1;
@@ -1581,7 +1583,7 @@ function renderReferralPage(){
     acts.map(a => { const c = AC[a.t]||AC.i; return '<div style="background:'+c[0]+';border:1px solid '+c[1]+';color:'+c[2]+';border-radius:9px;padding:9px 12px;font-size:13px;margin-bottom:6px">'+c[3]+' '+a.x+'</div>'; }).join('') + '</div>';
   // 🏆 อันดับผู้แนะนำ + สรุปเดือนนี้
   const top = [...list].sort((a,b)=>b.kids.length-a.kids.length).slice(0,3);
-  const mNow = MONTHS[Math.max(0, MONTH_NUMS.indexOf(new Date().getMonth()+1))] || '';
+  const mNow = MONTHS[dueMonthIdx()] || '';
   let mAcc = 0; list.forEach(r => r.kids.forEach(k => { refKidMonthRows(k).forEach(row => { if(row.label.indexOf(mNow) === 0) mAcc += row.credit; }); }));
   h += '<div style="' + CARD + ';display:flex;gap:12px;flex-wrap:wrap">' +
     '<div style="flex:1;min-width:220px"><div style="font-weight:700;color:#2E75B6;margin-bottom:6px">🏆 ผู้แนะนำยอดเยี่ยม</div>' +
@@ -2019,7 +2021,7 @@ function renderOwed(){
   const _ps = paidState(s);
   const p = getPriceForClass(s.cls);
   const busPrice = getBusPrice(s.village);
-  const monthIdx = Math.max(0, MONTH_NUMS.indexOf(new Date().getMonth()+1));
+  const monthIdx = dueMonthIdx();
   const monthName = MONTHS[monthIdx] || 'พ.ค.';
   const _si = startMonthIdx(s); // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม) ล็อกกดไม่ได้
 
@@ -3794,7 +3796,7 @@ function renderTimeline(s, myTx){
   const monthsBus = MONTH_NUMS.map(m => 'pending');
   const now = new Date();
   const curMonth = now.getMonth() + 1;
-  const curMonthIdx = MONTH_NUMS.indexOf(curMonth);
+  const curMonthIdx = dueMonthIdx(); // ต.ค./เม.ย. นับถึงเดือนก่อนหน้า
   
   // mark future
   MONTH_NUMS.forEach((m, i) => {
@@ -5098,7 +5100,7 @@ function startMonthIdx(s){
 function getOverdueMonths(s){
   const myTx = activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date));
   const curMonth = new Date().getMonth() + 1;
-  const curMonthIdx = MONTH_NUMS.indexOf(curMonth);
+  const curMonthIdx = dueMonthIdx(); // ต.ค./เม.ย. นับถึงเดือนก่อนหน้า
   if(curMonthIdx < 0) return {tuition: [], bus: []};
   
   const tuitionPaid = new Set();
@@ -5321,7 +5323,7 @@ function renderInvSlip(id){
   const monthsBus = [];
   const now = new Date();
   const curMonth = now.getMonth() + 1;
-  const curMonthIdx = MONTH_NUMS.indexOf(curMonth);
+  const curMonthIdx = dueMonthIdx(); // ต.ค./เม.ย. นับถึงเดือนก่อนหน้า
   for(let i=0; i<10; i++){
     if(curMonthIdx !== -1 && i > curMonthIdx){ monthsTuition.push('future'); monthsBus.push('future'); }
     else { monthsTuition.push('pending'); monthsBus.push('pending'); }

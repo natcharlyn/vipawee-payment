@@ -441,7 +441,7 @@ details summary{cursor:pointer;outline:none}
       <input class="input" id="ext-filter" placeholder="🔍 ค้นชื่อ..." style="max-width:170px" oninput="renderSpecial()">
       <button class="btn" onclick="openEnrollModal()">📋 ลงทะเบียนเด็กใน</button>
       <button class="btn btn-primary" onclick="newExternal()">➕ เพิ่มเด็กนอก</button>
-      <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
+      <button class="btn" style="background:#FEF3C7" onclick="printCourseInvoicesOwed()" title="พิมพ์ตามที่เลือกในช่อง ทั้งหมด/เด็กใน/เด็กนอก และช่องชั้น">🖨 ใบแจ้งคนที่ค้าง (2 คน/แผ่น)</button>
       <button class="btn" style="background:#DCFCE7" onclick="copyCourseOwedMsg()">💬 ข้อความแจ้งรายห้อง</button>
       <button class="btn" style="background:#E0E7FF" onclick="openCourseBusSheet()">🖊 ใบเซ็นรับค่ารถ (ตามวันจ่าย)</button>
     </div>
@@ -3309,9 +3309,12 @@ function printBusSheetSelected(){
 function copyCourseOwedMsg(){
   const lbl = roundLabel(curRound);
   const cf = $('ext-class') ? $('ext-class').value : '';
+  const tf = $('ext-type') ? $('ext-type').value : '';
   let list = courseMembers(curRound).filter(s => courseOwed(s,curRound) > 0);
   if(cf) list = list.filter(s => s.cls === cf);
-  if(!list.length){ toast('ไม่มีคนค้างชำระ' + (cf ? (' ห้อง ' + cf) : '') + ' 🎉'); return; }
+  if(tf==='in') list = list.filter(s => !s.external);
+  if(tf==='out') list = list.filter(s => s.external);
+  if(!list.length){ toast('ไม่มีคนค้างชำระ' + (tf==='in'?' (เด็กใน)':tf==='out'?' (เด็กนอก)':'') + (cf ? (' ห้อง ' + cf) : '') + ' 🎉'); return; }
   list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   let msg = '📢 แจ้งยอดค่าเรียนพิเศษ (รอบ ' + lbl + ')' + (cf ? (' · ห้อง ' + cf) : '') + '\n';
   msg += 'เรียนผู้ปกครองนักเรียนที่ลงคอร์สเรียนพิเศษ ขออนุญาตแจ้งยอดคงค้างดังนี้ค่ะ\n\n';
@@ -3331,10 +3334,14 @@ function copyCourseOwedMsg(){
 function printCourseInvoicesOwed(){
   const lbl = roundLabel(curRound);
   const cf = $('ext-class') ? $('ext-class').value : '';   // เลือกห้องในดรอปดาวน์ = พิมพ์เฉพาะห้องนั้น
+  const tf = $('ext-type') ? $('ext-type').value : '';     // ทั้งหมด / เด็กใน / เด็กนอก
+  const tfLbl = tf==='in' ? 'เด็กใน' : (tf==='out' ? 'เด็กนอก' : '');
   let list = courseMembers(curRound).filter(s=>courseOwed(s,curRound)>0);
   if(cf) list = list.filter(s=>s.cls===cf);
+  if(tf==='in') list = list.filter(s=>!s.external);
+  if(tf==='out') list = list.filter(s=>s.external);
   list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
-  if(!list.length){ toast('ไม่มีคนค้างชำระ' + (cf?(' ห้อง '+cf):'ในรอบนี้') + ' 🎉'); return; }
+  if(!list.length){ toast('ไม่มีคนค้างชำระ' + (tfLbl?(' ('+tfLbl+')'):'') + (cf?(' ห้อง '+cf):'ในรอบนี้') + ' 🎉'); return; }
   const blocks = list.map((s,i)=>{
     const fee=courseFeeEff(s,curRound), bus=courseBusEff(s,curRound), disc=courseDiscEff(s,curRound), paid=coursePaid(s,curRound), owed=courseOwed(s,curRound), note=courseNote(s,curRound);
     let rows=`<tr><td>ค่าคอร์สเรียนพิเศษ</td><td style="text-align:right">฿${fmt(fee)}</td></tr>`;
@@ -3352,7 +3359,7 @@ function printCourseInvoicesOwed(){
     </div>`;
   }).join('');
   const w=window.open('','_blank');
-  w.document.write(`<html><head><meta charset="utf-8"><title>ใบแจ้งค่าคอร์ส ${lbl}${cf?(' ห้อง '+cf):''} (${list.length} คน)</title>
+  w.document.write(`<html><head><meta charset="utf-8"><title>ใบแจ้งค่าคอร์ส ${lbl}${tfLbl?(' · '+tfLbl):''}${cf?(' ห้อง '+cf):''} (${list.length} คน)</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
     @page{size:A4 portrait;margin:8mm}
     body{font-family:'Sarabun',sans-serif;color:#1F2937;margin:0}

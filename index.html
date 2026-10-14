@@ -1267,12 +1267,19 @@ async function cloudSaveSchool(){
 function _setSnap(table){ _snap[table] = new Map(_rowsOf(table).map(r => [String(r.id), JSON.stringify(r)])); }
 
 async function cloudLoadAll(){
+  // ดึงทีละ 1000 แถวจนครบ — Supabase ส่งกลับได้สูงสุด 1000 แถวต่อครั้ง (บั๊ก 14 ต.ค.: ใบเสร็จเกิน 1000 ใบ → ใบเก่าสุดหายจากหน้าจอ)
   const get = async (t, order) => {
-    let q = sb.from(t).select('*');
-    if(order) q = q.order(order.col, {ascending: order.asc});
-    const { data, error } = await q;
-    if(error) throw error;
-    return data || [];
+    const PAGE = 1000; let all = [];
+    for(let from = 0; ; from += PAGE){
+      let q = sb.from(t).select('*');
+      if(order) q = q.order(order.col, {ascending: order.asc});
+      if(t !== 'school_config') q = q.order('id', {ascending: true});   // ลำดับคงที่ กันแถวซ้ำ/ตกหล่นระหว่างหน้า
+      const { data, error } = await q.range(from, from + PAGE - 1);
+      if(error) throw error;
+      all = all.concat(data || []);
+      if(!data || data.length < PAGE) break;
+    }
+    return all;
   };
   const [tx, slips, stus, pos, stk, cfg] = await Promise.all([
     get('transactions', {col:'date', asc:false}),

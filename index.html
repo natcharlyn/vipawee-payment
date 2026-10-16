@@ -3139,7 +3139,7 @@ async function saveCoursePay(){
   // บันทึกค่าที่แก้ในหน้าต่างนี้ลงทะเบียนเด็กคนนี้ (จำไว้ตลอดรอบ)
   const fee=+$('cp-fee').value||0, bus=+$('cp-bus').value||0, disc=+$('cp-disc').value||0;
   const note = ($('cp-note').value||'').trim();
-  s.courseOv = s.courseOv || {}; s.courseOv[curRound] = {fee:fee, bus:bus, disc:disc, note:note};
+  s.courseOv = s.courseOv || {}; s.courseOv[curRound] = Object.assign({}, s.courseOv[curRound] || {}, {fee:fee, bus:bus, disc:disc, note:note});   // เก็บสายรถช่วงคอร์ส (line) เดิมไว้ — 16 ต.ค. แก้: เดิมกดรับเงินแล้วสายที่ตั้งไว้หาย
   saveStudents();
   const total = Math.max(0, fee + bus - disc);
   const lbl = roundLabel(curRound);

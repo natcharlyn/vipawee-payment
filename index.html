@@ -2023,6 +2023,102 @@ function unpaidFeeItems(s){
   });
   return items;
 }
+// ===== ค้างค่าเรียนพิเศษ → โชว์ในหน้าบันทึกรับเงินด้วย (เพิ่ม 16 ต.ค. 69) =====
+// ผู้ปกครองมาจ่ายค่าเทอมปกติ คนรับเงินจะเห็นยอดค้างคอร์ส และเก็บรวมในใบเสร็จเดียวกันได้
+// ใช้ชื่อรายการเดียวกับหน้าคอร์ส → หน้าคอร์ส / ใบแจ้ง / ใบเซ็นรับค่ารถ นับให้อัตโนมัติ
+function courseOwedRounds(s){
+  if(!s || !Array.isArray(s.specialEnroll)) return [];
+  return COURSE_ROUNDS.map((r, i) => ({r: r, i: i})).filter(x => s.specialEnroll.includes(x.r.key) && courseOwed(s, x.r.key) > 0);
+}
+function courseOwedHtml(s){
+  const list = courseOwedRounds(s);
+  if(!list.length) return '';
+  let h = '<div class="owed" id="course-owed-box" style="border:1.5px solid #7C3AED;background:#F5F3FF"><div class="owed-cat" style="color:#6D28D9">🎨 ค้างค่าเรียนพิเศษ</div>';
+  list.forEach(x => {
+    const rk = x.r.key, i = x.i;
+    const fee = courseFeeEff(s, rk), bus = courseBusEff(s, rk), disc = courseDiscEff(s, rk), paid = coursePaid(s, rk), owed = courseOwed(s, rk), line = courseLine(s, rk);
+    const busLeft = Math.max(0, bus - courseBusPaid(s, rk));
+    const parts = ['ค่าเรียน ฿' + fmt(fee)];
+    if(bus > 0) parts.push('ค่ารถ ฿' + fmt(bus) + (line ? ' (สาย ' + line + ')' : ''));
+    let detail = parts.join(' + ');
+    if(disc > 0) detail += ' − ส่วนลด ฿' + fmt(disc);
+    if(paid > 0) detail += ' · จ่ายแล้ว ฿' + fmt(paid);
+    h += `<div class="owed-row" data-id="course${i}">
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
+        <input type="checkbox" class="chk-big" onchange="toggleCourseOwed(${i}, this)">
+        <span><strong>ค่าเรียนพิเศษ (${x.r.label})</strong><br><span style="font-size:12px;color:#5B21B6">${detail} · <b>ค้าง ฿${fmt(owed)}</b></span></span>
+      </label>
+      <span style="display:flex;align-items:center;gap:3px;white-space:nowrap">฿<input type="number" id="course${i}-amt" value="${owed}" min="0" max="${owed}" style="width:84px;padding:6px;border:1px solid #D1D5DB;border-radius:6px;text-align:right" oninput="updCourseOwed(${i})"></span>
+    </div>` + (busLeft > 0 ? `<div style="padding:0 10px 8px 42px"><button type="button" class="btn btn-sm" style="font-size:12px;padding:3px 10px;border:1px solid #7C3AED;color:#6D28D9;background:#fff" onclick="courseBusDirect(${i})">🚌 ค่ารถ ฿${fmt(busLeft)} ผู้ปกครองจ่ายกับคนขับเอง (ไม่ผ่านโรงเรียน)</button></div>` : '');
+  });
+  h += '<div style="font-size:11.5px;color:#9CA3AF;padding:0 10px 8px">💡 ติ๊กช่องซ้ายเพื่อเก็บรวมในใบเสร็จนี้ · จ่ายบางส่วนได้ (แก้ตัวเลขช่องขวา) · จ่ายแล้วชื่อจะหายจากรายการค้างในหน้าคอร์สพิเศษ และค่ารถจะขึ้นในใบเซ็นรับค่ารถของวันนั้น</div></div>';
+  return h;
+}
+// ผู้ปกครองจ่ายค่ารถช่วงคอร์สกับคนขับโดยตรง (ไม่ผ่านโรงเรียน) → เอาค่ารถส่วนที่เหลือออกจากยอดค้าง + จดหมายเหตุไว้
+// (ตั้ง "ค่ารถ" ของคอร์สรอบนั้น = เท่าที่โรงเรียนเก็บไปแล้ว · ใบเซ็นรับค่ารถของคนขับจะไม่มีชื่อเด็กคนนี้เพิ่ม · แก้คืนได้ที่หน้าคอร์สพิเศษ)
+function courseBusDirect(i){
+  const s = selStudent, r = COURSE_ROUNDS[i]; if(!s || !r) return;
+  const rk = r.key, line = courseLine(s, rk);
+  const busCollected = courseBusPaid(s, rk);
+  const busLeft = Math.max(0, courseBusEff(s, rk) - busCollected);
+  if(busLeft <= 0) return;
+  const who = 'คนขับ' + (line ? ' (' + line + ')' : '');
+  if(!confirm('ยืนยันไหมคะ: ค่ารถ ฿' + fmt(busLeft) + ' ของน้อง' + s.nick + ' (คอร์ส ' + r.label + ') ผู้ปกครองจ่ายตรงกับ' + who + ' ไม่ผ่านโรงเรียน\n\n• ระบบจะเอาค่ารถก้อนนี้ออกจากยอดค้าง เหลือค้างเฉพาะค่าเรียน\n• ใบเซ็นรับค่ารถของคนขับจะไม่มีชื่อน้องคนนี้ (คนขับรับเงินเองแล้ว)\n• ถ้ากดผิด แก้คืนได้ที่หน้าคอร์สพิเศษ ช่องค่ารถ')) return;
+  s.courseOv = s.courseOv || {};
+  const ov = s.courseOv[rk] || {};
+  const tag = 'ค่ารถจ่ายตรงกับ' + who;
+  const note = ov.note ? (ov.note.indexOf(tag) >= 0 ? ov.note : ov.note + ' · ' + tag) : tag;
+  s.courseOv[rk] = Object.assign({}, ov, {bus: busCollected, note: note});
+  saveStudents();
+  refreshCourseOwedBox();
+  toast('บันทึกแล้ว: ค่ารถจ่ายตรงกับ' + who + ' · เหลือค้างเฉพาะค่าเรียน ✓');
+}
+// วาดกล่องค้างคอร์สใหม่ โดยไม่ล้างรายการอื่นที่ติ๊กไว้ (ค่าเทอม/ค่ารถรายเดือน ฯลฯ)
+function refreshCourseOwedBox(){
+  Object.keys(owedSelected).forEach(k => { if(/^course\d+_/.test(k)) delete owedSelected[k]; });
+  const box = document.getElementById('course-owed-box');
+  const html = courseOwedHtml(selStudent);
+  if(box){ if(html) box.outerHTML = html; else box.remove(); }
+  updateTotal();
+}
+function toggleCourseOwed(i, el){
+  const row = el.closest('.owed-row');
+  if(el.checked){ row.classList.add('checked'); updCourseOwed(i); }
+  else { ['_fee','_disc','_bus'].forEach(k => delete owedSelected['course' + i + k]); row.classList.remove('checked'); updateTotal(); }
+}
+function updCourseOwed(i){
+  const s = selStudent, r = COURSE_ROUNDS[i];
+  ['_fee','_disc','_bus'].forEach(k => delete owedSelected['course' + i + k]);
+  const row = document.querySelector('.owed-row[data-id="course' + i + '"]');
+  const chk = row && row.querySelector('input[type=checkbox]');
+  if(!s || !r || !chk || !chk.checked){ updateTotal(); return; }
+  const rk = r.key, lbl = r.label;
+  const owed = courseOwed(s, rk);
+  const inp = $('course' + i + '-amt');
+  let amt = Math.max(0, +inp.value || 0);
+  if(amt > owed){ amt = owed; inp.value = owed; }          // กันเก็บเกินยอดค้าง
+  if(amt <= 0){ updateTotal(); return; }
+  // แบ่งเงิน: ค่าเรียน (หลังหักส่วนลด) ก่อนจนครบ ที่เหลือเป็นค่ารถ — กติกาเดียวกับหน้าคอร์ส (saveCoursePay)
+  const fee = courseFeeEff(s, rk), bus = courseBusEff(s, rk), disc = courseDiscEff(s, rk);
+  const busPaidSoFar = courseBusPaid(s, rk);
+  const feePaidSoFar = Math.max(0, coursePaid(s, rk) - busPaidSoFar);
+  const feeLeft = Math.max(0, Math.max(0, fee - disc) - feePaidSoFar);
+  const feePart = Math.min(amt, feeLeft);
+  const busPart = Math.min(amt - feePart, Math.max(0, bus - busPaidSoFar));
+  const extra = amt - feePart - busPart;                    // ปกติเป็น 0 (เผื่อไว้ เก็บฝั่งค่าเรียน)
+  const note = courseNote(s, rk), noteSfx = note ? ' · ' + note : '';
+  const feeDoneNow = feePaidSoFar === 0 && feePart >= feeLeft && extra === 0;
+  if(feeDoneNow && feePart > 0){
+    // จ่ายค่าเรียนครบในครั้งเดียว → เหมือนหน้าคอร์ส: ค่าเรียนเต็ม + ส่วนลด (ถ้ามี)
+    owedSelected['course' + i + '_fee'] = {amount: fee, label: 'ค่าคอร์สเรียนพิเศษ (' + lbl + ')' + noteSfx, months: 0};
+    if(disc > 0) owedSelected['course' + i + '_disc'] = {amount: -disc, label: 'ค่าคอร์ส-ส่วนลด (' + lbl + ')', months: 0};
+  } else if(feePart + extra > 0){
+    owedSelected['course' + i + '_fee'] = {amount: feePart + extra, label: 'ค่าคอร์สเรียนพิเศษ - บางส่วน (' + lbl + ')' + noteSfx, months: 0};
+  }
+  if(busPart > 0) owedSelected['course' + i + '_bus'] = {amount: busPart, label: 'ค่าคอร์ส-ค่ารถ (' + lbl + ')', months: 0};
+  updateTotal();
+}
+
 function renderOwed(){
   const s = selStudent;
   const _ps = paidState(s);
@@ -2032,7 +2128,8 @@ function renderOwed(){
   const monthName = MONTHS[monthIdx] || 'พ.ค.';
   const _si = startMonthIdx(s); // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม) ล็อกกดไม่ได้
 
-  let html = '<div class="owed"><div class="owed-cat">💰 ค่าเทอม / ค่ารถ (รายเดือน)</div>';
+  let html = courseOwedHtml(s);   // 🎨 ค้างค่าเรียนพิเศษ (ถ้ามี) โชว์บนสุด กันลืมเก็บ
+  html += '<div class="owed"><div class="owed-cat">💰 ค่าเทอม / ค่ารถ (รายเดือน)</div>';
   // ค่าเทอม
   if(p && s.discount !== 'ฟรี 100%'){
     const amt = s.discount === 'ลด 50%' ? p.monthly * 0.5 : p.monthly;
@@ -3060,7 +3157,7 @@ function renderSpecial(){
       <td>${typeBadge}</td>
       <td style="text-align:right"><input type="number" value="${fee}" onchange="setCourseOv(${s.id},'fee',this.value)" title="ราคาปกติ ฿${fmt(feeDef)} · แก้ได้ เช่น นักเต้นลดครึ่ง" style="width:72px;text-align:right;padding:3px 5px;border:1px solid ${fee!==feeDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${fee!==feeDef?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right"><input type="number" value="${bus}" onchange="setCourseOv(${s.id},'bus',this.value)" title="ตามหมู่บ้าน ฿${fmt(busDef)} · แก้ได้ · 0 = รร.ออกให้/ไม่ใช้รถ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${bus!==busDef?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${bus!==busDef?'#FFFBEB':'#fff'}"></td>
-      <td><input type="text" value="${(courseLine(s,curRound)||'').replace(/"/g,'&quot;')}" placeholder="-" onchange="setCourseOv(${s.id},'line',this.value)" title="สายรถช่วงคอร์ส · แก้ได้ เช่น เด็ก A1 ขึ้นรถครูเอกช่วง ต.ค. พิมพ์ ครูเอก / เด็กนอกพิมพ์ชื่อสายร่วม" style="width:64px;padding:3px 5px;border:1px solid ${courseOvGet(s,curRound).line?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${courseOvGet(s,curRound).line?'#FFFBEB':'#fff'}"></td>
+      <td><input type="text" value="${(courseLine(s,curRound)||'').replace(/"/g,'&quot;')}" placeholder="-" onchange="setCourseOv(${s.id},'line',this.value)" title="สายรถช่วงคอร์ส · แก้ได้ เช่น เด็ก A1 ขึ้นรถพี่เอกช่วง ต.ค. พิมพ์ พี่เอก / เด็กนอกพิมพ์ชื่อสายร่วม" style="width:64px;padding:3px 5px;border:1px solid ${courseOvGet(s,curRound).line?'#F59E0B':'#E5E7EB'};border-radius:6px;background:${courseOvGet(s,curRound).line?'#FFFBEB':'#fff'}"></td>
       <td style="text-align:right"><input type="number" value="${disc||''}" placeholder="0" onchange="setCourseOv(${s.id},'disc',this.value)" title="ส่วนลด (บาท) เช่น นักเต้นลดครึ่ง ใส่ 500 · แสดงในใบแจ้ง/ใบเสร็จ" style="width:64px;text-align:right;padding:3px 5px;border:1px solid ${disc>0?'#16A34A':'#E5E7EB'};border-radius:6px;background:${disc>0?'#F0FDF4':'#fff'};color:${disc>0?'#0a7c46':'inherit'}"></td>
       <td style="text-align:right;color:#10B981">฿${fmt(paid)}</td>
       <td style="text-align:right;font-weight:700;color:${owed>0?'#DC2626':'#10B981'}">${owed>0?('฿'+fmt(owed)):'✓ ครบ'}</td>
@@ -3214,7 +3311,7 @@ function busPaymentsOn(dateStr){
   return out;
 }
 function knownBusLines(){
-  const set=new Set(['A1','A2','A3','ครูเอก']);
+  const set=new Set(['A1','A2','A3','พี่เอก']);
   STUDENTS.forEach(s2=>{ if(s2.busCode) set.add(s2.busCode); if(s2.courseOv){Object.values(s2.courseOv).forEach(o=>{if(o&&o.line)set.add(o.line);});} });
   return [...set];
 }

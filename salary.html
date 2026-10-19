@@ -884,7 +884,7 @@ function bonusSrcMonthName(){
   return idx>=0 ? T_MONTHS[idx] : '';
 }
 function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSel').value);const r=refundAmt(s);const A=refAcct();const ML=monthLabel(MONTH);
-  let msg;
+  let msg, otherWarn='';
   if(lineMode==='confirm'){
     msg = r>0
       ? `เรียน ${s.n}\n\nได้รับเงินโอนคืนของเดือน ${ML} จำนวน ฿${f(r)} เรียบร้อยแล้วค่ะ ✅\nขอบคุณค่ะ 🙏`
@@ -900,6 +900,15 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
     const att = L.length?`\n\n📋 บันทึกเวลาเดือนนี้\n`+L.join('\n'):`\n\n✓ เดือนนี้มาเต็มเวลา ไม่มีขาด/ลา/มาสาย`;
     msg = `เรียน ${s.n}\n\nแจ้งเงินเดือนประจำเดือน ${ML}\n${payOf(s)==='เงินสด'?'รับเป็นเงินสดที่ฝ่ายการเงินได้เลยค่ะ':'โอนเข้าบัญชีเรียบร้อยแล้วค่ะ'}`;
     msg += att;
+    // 🧾 หักอื่นๆ (ถ้ามี) — ยอด + หักค่าอะไร ดึงจากกล่องล่างสุดหน้ากรอกเงินเดือน (เพิ่ม 19 ต.ค. 69)
+    const oCols = e ? otherDedCols(e.g).filter(c => Number(it[c.key]||0) > 0) : [];
+    if(oCols.length){
+      const why = String(it.otherNote||'').trim();
+      const lines = oCols.map(c => `• ${c.name} ${f(it[c.key])} บาท`);
+      if(why){ if(lines.length===1) lines[0] += ' — ' + why; else lines.push('รายละเอียด: ' + why); }
+      msg += `\n\n🧾 รายการหักอื่นๆ เดือนนี้\n` + lines.join('\n');
+      if(!why) otherWarn = `<div class="tip" style="margin-bottom:10px">⚠ ${esc(s.n)} ถูกหักอื่นๆ แต่ยังไม่ได้พิมพ์ว่าหักค่าอะไร · ไปพิมพ์ที่หน้า <b>กรอกเงินเดือน</b> (กล่องล่างสุด) ก่อนส่งนะคะ</div>`;
+    }
     // 🤝 โบนัสเพื่อนบ้านชวนเรียน (ถ้ามี) — มาจากน้องที่ครูแนะนำ จ่ายค่าเทอมตรงเดือนก่อนหน้า
     const refB = Number(it.bonusRef||0);
     if(refB > 0){
@@ -917,7 +926,7 @@ function drawLine(){const s=STAFF.find(x=>x.id==+document.getElementById('lineSe
     groupCard=`<div class="panel" style="border:1px solid #16A34A;background:#F0FDF4"><h3>📢 ส่งทีเดียวทั้งกลุ่ม (${active} คน)</h3><div class="tip" style="margin-bottom:10px">ข้อความกลางส่งเข้ากลุ่มไลน์ครูทีเดียว — ไม่มียอดเงิน ปลอดภัย · ยอดโอนคืนแจ้งรายคนแยก</div><div class="linebox">${gmsg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyGroup()">📋 คัดลอกข้อความกลุ่ม (ส่งทีเดียว)</button></div>`;
   }
   const perTitle=lineMode==='confirm'?'💬 ยืนยันรับโอนคืน — รายคน (ส่งทีละคน)':'💬 ข้อความรายคน — '+s.n;
-  document.getElementById('lineArea').innerHTML=groupCard+`<div class="panel"><h3>${perTitle}</h3><div class="tip" style="margin-bottom:10px">🔒 แบบสั้น-ปลอดภัย: ไม่ใส่ยอดเงินเดือนในข้อความ (กันหลุดเมื่อครูแชร์ต่อ)</div><div class="linebox">${msg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyLine()">📋 คัดลอกข้อความรายคน</button></div>`;
+  document.getElementById('lineArea').innerHTML=groupCard+`<div class="panel"><h3>${perTitle}</h3><div class="tip" style="margin-bottom:10px">🔒 แบบสั้น-ปลอดภัย: ไม่ใส่ยอดเงินเดือนในข้อความ (กันหลุดเมื่อครูแชร์ต่อ)</div>${otherWarn}<div class="linebox">${msg.replace(/</g,'&lt;')}</div><button class="copybtn" onclick="copyLine()">📋 คัดลอกข้อความรายคน</button></div>`;
   window._lineMsg=msg;
 }
 function copyLine(){navigator.clipboard.writeText(window._lineMsg||'').then(()=>toast('คัดลอกข้อความรายคนแล้ว ✓'));}
@@ -1212,6 +1221,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v2.2 (19 ต.ค. 69: กล่องหักอื่นๆ — หักค่าอะไร ในหน้ากรอกเงินเดือน) · v2.1 (บันทึกอัตโนมัติหน้ากรอกเงินเดือน/ลา-ขาด-สาย + เตือนก่อนออก) · 30 ก.ย. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v2.3 (19 ต.ค. 69: หักอื่นๆ+เหตุผล ในข้อความไลน์รายคน) · v2.2 (19 ต.ค. 69: กล่องหักอื่นๆ — หักค่าอะไร ในหน้ากรอกเงินเดือน) · v2.1 (บันทึกอัตโนมัติหน้ากรอกเงินเดือน/ลา-ขาด-สาย + เตือนก่อนออก) · 30 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

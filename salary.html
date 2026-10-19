@@ -127,12 +127,25 @@
   .sv-b{padding:20px}.sv-amt{background:#F3EEFF;border-radius:12px;padding:16px;text-align:center;margin-bottom:14px}
   .sv-amt .l{font-size:13px;color:var(--purple);font-weight:600}.sv-amt .v{font-size:30px;font-weight:800;color:var(--purple)}
   .sv-priv{font-size:12px;color:var(--mute);background:#F4F7FB;border-radius:8px;padding:8px 11px;margin-top:12px;text-align:center}
+  .xnote{margin-top:16px;border:1.5px solid var(--gold);background:#FFFBEB;border-radius:12px;padding:14px 16px}
+  .xnote h4{font-size:14.5px;color:#7A5B00;font-weight:800;margin-bottom:8px}
+  .xnote .who{display:flex;align-items:center;gap:10px;margin:6px 0;flex-wrap:wrap;font-size:14px}
+  .xnote .who .nm2{min-width:190px;font-weight:700;color:var(--navy)}
+  .xnote .who .amt{color:var(--red);font-weight:700;min-width:130px}
+  .xnote input,.xnote textarea{font-family:inherit;font-size:14px;border:1.5px solid #E7C84B;border-radius:8px;padding:7px 10px;background:#fff;color:var(--ink)}
+  .xnote input{flex:1;min-width:220px}
+  .xnote textarea{width:100%;resize:vertical;margin-top:4px}
+  .xnote input:disabled,.xnote textarea:disabled{background:#F8FAFC;color:#475569;border-color:#E2E8F0}
+  .xnote .xnote-sub{margin-top:10px;font-size:13px;font-weight:700;color:#7A5B00}
+  .xnote .xnote-empty{font-size:13px;color:#94A3B8}
+  .xnote .hint{font-size:12px;color:#94A3B8;margin-top:6px}
   @page{margin:12mm}
   @media print{.side,.topbar,.tabs,.row-sel,.copybtn,.online-flag,.print-hide,.save-bar,.sv-bg,.colmeta,.menu-btn,.btn-print,.month-sel{display:none!important}
     html,body{margin:0!important}.main{margin:0!important;width:100%!important}.content{padding:0;max-width:none}.panel{border:none;box-shadow:none;padding:6px 0;margin-top:10px}
     .etable-wrap{overflow:visible!important}.etable-wrap table{min-width:0!important;width:100%!important}
     table.entry input.cell{border:none!important;background:transparent!important;width:auto;font-weight:600}.colname{border:none;background:transparent}
-    .paysel{border:none;background:transparent;padding:0}body{background:#fff}.print-head{display:block!important}}
+    .paysel{border:none;background:transparent;padding:0}body{background:#fff}.print-head{display:block!important}
+    .xnote{break-inside:avoid;background:#fff}.xnote input,.xnote textarea{border:none!important;background:transparent!important}.xnote .hint{display:none}}
   .print-head{display:none;text-align:center;margin-bottom:10px}.print-head .ph1{font-size:18px;font-weight:800;color:#000}.print-head .ph2{font-size:13px;color:#333}
 </style>
 </head>
@@ -475,8 +488,9 @@ async function _autoSave(){
   finally{_asRunning=false;}
   if(_dirty.size){clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,1500);}
 }
-async function flushAutoSave(){clearTimeout(_asTimer);let g=0;while((_dirty.size||_asRunning)&&g<40){if(!_asRunning)await _autoSave();else await new Promise(r=>setTimeout(r,250));g++;}}
-window.addEventListener('beforeunload',e=>{if(_dirty.size||_asRunning){e.preventDefault();e.returnValue='ยังบันทึกข้อมูลไม่เสร็จ';return e.returnValue;}});
+async function flushAutoSave(){clearTimeout(_asTimer);let g=0;while((_dirty.size||_asRunning)&&g<40){if(!_asRunning)await _autoSave();else await new Promise(r=>setTimeout(r,250));g++;}
+  if(typeof _enPending!=='undefined'&&_enPending)await saveEntryNotes();}
+window.addEventListener('beforeunload',e=>{if(_dirty.size||_asRunning||(typeof _enPending!=='undefined'&&_enPending)){e.preventDefault();e.returnValue='ยังบันทึกข้อมูลไม่เสร็จ';return e.returnValue;}});
 async function saveRefund(sid){
   const s=STAFF.find(x=>x.id==sid);const r=REFUNDS[sid];if(!r)return;
   await q(sb.from('payroll_refunds').upsert({month:MONTH,staff_id:+sid,state_amount:r.rate||null,net:s?net(s):0,
@@ -626,10 +640,41 @@ function renderEntry(){
   h+=`</tbody></table></div>
     <div class="save-bar"><button class="btn btn-add" ${dis} onclick="addColumn()">➕ เพิ่มคอลัมน์</button>
       <div class="grouptotal">รับสุทธิรวมกลุ่ม <b>${curGroup}</b>: <b id="grpTotal">฿${f(act(curGroup).reduce((a,s)=>a+net(s),0))}</b></div>
-      <button class="btn btn-primary" ${dis} onclick="saveEntries('${curGroup}')">💾 บันทึกขึ้นคลาวด์</button></div>`;
+      <button class="btn btn-primary" ${dis} onclick="saveEntries('${curGroup}')">💾 บันทึกขึ้นคลาวด์</button></div>
+    <div id="otherNoteBox">${otherNoteHTML(curGroup)}</div>`;
   document.getElementById('content').innerHTML=h;
 }
 function setGroup(g){curGroup=g;renderEntry();}
+// ===== 📝 หักอื่นๆ — หักค่าอะไร (กล่องล่างสุดหน้ากรอกเงินเดือน · เพิ่ม 19 ต.ค. 69 · ครูเลือกแบบ B) =====
+// ใครมียอดในคอลัมน์ "หักอื่นๆ" (หรือคอลัมน์หักที่ครูเพิ่มเอง) → ชื่อ+ยอดขึ้นในกล่องเอง ครูพิมพ์แค่ว่าหักค่าอะไร
+// เหตุผลรายคนเก็บใน items.otherNote (บันทึกอัตโนมัติพร้อมเงินเดือน) · ข้อความเพิ่มเติมของกลุ่มเก็บใน CONFIG.entry_notes[เดือน][กลุ่ม]
+const otherDedCols=g=>dedColsG(g).filter(c=>c.key==='otherDeduct'||/^c\d+$/.test(c.key));
+function entryNoteText(g){const m=(CONFIG.entry_notes||{})[MONTH]||{};return m[g]||'';}
+function otherNoteHTML(g){
+  const dis=canEdit()?'':'disabled';
+  const cols=otherDedCols(g);
+  const people=act(g).filter(s=>cols.some(c=>Number(ent(s).items[c.key]||0)>0));
+  let h=`<div class="xnote"><h4>📝 หักอื่นๆ เดือนนี้ — หักค่าอะไร</h4>`;
+  if(!people.length) h+=`<div class="xnote-empty">ยังไม่มีใครถูกหักอื่นๆ ในกลุ่มนี้ · ใส่ยอดในช่อง "${esc(cols.map(c=>c.name).join(' / ')||'หักอื่นๆ')}" ด้านบน แล้วชื่อจะขึ้นตรงนี้เอง</div>`;
+  people.forEach(s=>{const e=ent(s);
+    const amts=cols.filter(c=>Number(e.items[c.key]||0)>0).map(c=>esc(c.name)+' ฿'+f(e.items[c.key])).join(' · ');
+    h+=`<div class="who"><span class="nm2">${esc(s.n)}</span><span class="amt">${amts}</span>
+      <input ${dis} value="${esc(e.items.otherNote||'')}" placeholder="หักค่าอะไร เช่น ค่าชุด / ยืมเงิน / ค่าของเสียหาย" oninput="setOtherNote(${s.id},this.value)"></div>`;});
+  const t=entryNoteText(g);
+  h+=`<div class="xnote-sub">ข้อความเพิ่มเติม (ถ้ามี)</div>
+    <textarea ${dis} rows="${Math.max(2,(t.match(/\n/g)||[]).length+1)}" placeholder="จดอะไรก็ได้ของกลุ่มนี้ เดือนนี้" oninput="setEntryNote('${g}',this.value)">${esc(t)}</textarea>
+    <div class="hint">บันทึกให้อัตโนมัติ · แยกกลุ่ม แยกเดือน · เปิดเดือนใหม่จะเริ่มว่าง</div></div>`;
+  return h;
+}
+function refreshOtherNote(){const el=document.getElementById('otherNoteBox');if(el)el.innerHTML=otherNoteHTML(curGroup);}
+function setOtherNote(id,v){const e=ENTRIES[id];if(!e||!canEdit())return;e.items.otherNote=v;markDirty(id);}
+let _enTimer=null,_enPending=false;
+function setEntryNote(g,v){if(!canEdit())return;
+  const all=Object.assign({},CONFIG.entry_notes||{});all[MONTH]=Object.assign({},all[MONTH]||{});all[MONTH][g]=v;CONFIG.entry_notes=all;
+  _enPending=true;_asStatus('dirty');clearTimeout(_enTimer);_enTimer=setTimeout(saveEntryNotes,1500);}
+async function saveEntryNotes(){clearTimeout(_enTimer);if(!_enPending)return;_enPending=false;_asStatus('saving');
+  try{await saveConfig('entry_notes',CONFIG.entry_notes);_asStatus(_dirty.size?'dirty':'saved');}
+  catch(err){console.error('entry_notes',err);_enPending=true;_asStatus('error');_enTimer=setTimeout(saveEntryNotes,4000);}}
 async function changeGroup(id,g){const s=STAFF.find(x=>x.id==id);const e=ent(s);const old=e.g;if(g===old)return;
   e.g=g;colsG(g).forEach(c=>{if(e.items[c.key]===undefined)e.items[c.key]=0;});
   await saveEntries();renderEntry();toast('ย้าย '+s.n+' จาก '+old+' → '+g+' แล้ว ✓');}
@@ -639,7 +684,8 @@ function setV(id,key,v){const e=ENTRIES[id];e.items[key]=Number(v||0);markDirty(
   const rn=document.getElementById('rn_'+id);if(rn)rn.innerHTML=netRaw(s)<0?`<span style="color:var(--red);font-weight:800" title="หักเกินเงินเดือน ฿${f(-netRaw(s))}">⚠ ฿0</span>`:'฿'+f(net(s));
   const nb=document.getElementById('negBanner');if(nb)nb.innerHTML=negBannerHTML(act(curGroup));
   const gt=document.getElementById('grpTotal');if(gt)gt.textContent='฿'+f(act(curGroup).reduce((a,x)=>a+net(x),0));
-  const ck=document.getElementById('ck_'+id);if(ck){const chk=colsG(e.g).filter(c=>c.src==='chk');ck.textContent='฿'+f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0));}}
+  const ck=document.getElementById('ck_'+id);if(ck){const chk=colsG(e.g).filter(c=>c.src==='chk');ck.textContent='฿'+f(chk.reduce((a,c)=>a+itemAmt(e.items,c),0));}
+  if(otherDedCols(e.g).some(c=>c.key===key))refreshOtherNote();}
 function renColumn(key,name){const c=colsG(curGroup).find(x=>x.key===key);if(c){c.name=name.trim()||c.name;saveCols();}}
 async function addColumn(){
   const name=(prompt('ชื่อคอลัมน์ใหม่ (เช่น โบนัส, หักซื้อของ, เบี้ยขยัน):')||'').trim();if(!name)return;
@@ -1166,6 +1212,6 @@ function toast(m){let t=document.getElementById('toast');
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:.2s';document.body.appendChild(t);}
   t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1800);}
 </script>
-<!-- ระบบเงินเดือนวิภาวี v2.1 (บันทึกอัตโนมัติหน้ากรอกเงินเดือน/ลา-ขาด-สาย + เตือนก่อนออก) · 30 ก.ย. 2569 · END-OF-FILE -->
+<!-- ระบบเงินเดือนวิภาวี v2.2 (19 ต.ค. 69: กล่องหักอื่นๆ — หักค่าอะไร ในหน้ากรอกเงินเดือน) · v2.1 (บันทึกอัตโนมัติหน้ากรอกเงินเดือน/ลา-ขาด-สาย + เตือนก่อนออก) · 30 ก.ย. 2569 · END-OF-FILE -->
 </body>
 </html>

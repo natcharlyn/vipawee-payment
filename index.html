@@ -1434,7 +1434,84 @@ function getBusPrice(village){
 }
 
 // === NAV ===
-function goto(page){
+// ===== 📱 ปุ่มย้อนกลับ + ประวัติหน้า (25 ต.ค. 69) — มือถือ/ไอแพดกดย้อนกลับได้ ไม่ต้องปิดแอปแล้วเข้าใหม่ =====
+// เปลี่ยนหน้า / เปิดหน้าต่าง / เลือกเด็ก → จำไว้ในประวัติของเบราว์เซอร์ → ปุ่ม "◀ ย้อนกลับ" (หรือปุ่ม back ของ Android / ปัดย้อนใน Safari)
+// ลำดับการย้อน: ปิดหน้าต่างที่เปิดอยู่ → (หน้าบันทึกรับเงิน) ล้างเด็กที่เลือก กลับไปช่องค้นชื่อ → หน้าก่อนหน้า
+let _navPage = 'home', _ignorePop = 0;
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+function _navPush(state){ try{ history.pushState(state, ''); }catch(e){} }
+try{ history.replaceState({vp:'home', root:true}, ''); }catch(e){}
+window.addEventListener('popstate', function(e){
+  if(_ignorePop > 0){ _ignorePop--; return; }
+  try{
+    const open = Array.from(document.querySelectorAll('.modal-back.active'));
+    if(open.length){
+      const m = open[open.length-1];
+      m._navPushed = false;
+      if(m.id === 'rcpt-modal') closeRcpt();          // ปิดใบเสร็จแบบปกติ: ล้างฟอร์ม (กันบันทึกซ้ำ) แล้วไปหน้าหลัก
+      else m.classList.remove('active');
+      updBackBtn(); return;
+    }
+    if(_navPage === 'record' && selStudent){ resetRec(); updBackBtn(); window.scrollTo(0,0); return; }
+    const p = (e.state && e.state.vp) || 'home';
+    goto(p, true);
+  }catch(err){ console.error('back', err); }
+});
+function navBack(){ history.back(); }
+function updBackBtn(){
+  const b = document.getElementById('nav-back'); if(!b) return;
+  const show = IS_TOUCH && (_navPage !== 'home' || !!document.querySelector('.modal-back.active'));
+  b.style.display = show ? 'flex' : 'none';
+}
+(function initNavBack(){
+  // หน้าต่าง (modal) เปิด → เพิ่มประวัติ 1 ชั้น · ปิดด้วยปุ่มของหน้าต่างเอง → ถอยประวัติชั้นนั้นออก (ไม่ต้องกดย้อนซ้ำ)
+  const mo = new MutationObserver(function(list){
+    list.forEach(function(mu){
+      const m = mu.target, on = m.classList.contains('active');
+      if(on && !m._navPushed){ m._navPushed = true; _navPush({vp:_navPage, modal:m.id}); }
+      else if(!on && m._navPushed){ m._navPushed = false; if(history.state && history.state.modal === m.id){ _ignorePop++; history.back(); } }
+    });
+    updBackBtn();
+  });
+  document.querySelectorAll('.modal-back').forEach(function(m){ mo.observe(m, {attributes:true, attributeFilter:['class']}); });
+  if(!IS_TOUCH) return;
+  // ปุ่มย้อนกลับลอยมุมซ้ายล่าง · ขยายตามจอ (หน้าเว็บนี้ตั้งความกว้าง 1280 จอมือถือเลยย่อทั้งหน้า)
+  const k = Math.min(3.2, Math.max(1, 1280 / Math.max(320, Math.min(screen.width || 1280, 1280))));
+  const b = document.createElement('button');
+  b.id = 'nav-back'; b.type = 'button'; b.className = 'no-print'; b.onclick = navBack; b.textContent = '◀ ย้อนกลับ';
+  b.style.cssText = 'position:fixed;left:' + Math.round(14*k) + 'px;bottom:' + Math.round(14*k) + 'px;z-index:250;display:none;align-items:center;font-family:inherit;font-weight:700;font-size:' + Math.round(17*k) + 'px;padding:' + Math.round(10*k) + 'px ' + Math.round(20*k) + 'px;border-radius:999px;border:none;background:#1A3A8F;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer';
+  document.body.appendChild(b);
+})();
+
+// ===== 🖨 พิมพ์บนไอแพด/ไอโฟน (25 ต.ค. 69) — พิมพ์ในหน้าเดิม ไม่เปิดหน้าต่างใหม่ (ไอแพดเปิดหน้าต่างใหม่แล้วสั่งพิมพ์ไม่ได้ ต้องบันทึกไฟล์ก่อน) =====
+// คอม/Android ใช้แบบเดิม (เปิดหน้าต่างพิมพ์) ไม่เปลี่ยน
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+function openPrintWindow(){
+  if(!IS_IOS) return window.open('', '_blank');
+  let buf = '';
+  return { closed:false, document:{ write: function(x){ buf += String(x); }, close: function(){} }, focus: function(){}, close: function(){}, print: function(){ printInPage(buf); } };
+}
+function printInPage(html){
+  try{
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    let css = Array.from(doc.querySelectorAll('style')).map(function(x){ return x.textContent; }).join('\n');
+    const pageRules = (css.match(/@page[^{]*\{[^}]*\}/g) || []).join('\n');
+    css = css.replace(/@page[^{]*\{[^}]*\}/g, '').replace(/(^|[^-.#\w])(html|body)(?![-\w])/g, '$1:host');
+    const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(function(l){ return l.outerHTML; }).join('');
+    let host = document.getElementById('print-root');
+    if(!host){ host = document.createElement('div'); host.id = 'print-root'; document.body.appendChild(host); host.attachShadow({mode:'open'}); }
+    host.shadowRoot.innerHTML = links + '<style>:host{all:initial;display:block}' + css + '</style>' + doc.body.innerHTML;
+    let ps = document.getElementById('print-root-style');
+    if(!ps){ ps = document.createElement('style'); ps.id = 'print-root-style'; document.head.appendChild(ps); }
+    ps.textContent = '#print-root{display:none}@media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}}' + pageRules;
+    const imgs = Array.from(host.shadowRoot.querySelectorAll('img'));
+    Promise.all(imgs.map(function(im){ return im.complete ? Promise.resolve() : new Promise(function(r){ im.onload = im.onerror = r; setTimeout(r, 1500); }); }))
+      .then(function(){ setTimeout(function(){ window.print(); }, 120); });
+  }catch(err){ console.error('printInPage', err); toast('พิมพ์ไม่สำเร็จ · ลองกดพิมพ์อีกครั้ง', 'error'); }
+}
+window.addEventListener('afterprint', function(){ const ps = document.getElementById('print-root-style'); if(ps) ps.textContent = '#print-root{display:none}'; });
+
+function goto(page, fromPop){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(a=>a.classList.remove('active'));
   $('page-'+page).classList.add('active');
@@ -1451,6 +1528,8 @@ function goto(page){
   if(page==='invoice') renderInvoice();
   if(page==='msg') renderMsg();
   if(page==='referral'){ refDetailKey = null; renderReferralPage(); }
+  if(!fromPop && page !== _navPage) _navPush({vp:page});
+  _navPage = page; updBackBtn();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('.menu a[data-page]').forEach(a=>{ a.onclick = ()=>goto(a.dataset.page); });
@@ -1778,7 +1857,7 @@ function printReferralReport(){
   const bonusT = teachers.reduce((a,r)=>a+r.bonus,0);
   const rows = list.map(r => '<tr><td>'+esc(r.name)+'</td><td>'+(r.type==='teacher'?'ครู':'ผู้ปกครอง')+'</td><td>'+(r.child?esc(r.child.nick)+' · '+esc(r.child.cls):'-')+'</td>' +
     '<td class="c">'+r.kids.length+'</td><td class="r">'+fmt(r.accrued)+'</td><td class="r">'+fmt(r.redeemed)+'</td><td class="r"><b>'+fmt(r.balance||r.bonus)+'</b></td></tr>').join('');
-  const w = window.open('', '_blank');
+  const w = openPrintWindow();
   if(!w){ toast('เบราว์เซอร์บล็อคหน้าต่างพิมพ์ · อนุญาต popup ก่อน', 'error'); return; }
   w.document.write('<html><head><meta charset="UTF-8"><title>รายงานโครงการเพื่อนบ้านชวนเรียน</title><style>' +
     '@page{size:A4;margin:12mm}body{font-family:Sarabun,Tahoma,sans-serif;font-size:13px}' +
@@ -1963,6 +2042,7 @@ function selStu(id){
   renderOwed();
   $('step-pay').classList.remove('hidden');
   syncCashierUI();
+  _navPush({vp:'record', sel:id});   // กดย้อนกลับ = ล้างเด็กที่เลือก กลับไปช่องค้นชื่อ
 }
 
 function resetRec(){
@@ -2755,7 +2835,7 @@ function closeRcpt(){
   goto('home');
 }
 function printRcpt(){
-  const w = window.open('', '_blank');
+  const w = openPrintWindow();
   if(!w){ toast('เบราว์เซอร์บล็อคหน้าต่างพิมพ์ · อนุญาต popup ก่อน', 'error'); return; }
   if(currentRcptTx){
     w.document.write(receiptPrintDual(currentRcptTx));
@@ -3285,7 +3365,7 @@ function printCourseInvoice(id){
   if(disc>0) rows += `<tr><td style="color:#0a7c46">ส่วนลด</td><td style="text-align:right;color:#0a7c46">-฿${fmt(disc)}</td></tr>`;
   if(paid>0) rows += `<tr><td style="color:#10B981">หัก จ่ายแล้ว</td><td style="text-align:right;color:#10B981">-฿${fmt(paid)}</td></tr>`;
   if(note) rows += `<tr><td colspan="2" style="color:#6B7280">📝 หมายเหตุ: ${note}</td></tr>`;
-  const w = window.open('', '_blank');
+  const w = openPrintWindow();
   w.document.write(`<html><head><title>ใบแจ้งค่าเรียนพิเศษ</title><meta charset="utf-8"><style>body{font-family:'Sarabun',sans-serif;padding:28px;max-width:560px;margin:0 auto;color:#1F2937;font-size:17px}table{width:100%;border-collapse:collapse;margin:14px 0}td{padding:9px 0;border-bottom:1px dashed #D9DEE7;font-size:17px}.tot{font-size:28px;font-weight:700;color:#DC2626}</style></head><body>
     <div style="text-align:center"><img src="${LOGO_SRC}" style="width:60px;height:60px;object-fit:contain"><h2 style="margin:4px 0">${SCHOOL.name}</h2><div style="font-size:12px;color:#6B7280">${SCHOOL.addr}</div></div>
     <h3 style="text-align:center;background:#FEF3C7;padding:6px;border-radius:8px;margin:14px 0">📄 ใบแจ้งค่าเรียนพิเศษ · ${lbl}</h3>
@@ -3389,7 +3469,7 @@ function printBusSheetSelected(){
       </div>
     </div>`;
   });
-  const w=window.open('','_blank');
+  const w=openPrintWindow();
   w.document.write(`<html><head><meta charset="utf-8"><title>ใบเซ็นรับค่ารถ ${dTh}</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
     @page{size:A4 portrait;margin:12mm}
@@ -3462,7 +3542,7 @@ function printCourseInvoicesOwed(){
       <div class="bank">💳 ${SCHOOL.bank} ${SCHOOL.bankNo} · ${SCHOOL.bankName} · 📞 ${SCHOOL.phone}</div>
     </div>`;
   }).join('');
-  const w=window.open('','_blank');
+  const w=openPrintWindow();
   w.document.write(`<html><head><meta charset="utf-8"><title>ใบแจ้งค่าคอร์ส ${lbl}${tfLbl?(' · '+tfLbl):''}${cf?(' ห้อง '+cf):''} (${list.length} คน)</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>
     @page{size:A4 portrait;margin:8mm}
@@ -4257,7 +4337,7 @@ function printPayout(id){
       พิมพ์ 2 ใบ · ฉบับโรงเรียน + ฉบับคนขับ
     </div>
   </body></html>`;
-  const w = window.open('', '_blank');
+  const w = openPrintWindow();
   w.document.write(html);
   w.document.close();
   setTimeout(()=>w.print(), 500);
@@ -5533,7 +5613,7 @@ function renderInvSlip(id){
 }
 function printInvoices(){
   if(invSel.size === 0){ toast('เลือกอย่างน้อย 1 คน', 'error'); return; }
-  const w = window.open('', '_blank');
+  const w = openPrintWindow();
   const sty = document.querySelector('style').innerHTML;
   w.document.write('<html><head><title>ใบแจ้งหนี้</title><style>'+sty+'</style></head><body>'+$('inv-preview').innerHTML+'</body></html>');
   w.document.close();

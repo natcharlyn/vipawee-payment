@@ -1489,7 +1489,9 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfo
 function openPrintWindow(){
   if(!IS_IOS) return window.open('', '_blank');
   let buf = '';
-  return { closed:false, document:{ write: function(x){ buf += String(x); }, close: function(){} }, focus: function(){}, close: function(){}, print: function(){ printInPage(buf); } };
+  let done = false;
+  // สั่งพิมพ์ทันทีตอน close() (ยังอยู่ในจังหวะที่ผู้ใช้แตะปุ่ม) — Safari บล็อกการพิมพ์ที่สั่งช้ากว่าการแตะ
+  return { closed:false, document:{ write: function(x){ buf += String(x); }, close: function(){ if(!done){ done = true; printInPage(buf); } } }, focus: function(){}, close: function(){}, print: function(){ if(!done){ done = true; printInPage(buf); } } };
 }
 function printInPage(html){
   try{
@@ -1504,12 +1506,9 @@ function printInPage(html){
     let ps = document.getElementById('print-root-style');
     if(!ps){ ps = document.createElement('style'); ps.id = 'print-root-style'; document.head.appendChild(ps); }
     ps.textContent = '#print-root{display:none}@media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}}' + pageRules;
-    const imgs = Array.from(host.shadowRoot.querySelectorAll('img'));
-    Promise.all(imgs.map(function(im){ return im.complete ? Promise.resolve() : new Promise(function(r){ im.onload = im.onerror = r; setTimeout(r, 1500); }); }))
-      .then(function(){ setTimeout(function(){ window.print(); }, 120); });
+    window.print();   // เรียกทันที ไม่หน่วงเวลา (กัน Safari ขึ้น "ปิดกั้นไม่ให้พิมพ์")
   }catch(err){ console.error('printInPage', err); toast('พิมพ์ไม่สำเร็จ · ลองกดพิมพ์อีกครั้ง', 'error'); }
 }
-window.addEventListener('afterprint', function(){ const ps = document.getElementById('print-root-style'); if(ps) ps.textContent = '#print-root{display:none}'; });
 
 function goto(page, fromPop){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));

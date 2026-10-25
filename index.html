@@ -214,6 +214,18 @@ details summary{cursor:pointer;outline:none}
 
 /* CHECKBOX big */
 .chk-big{width:18px;height:18px;cursor:pointer;accent-color:#E8804B}
+/* ===== เคาน์เตอร์ (ครูที่มาช่วย) · 25 ต.ค. 69 ===== */
+.menu a[data-page="counterday"]{display:none}
+body.counter-mode .menu a[data-page]:not([data-page="record"]):not([data-page="counterday"]){display:none!important}
+body.counter-mode .menu a[data-page="counterday"]{display:flex!important}
+body.counter-mode .sidebar-foot{display:none}
+body.counter-mode #cashier-sel,body.counter-mode #cashier-custom,body.counter-mode #cashier-hint{display:none!important}
+#counter-badge,#counter-cashier-lock{display:none}
+body.counter-mode #counter-badge{display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;color:#92400E;border:1.5px solid #F59E0B;border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px;position:fixed;top:10px;right:14px;z-index:9000}
+body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;font-size:16px;color:#92400E;background:#FEF3C7;padding:6px 12px;border-radius:8px}
+.lg-tab{flex:1;padding:9px;border:1.5px solid #D1D5DB;background:#fff;border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#374151}
+.lg-tab.on{background:#1A3A8F;color:#fff;border-color:#1A3A8F}
+.lg-in{width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 14px;font-size:15px;box-sizing:border-box;font-family:inherit}
 </style>
 </head>
 <body>
@@ -225,16 +237,33 @@ details summary{cursor:pointer;outline:none}
       <div style="font-size:20px;font-weight:800;color:#1A3A8F">ระบบเก็บเงินวิภาวี</div>
       <div style="font-size:12px;color:#6B7280;margin-top:4px">เวอร์ชั่นออนไลน์ · เข้าสู่ระบบก่อนใช้งาน</div>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="lg-tab on" id="lg-tab-admin" onclick="loginMode('admin')">ผู้ดูแล</button>
+      <button class="lg-tab" id="lg-tab-counter" onclick="loginMode('counter')">ครูที่มาช่วย</button>
+    </div>
+    <div id="lg-counter" style="display:none">
+      <label style="font-size:13px;font-weight:600;color:#374151">เคาน์เตอร์</label>
+      <select id="cl-counter" class="lg-in"><option value="1">เคาน์เตอร์ 1</option><option value="2">เคาน์เตอร์ 2</option></select>
+      <label style="font-size:13px;font-weight:600;color:#374151">PIN วันนี้ (6 หลัก จากครูแนท)</label>
+      <input id="cl-pin" class="lg-in" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••" style="letter-spacing:6px;font-size:20px;text-align:center">
+      <label style="font-size:13px;font-weight:600;color:#374151">ชื่อผู้รับเงิน (พิมพ์ชื่อตัวเอง)</label>
+      <input id="cl-name" class="lg-in" list="cl-names" autocomplete="off" placeholder="เช่น ครูส้ม">
+      <datalist id="cl-names"></datalist>
+      <button onclick="doCounterLogin()" id="cl-btn" style="width:100%;padding:12px;background:#E8804B;color:white;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">เข้าระบบรับเงิน</button>
+    </div>
+    <div id="lg-admin">
     <label style="font-size:13px;font-weight:600;color:#374151">อีเมล</label>
     <input id="login-email" type="email" autocomplete="username" style="width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 14px;font-size:15px;box-sizing:border-box">
     <label style="font-size:13px;font-weight:600;color:#374151">รหัสผ่าน</label>
     <input id="login-pass" type="password" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="กรอกรหัสผ่านทุกครั้ง" style="width:100%;padding:10px 12px;border:1.5px solid #D1D5DB;border-radius:8px;margin:4px 0 18px;font-size:15px;box-sizing:border-box" onkeydown="if(event.key==='Enter')doLogin()">
     <button onclick="doLogin()" id="login-btn" style="width:100%;padding:12px;background:#1A3A8F;color:white;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">เข้าสู่ระบบ</button>
+    </div>
     <div id="login-err" style="color:#DC2626;font-size:13px;margin-top:12px;text-align:center;min-height:18px"></div>
     <div id="login-loading" style="display:none;text-align:center;color:#6B7280;font-size:13px;margin-top:8px">⏳ กำลังโหลดข้อมูล...</div>
   </div>
 </div>
 
+<div id="counter-badge">👤 <span id="counter-badge-txt"></span></div>
 <div class="app">
 
 <!-- SIDEBAR -->
@@ -249,6 +278,7 @@ details summary{cursor:pointer;outline:none}
   <div class="menu">
     <a class="active" data-page="home"><span class="ico">🏠</span> หน้าหลัก</a>
     <a data-page="record"><span class="ico">💰</span> บันทึกรับเงิน</a>
+    <a data-page="counterday"><span class="ico">🧾</span> ใบเสร็จวันนี้</a>
     <a data-page="slip"><span class="ico">📥</span> กล่องสลิป <span class="badge hidden" id="badge-slip">0</span></a>
     <a data-page="students"><span class="ico">👶</span> นักเรียน <span class="badge" id="badge-students">0</span></a>
     <a data-page="special"><span class="ico">⭐</span> คอร์สพิเศษ</a>
@@ -287,6 +317,19 @@ details summary{cursor:pointer;outline:none}
     <div class="stat"><div class="stat-num" id="h-tx-month">0</div><div class="stat-lbl">บันทึกเดือนนี้</div></div>
     <div class="stat"><div class="stat-num" id="h-amount-month">฿0</div><div class="stat-lbl">รับเงินเดือนนี้</div></div>
   </div>
+  <div class="card" id="h-counter-card" style="border-left:4px solid #E8804B">
+    <div class="card-title">🔑 เคาน์เตอร์ครูที่มาช่วย · PIN วันนี้ <span style="margin-left:auto;font-size:12px;color:#6B7280;font-weight:400">PIN หมดอายุเที่ยงคืน</span></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <div style="background:#F3F4F6;border-radius:8px;padding:10px 16px"><div style="font-size:12px;color:#6B7280">เคาน์เตอร์ 1</div><div id="pin-c1" style="font-size:26px;font-weight:800;letter-spacing:4px;font-family:monospace">------</div></div>
+      <div style="background:#F3F4F6;border-radius:8px;padding:10px 16px"><div style="font-size:12px;color:#6B7280">เคาน์เตอร์ 2</div><div id="pin-c2" style="font-size:26px;font-weight:800;letter-spacing:4px;font-family:monospace">------</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="genCounterPins(false)">🔑 สร้าง PIN วันนี้</button>
+        <button class="btn" onclick="genCounterPins(true)">🔄 สร้างใหม่ (PIN หลุด)</button>
+        <button class="btn" onclick="closeCounters()">⛔ ปิดเคาน์เตอร์ทั้งหมด</button>
+      </div>
+    </div>
+    <div id="pin-note" style="font-size:12px;color:#6B7280;margin-top:8px">ส่ง PIN ทางไลน์ส่วนตัวให้ครูที่มาช่วยวันนี้เท่านั้น · อย่าส่งในกลุ่ม</div>
+  </div>
   <div class="card" id="h-breakdown-card" style="border-left:4px solid #10B981">
     <div class="card-title">💰 รับเงินเดือนนี้ · แยกประเภท</div>
     <div id="h-amount-breakdown"></div>
@@ -296,6 +339,29 @@ details summary{cursor:pointer;outline:none}
     <table class="tbl">
       <thead><tr><th>วันที่</th><th>นักเรียน</th><th>รายการ</th><th style="text-align:right">เงิน</th><th>วิธี</th><th></th></tr></thead>
       <tbody id="recent-tx"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- COUNTER DAY (ใบเสร็จวันนี้ · เคาน์เตอร์) -->
+<div class="page" id="page-counterday">
+  <div class="topbar">
+    <div>
+      <div class="page-title">🧾 ใบเสร็จวันนี้</div>
+      <div class="page-sub" id="cd-date"></div>
+    </div>
+    <div class="tools"><button class="btn btn-primary" onclick="goto('record')">💰 บันทึกรับเงิน</button></div>
+  </div>
+  <div class="card" style="border-left:4px solid #10B981">
+    <div class="card-title">👥 ยอดรับวันนี้ · แยกตามคนรับเงิน</div>
+    <div id="cd-sum"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🧾 รายการวันนี้ · กด 🖨 เพื่อพิมพ์ใบเสร็จซ้ำ</div>
+    <input class="input" id="cd-filter" placeholder="🔍 ค้นชื่อเด็ก / เลขใบเสร็จ" oninput="renderCounterDay()" style="max-width:280px;margin-bottom:10px">
+    <table class="tbl">
+      <thead><tr><th>เวลา</th><th>เลขที่</th><th>นักเรียน</th><th style="text-align:right">เงิน</th><th>วิธี</th><th>ผู้รับเงิน</th><th></th></tr></thead>
+      <tbody id="cd-list"></tbody>
     </table>
   </div>
 </div>
@@ -345,7 +411,8 @@ details summary{cursor:pointer;outline:none}
           <option value="__custom__">อื่นๆ (พิมพ์ชื่อ)...</option>
         </select>
         <input class="input" id="cashier-custom" placeholder="พิมพ์ชื่อผู้รับเงิน" style="max-width:220px;display:none" oninput="customCashier(this)">
-        <span style="font-size:12px;color:#6B7280">ระบบจำคนล่าสุดให้ · ชื่อนี้ขึ้นในใบเสร็จช่อง ผู้รับเงิน</span>
+        <span id="counter-cashier-lock"></span>
+        <span id="cashier-hint" style="font-size:12px;color:#6B7280">ระบบจำคนล่าสุดให้ · ชื่อนี้ขึ้นในใบเสร็จช่อง ผู้รับเงิน</span>
       </div>
     </div>
     <div class="card">
@@ -1328,6 +1395,7 @@ function rerenderActive(){
   const id = p.id.replace('page-','');
   try{
     if(id==='home') renderHome();
+    else if(id==='counterday') renderCounterDay();
     else if(id==='students') renderStudents();
     else if(id==='slip') renderSlips();
     else if(id==='bus') renderBus();
@@ -1363,11 +1431,11 @@ async function afterLogin(){
   try{
     await cloudLoadAll();
     startRealtime();
-    await ensureReceiptNos();
+    if(!IS_COUNTER) await ensureReceiptNos();
     $('login-overlay').style.display = 'none';
     document.querySelectorAll('.ay-label').forEach(el => el.textContent = AY);
-    renderHome();
-    autoBackupWeekly();
+    if(IS_COUNTER){ applyCounterMode(); goto('counterday'); }
+    else { renderHome(); autoBackupWeekly(); loadCounterPins(); }
   } catch(err){
     $('login-err').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err.message||err);
     $('login-btn').disabled = false;
@@ -1376,9 +1444,144 @@ async function afterLogin(){
 }
 async function doLogout(){
   if(!confirm('ออกจากระบบ?')) return;
+  if(IS_COUNTER){ try{ localStorage.removeItem('vipawee_counter_name'); }catch(e){} }
   await sb.auth.signOut();
   location.reload();
 }
+
+// ====== 🔑 เคาน์เตอร์ครูที่มาช่วย + PIN ประจำวัน (25 ต.ค. 69) ======
+// บัญชี counter1/counter2@vipawee.staff · รหัสผ่าน = PIN ประจำวัน (ครูแนทกดสร้างที่หน้าหลัก) · หลังบ้าน (RLS) ล็อกสิทธิ์จริง
+let IS_COUNTER = false, COUNTER_NO = 0, COUNTER_NAME = '';
+const COUNTER_PAGES = ['record','counterday'];
+function isCounterEmail(e){ return /@vipawee\.staff$/i.test(String(e||'')); }
+function normCashierName(n){
+  n = String(n||'').replace(/\s+/g,' ').trim();
+  n = n.replace(/^(คุณครู|ครู)\s*/,'').trim();
+  return n;
+}
+function loginMode(m){
+  $('lg-admin').style.display = m==='admin' ? '' : 'none';
+  $('lg-counter').style.display = m==='counter' ? '' : 'none';
+  $('lg-tab-admin').classList.toggle('on', m==='admin');
+  $('lg-tab-counter').classList.toggle('on', m==='counter');
+  $('login-err').textContent = '';
+  try{ localStorage.setItem('vipawee_login_mode', m); }catch(e){}
+  if(m==='counter') fillCashierNames();
+}
+function fillCashierNames(){
+  let names = [];
+  try{ names = JSON.parse(localStorage.getItem('vipawee_cashier_names')||'[]'); }catch(e){}
+  $('cl-names').innerHTML = names.map(n => '<option value="'+esc('ครู'+n)+'">').join('');
+}
+function rememberCashierName(n){
+  try{
+    let names = JSON.parse(localStorage.getItem('vipawee_cashier_names')||'[]');
+    names = [n].concat(names.filter(x => x !== n)).slice(0,20);
+    localStorage.setItem('vipawee_cashier_names', JSON.stringify(names));
+  }catch(e){}
+}
+async function counterStatus(){
+  try{
+    const { data, error } = await sb.rpc('counter_status');
+    if(error) return {ok:false, err:error.message};
+    return data || {ok:false};
+  }catch(e){ return {ok:false, err:String(e)}; }
+}
+async function doCounterLogin(){
+  const no = $('cl-counter').value, pin = $('cl-pin').value.trim(), name = normCashierName($('cl-name').value);
+  const err = m => { $('login-err').textContent = m; $('cl-btn').disabled = false; };
+  if(!/^\d{6}$/.test(pin)) return err('ใส่ PIN ให้ครบ 6 หลัก');
+  if(name.length < 2) return err('พิมพ์ชื่อผู้รับเงิน (ชื่อตัวเอง) ก่อนเข้าระบบ');
+  $('cl-btn').disabled = true; $('login-err').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({email: 'counter'+no+'@vipawee.staff', password: pin});
+  if(error) return err('PIN ไม่ถูกต้อง หรือวันนี้ครูแนทยังไม่ได้เปิดเคาน์เตอร์');
+  const st = await counterStatus();
+  if(!st.ok){ await sb.auth.signOut(); return err('PIN นี้หมดอายุแล้ว · ขอ PIN ของวันนี้จากครูแนท'); }
+  try{ localStorage.setItem('vipawee_counter_name', name); }catch(e){}
+  rememberCashierName(name);
+  $('cl-pin').value = '';
+  setCounterIdentity(no, name);
+  $('cl-btn').disabled = false;
+  await afterLogin();
+}
+function setCounterIdentity(no, name){
+  IS_COUNTER = true; COUNTER_NO = Number(no)||0; COUNTER_NAME = name;
+  cashierName = 'ครู' + name;   // ไม่บันทึกทับชื่อผู้รับเงินของครูแนทในเครื่อง (ไม่เรียก setCashier)
+}
+async function counterResume(session){
+  // เปิดเว็บใหม่ทั้งที่ยังล็อกอินเคาน์เตอร์ค้าง → เช็ก PIN วันนี้ + ต้องมีชื่อ ไม่งั้นให้เข้าใหม่
+  const m = String(session.user.email).match(/counter(\d+)@/i);
+  let name = ''; try{ name = localStorage.getItem('vipawee_counter_name') || ''; }catch(e){}
+  const st = await counterStatus();
+  if(!st.ok || !name){
+    await sb.auth.signOut();
+    loginMode('counter');
+    $('login-err').textContent = !st.ok ? 'PIN เมื่อวานหมดอายุแล้ว · ขอ PIN ของวันนี้จากครูแนท' : 'กรุณาเข้าระบบใหม่และพิมพ์ชื่อผู้รับเงิน';
+    return false;
+  }
+  setCounterIdentity(m ? m[1] : 0, name);
+  return true;
+}
+function applyCounterMode(){
+  document.body.classList.add('counter-mode');
+  $('counter-badge-txt').textContent = 'ผู้รับเงิน: ครู' + COUNTER_NAME + ' · เคาน์เตอร์ ' + COUNTER_NO;
+  $('counter-cashier-lock').textContent = '👤 ครู' + COUNTER_NAME + ' (เคาน์เตอร์ ' + COUNTER_NO + ')';
+  const hc = $('h-counter-card'); if(hc) hc.remove();
+  // เช็กทุก 3 นาที: เลยเที่ยงคืน / ครูแนทกดสร้าง PIN ใหม่ / ปิดเคาน์เตอร์ → ออกจากระบบ
+  setInterval(async () => {
+    if(_savingTx) return;
+    const st = await counterStatus();
+    if(st && st.ok === false && !st.err){
+      alert('เคาน์เตอร์ถูกปิด หรือ PIN หมดอายุแล้ว · ระบบจะออกจากระบบ\nขอ PIN ใหม่จากครูแนทแล้วเข้าใหม่');
+      try{ await sb.auth.signOut(); }catch(e){}
+      location.reload();
+    }
+  }, 180000);
+}
+function renderCounterDay(){
+  const now = new Date();
+  $('cd-date').textContent = now.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const isToday = t => { const d = new Date(t.date); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate(); };
+  const list = TX.filter(t => !t.voidedAt && isToday(t)).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const by = {};
+  list.forEach(t => { const k = t.cashier || '-'; const o = by[k] || (by[k] = {n:0, cash:0, tr:0}); o.n++; if(t.method==='เงินสด') o.cash += t.total; else o.tr += t.total; });
+  const keys = Object.keys(by).sort();
+  const tot = list.reduce((s,t)=>s+t.total,0);
+  $('cd-sum').innerHTML = keys.length ? '<table class="tbl"><thead><tr><th>ผู้รับเงิน</th><th style="text-align:right">ใบ</th><th style="text-align:right">เงินสด</th><th style="text-align:right">โอน</th><th style="text-align:right">รวม</th></tr></thead><tbody>' +
+    keys.map(k => '<tr><td><strong>'+esc(k)+'</strong></td><td style="text-align:right">'+by[k].n+'</td><td style="text-align:right">฿'+fmt(by[k].cash)+'</td><td style="text-align:right">฿'+fmt(by[k].tr)+'</td><td style="text-align:right;font-weight:700">฿'+fmt(by[k].cash+by[k].tr)+'</td></tr>').join('') +
+    '<tr style="background:#F0FDF4"><td><strong>รวมทั้งหมด</strong></td><td style="text-align:right">'+list.length+'</td><td></td><td></td><td style="text-align:right;font-weight:800">฿'+fmt(tot)+'</td></tr></tbody></table>'
+    : '<div style="color:#9CA3AF;padding:10px">วันนี้ยังไม่มีใบเสร็จ</div>';
+  const q = ($('cd-filter') && $('cd-filter').value || '').trim().toLowerCase();
+  const rows = list.filter(t => !q || [t.studentNick,t.studentName,t.receiptNo,t.payerName].join(' ').toLowerCase().indexOf(q) >= 0);
+  $('cd-list').innerHTML = rows.length ? rows.map(t => '<tr><td>'+new Date(t.date).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</td><td>'+esc(t.receiptNo||'')+'</td><td><strong>'+esc(t.studentNick||'')+'</strong> · '+esc(t.studentClass||'')+'</td><td style="text-align:right;font-weight:700">฿'+fmt(t.total)+'</td><td>'+esc(t.method||'')+'</td><td>'+esc(t.cashier||'')+'</td><td><button class="btn btn-sm" onclick="reprintTx('+t.id+')" title="พิมพ์ซ้ำ">🖨</button></td></tr>').join('')
+    : '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:20px">ไม่มีรายการ</td></tr>';
+}
+// ---- ฝั่งครูแนท: สร้าง/ดู/ปิด PIN ----
+function showPins(d){
+  $('pin-c1').textContent = (d && d.c1) || '------';
+  $('pin-c2').textContent = (d && d.c2) || '------';
+}
+async function loadCounterPins(){
+  if(!$('pin-c1')) return;
+  try{ const { data, error } = await sb.rpc('get_counter_pins'); if(!error) showPins(data); else $('pin-note').textContent = 'ยังไม่ได้ติดตั้งระบบเคาน์เตอร์ในฐานข้อมูล'; }catch(e){}
+}
+async function genCounterPins(force){
+  const has = $('pin-c1').textContent.indexOf('-') < 0;
+  if(has && !force){ toast('PIN วันนี้สร้างแล้ว · ถ้า PIN หลุด กด "สร้างใหม่"'); return; }
+  if(force && !confirm('สร้าง PIN ใหม่?\nPIN เดิมจะใช้ไม่ได้ทันที และเครื่องเคาน์เตอร์ที่เข้าอยู่จะถูกออกจากระบบ (ต้องเข้าใหม่ด้วย PIN ใหม่)')) return;
+  const { data, error } = await sb.rpc('gen_counter_pins');
+  if(error){ toast('⚠ สร้าง PIN ไม่สำเร็จ: ' + error.message, 'error'); return; }
+  showPins(data);
+  toast('🔑 สร้าง PIN วันนี้แล้ว · ส่งทางไลน์ส่วนตัวให้ครูที่มาช่วย');
+}
+async function closeCounters(){
+  if(!confirm('ปิดเคาน์เตอร์ทั้งหมดตอนนี้?\nเครื่องเคาน์เตอร์จะถูกออกจากระบบ และ PIN วันนี้ใช้ไม่ได้อีก')) return;
+  const { error } = await sb.rpc('close_counters');
+  if(error){ toast('⚠ ปิดไม่สำเร็จ: ' + error.message, 'error'); return; }
+  showPins(null);
+  toast('⛔ ปิดเคาน์เตอร์ทั้งหมดแล้ว');
+}
+try{ if(localStorage.getItem('vipawee_login_mode') === 'counter') setTimeout(() => loginMode('counter'), 0); }catch(e){}
 // ====== END CLOUD LAYER ======
 function saveStock(){ cloudSync('stock'); }
 let invSel = new Set();
@@ -1573,6 +1776,8 @@ function printInPage(html, overlay){
 }
 
 function goto(page, fromPop){
+  if(IS_COUNTER && COUNTER_PAGES.indexOf(page) < 0) page = 'counterday';   // เคาน์เตอร์เข้าได้เฉพาะ รับเงิน + ใบเสร็จวันนี้
+  if(page === 'counterday') renderCounterDay();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(a=>a.classList.remove('active'));
   $('page-'+page).classList.add('active');
@@ -2724,7 +2929,7 @@ let cashierName = localStorage.getItem('vipawee_cashier') || 'วีรญา';
 function setCashier(name){ cashierName = (name||'').trim() || 'วีรญา'; localStorage.setItem('vipawee_cashier', cashierName); }
 function pickCashier(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(s.value==='__custom__'){ c.style.display=''; c.focus(); cashierName=c.value.trim(); } else { c.style.display='none'; setCashier(s.value); } }
 function customCashier(el){ setCashier(el.value); }
-function syncCashierUI(){ const s=$('cashier-sel'), c=$('cashier-custom'); if(!s) return; if(['วีรญา','ภาวิณี'].includes(cashierName)){ s.value=cashierName; c.style.display='none'; } else { s.value='__custom__'; c.style.display=''; c.value=cashierName; } }
+function syncCashierUI(){ if(IS_COUNTER){ cashierName = 'ครู' + COUNTER_NAME; return; } const s=$('cashier-sel'), c=$('cashier-custom'); if(!s) return; if(['วีรญา','ภาวิณี'].includes(cashierName)){ s.value=cashierName; c.style.display='none'; } else { s.value='__custom__'; c.style.display=''; c.value=cashierName; } }
 
 // จองเลขใบเสร็จจากคลาวด์ (authoritative) — กันเลขซ้ำข้ามเครื่อง/หลายแคชเชียร์ + กัน local ล้าสมัย
 async function cloudNextReceiptNo(){
@@ -5896,7 +6101,13 @@ function clearAll(){
 (async () => {
   try{
     const { data } = await sb.auth.getSession();
-    if(data && data.session){ await afterLogin(); }
+    if(data && data.session){
+      if(isCounterEmail(data.session.user && data.session.user.email)){
+        const okc = await counterResume(data.session);
+        if(!okc) return;
+      }
+      await afterLogin();
+    }
   } catch(e){ console.error(e); }
 })();
 </script>

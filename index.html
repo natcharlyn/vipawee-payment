@@ -2851,12 +2851,44 @@ ${[1,2].map(tn => { const pd = paidTerms && paidTerms.has(tn); return `<label cl
   }
   // annual (default)
   const annualLabel = label + ' (ปี ' + AY + ')';
+  // 25 ต.ค. 69: ค่าหนังสือ หลัง 16 มิ.ย. ราคาไม่เท่าเดิม (แต่ละปีไม่เท่ากัน) → ให้เจ้าหน้าที่พิมพ์ราคาเองตามตาราง
+  if(id === 'book' && !paidAnnual && new Date() >= new Date(AY - 543, 5, 16)){
+    return `<div class="owed-row" data-id="book" style="flex-wrap:wrap;gap:8px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" class="chk-big" id="book-chk" onchange="toggleBook(this)" data-label="${annualLabel}"> ${label} <span style="color:#9CA3AF;font-size:12px;font-weight:400">(ปี ${AY})</span></label>
+      <span style="flex:1;min-width:180px;font-size:12px;color:#B45309">🆕 เด็กเข้าใหม่หลัง 16 มิ.ย. → พิมพ์ราคาตามตารางของครูแนท · เด็กเก่าใช้ราคาเดิม ฿${fmt(amount)}</span>
+      <span style="white-space:nowrap">฿ <input type="number" min="0" step="1" class="input" id="book-price" value="${amount}" data-std="${amount}" style="width:100px;display:inline-block" oninput="updBookPrice()" onclick="event.stopPropagation()"></span>
+      <span style="font-weight:700;min-width:70px;text-align:right" id="amt-book">฿0</span>
+    </div>`;
+  }
   return `<label class="owed-row${paidAnnual?' mchip-paid':''}" data-id="${id}">
     <span><input type="checkbox" class="chk-big" onchange="toggleOwed('${id}', this)" data-amt="${amount}" data-label="${annualLabel}" ${paidAnnual?'disabled':''}> ${label} <span style="color:#9CA3AF;font-size:12px;font-weight:400">(ปี ${AY})${paidAnnual?' · ✓ จ่ายแล้ว':''}</span></span>
     <span style="font-weight:700">฿${fmt(amount)}</span>
   </label>`;
 }
 
+function _bookItem(){
+  const inp = $('book-price'); const chk = $('book-chk'); if(!inp || !chk) return null;
+  const price = Math.round(+inp.value || 0), std = +inp.dataset.std || 0;
+  return {amount: price, label: chk.dataset.label + (price !== std ? ' · ราคาเข้าหลัง 16 มิ.ย.' : ''), months: 1};
+}
+function toggleBook(el){
+  const row = el.closest('.owed-row');
+  if(el.checked){
+    const it = _bookItem();
+    if(!it || it.amount <= 0){ el.checked = false; toast('ใส่ราคาค่าหนังสือก่อน', 'error'); return; }
+    owedSelected.book = it; row.classList.add('checked'); $('amt-book').textContent = '฿' + fmt(it.amount);
+  } else {
+    delete owedSelected.book; row.classList.remove('checked'); $('amt-book').textContent = '฿0';
+  }
+  updateTotal();
+}
+function updBookPrice(){
+  const chk = $('book-chk'); if(!chk || !chk.checked) return;
+  const it = _bookItem();
+  if(!it || it.amount <= 0){ delete owedSelected.book; $('amt-book').textContent = '฿0'; }
+  else { owedSelected.book = it; $('amt-book').textContent = '฿' + fmt(it.amount); }
+  updateTotal();
+}
 function toggleOwed(id, el){
   if(el.checked){
     owedSelected[id] = {amount: +el.dataset.amt, label: el.dataset.label, months: 1};
@@ -3118,6 +3150,7 @@ async function saveTx(){
     const q = +((r.querySelector('[data-role=qty]')||{}).value) || 0, p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
     return name && name !== '__custom__' && (q <= 0 || p <= 0);
   });
+  if($('book-chk') && $('book-chk').checked && !owedSelected.book){ toast('⚠ ติ๊กค่าหนังสือแล้วแต่ยังไม่ใส่ราคา', 'error'); return; }
   if(_badEx.length){ toast('⚠ ของขาย/ชุด ยังไม่ได้ใส่ราคาหรือจำนวน · ดูราคาจากตาราง แล้วใส่ให้ครบก่อนบันทึก (หรือกด × ลบแถวนั้น)', 'error'); _badEx[0].scrollIntoView({block:'center'}); return; }
   if(Object.keys(owedSelected).length === 0){
     toast('กรุณาเลือกอย่างน้อย 1 รายการ', 'error'); return;

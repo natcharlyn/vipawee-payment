@@ -216,7 +216,8 @@ details summary{cursor:pointer;outline:none}
 .chk-big{width:18px;height:18px;cursor:pointer;accent-color:#E8804B}
 /* ===== เคาน์เตอร์ (ครูที่มาช่วย) · 25 ต.ค. 69 ===== */
 .menu a[data-page="counterday"]{display:none}
-body.counter-mode .menu a[data-page]:not([data-page="record"]):not([data-page="counterday"]){display:none!important}
+body.counter-mode .menu a[data-page]:not([data-page="record"]):not([data-page="counterday"]):not([data-page="slip"]){display:none!important}
+body.counter-mode .adm-only{display:none!important}
 body.counter-mode .menu a[data-page="counterday"]{display:flex!important}
 body.counter-mode .sidebar-foot{display:none}
 body.counter-mode #cashier-sel,body.counter-mode #cashier-custom,body.counter-mode #cashier-hint{display:none!important}
@@ -350,7 +351,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
       <div class="page-title">🧾 ใบเสร็จวันนี้</div>
       <div class="page-sub" id="cd-date"></div>
     </div>
-    <div class="tools"><button class="btn btn-primary" onclick="goto('record')">💰 บันทึกรับเงิน</button></div>
+    <div class="tools"><button class="btn" onclick="newStu()">➕ เพิ่มเด็กใหม่</button> <button class="btn btn-primary" onclick="goto('record')">💰 บันทึกรับเงิน</button></div>
   </div>
   <div class="card" style="border-left:4px solid #10B981">
     <div class="card-title">👥 ยอดรับวันนี้ · แยกตามคนรับเงิน</div>
@@ -373,6 +374,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
       <div class="page-title">💰 บันทึกรับเงิน</div>
       <div class="page-sub">ค้นชื่อเด็ก → เลือกรายการ → ออกใบเสร็จ</div>
     </div>
+    <div class="tools"><button class="btn" onclick="newStu()">➕ เพิ่มเด็กใหม่ (สมัครเรียน)</button></div>
   </div>
   <div class="card" id="step-search">
     <div class="card-title">1️⃣ ค้นหานักเรียน</div>
@@ -447,7 +449,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
     </div>
     <div class="tools">
       <button class="btn" onclick="toggleUnpaid()">📋 ใครยังไม่จ่าย</button>
-      <button class="btn btn-primary" onclick="newSlip()">➕ เพิ่มสลิปใหม่</button>
+      <button class="btn btn-primary adm-only" onclick="newSlip()">➕ เพิ่มสลิปใหม่</button>
     </div>
   </div>
   <div class="card hidden" id="unpaid-panel" style="border:1px solid #F0C27A;background:#FFFBEB">
@@ -1452,7 +1454,7 @@ async function doLogout(){
 // ====== 🔑 เคาน์เตอร์ครูที่มาช่วย + PIN ประจำวัน (25 ต.ค. 69) ======
 // บัญชี counter1/counter2@vipawee.staff · รหัสผ่าน = PIN ประจำวัน (ครูแนทกดสร้างที่หน้าหลัก) · หลังบ้าน (RLS) ล็อกสิทธิ์จริง
 let IS_COUNTER = false, COUNTER_NO = 0, COUNTER_NAME = '';
-const COUNTER_PAGES = ['record','counterday'];
+const COUNTER_PAGES = ['record','counterday','slip'];
 function isCounterEmail(e){ return /@vipawee\.staff$/i.test(String(e||'')); }
 function normCashierName(n){
   n = String(n||'').replace(/\s+/g,' ').trim();
@@ -3206,6 +3208,9 @@ function newStu(){
   $('f-discount').value = 'ไม่มี';
   $('f-discountReason').value = '';
   $('f-startMonth').value = '';
+  // เคาน์เตอร์: ส่วนลด/ฟรี/สถานะ ครูแนทเป็นคนกำหนด (หลังบ้านบังคับซ้ำด้วย trigger)
+  ['f-discount','f-discountReason','f-status'].forEach(id => { $(id).disabled = IS_COUNTER; });
+  Array.from($('f-payTuition').options).forEach(o => { if(o.value==='ฟรี') o.disabled = IS_COUNTER; });
   $('stu-modal').classList.add('active');
 }
 
@@ -3378,6 +3383,7 @@ async function saveStu(){
       return;
     }
     toast('เพิ่ม ' + data.nick + ' ✓ (รหัส ' + added.id + ')');
+    if(IS_COUNTER){ closeStuModal(); goto('record'); try{ selStu(added.id); }catch(e){} return; }
   }
   closeStuModal();
   // Refresh views
@@ -4211,6 +4217,7 @@ $('stu-filter').oninput = renderStudents;
 // === STUDENT DETAIL ===
 let detailStudentId = null;
 function openDetail(id){
+  if(IS_COUNTER) return;   // เคาน์เตอร์ไม่เปิดหน้าประวัติเด็ก
   detailStudentId = id;
   const s = STUDENTS.find(x=>x.id===id);
   if(!s) return;
@@ -5378,7 +5385,7 @@ function renderSlips(){
       <td>${s.matched ? '<span class="b b-paid">บันทึกแล้ว</span>' : '<span class="b b-pending">รอบันทึก</span>'}</td>
       <td>
         ${!s.matched ? `<button class="btn btn-sm btn-primary" onclick="slipToRecord(${s.id})">→ บันทึกรับเงิน</button>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="delSlip(${s.id})">×</button>
+        <button class="btn btn-sm btn-danger adm-only" onclick="delSlip(${s.id})">×</button>
       </td>
     </tr>`).join('');
 }
@@ -5450,6 +5457,7 @@ function quickSearchSlip(id){
   assignSlipStu(id, m[0].nick);
 }
 function openDetailByNick(nick){
+  if(IS_COUNTER) return;
   const s = STUDENTS.find(x => x.nick === nick);
   if(s) openDetail(s.id);
 }

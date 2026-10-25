@@ -1401,6 +1401,7 @@ async function _rtRefetch(){
     _rtTimer = setTimeout(_rtRefetch, 1500);
     return;
   }
+  if(IS_COUNTER && await counterKickIfClosed()) return;
   try{ await cloudLoadAll(); rerenderActive(); } catch(e){ console.error(e); }
 }
 function startRealtime(){
@@ -1502,6 +1503,17 @@ function rememberCashierName(n){
     localStorage.setItem('vipawee_cashier_names', JSON.stringify(names));
   }catch(e){}
 }
+async function counterKickIfClosed(){
+  const st = await counterStatus();
+  const authErr = st && st.err && /JWT|jwt|token|auth|expired|session/i.test(st.err);
+  if(st && ((st.ok === false && !st.err) || authErr)){
+    alert('เคาน์เตอร์ถูกปิด หรือ PIN หมดอายุแล้ว · ระบบจะออกจากระบบ\nขอ PIN ใหม่จากครูแนทแล้วเข้าใหม่');
+    try{ await sb.auth.signOut(); }catch(e){}
+    location.reload();
+    return true;
+  }
+  return false;
+}
 async function counterStatus(){
   try{
     const { data, error } = await sb.rpc('counter_status');
@@ -1553,15 +1565,7 @@ function applyCounterMode(){
   $('counter-cashier-lock').textContent = '👤 ครู' + COUNTER_NAME + ' (เคาน์เตอร์ ' + COUNTER_NO + ')';
   const hc = $('h-counter-card'); if(hc) hc.remove();
   // เช็กทุก 3 นาที: เลยเที่ยงคืน / ครูแนทกดสร้าง PIN ใหม่ / ปิดเคาน์เตอร์ → ออกจากระบบ
-  setInterval(async () => {
-    if(_savingTx) return;
-    const st = await counterStatus();
-    if(st && st.ok === false && !st.err){
-      alert('เคาน์เตอร์ถูกปิด หรือ PIN หมดอายุแล้ว · ระบบจะออกจากระบบ\nขอ PIN ใหม่จากครูแนทแล้วเข้าใหม่');
-      try{ await sb.auth.signOut(); }catch(e){}
-      location.reload();
-    }
-  }, 180000);
+  setInterval(async () => { if(!_savingTx) await counterKickIfClosed(); }, 120000);
 }
 function renderCounterDay(){
   const now = new Date();
@@ -1711,6 +1715,7 @@ async function loadCounterPins(){
   try{ const { data, error } = await sb.rpc('get_counter_pins'); if(!error) showPins(data); else $('pin-note').textContent = 'ยังไม่ได้ติดตั้งระบบเคาน์เตอร์ในฐานข้อมูล'; }catch(e){}
 }
 async function genCounterPins(force){
+  try{ const { data } = await sb.rpc('get_counter_pins'); showPins(data); }catch(e){}
   const has = $('pin-c1').textContent.indexOf('-') < 0;
   if(has && !force){ toast('PIN วันนี้สร้างแล้ว · ถ้า PIN หลุด กด "สร้างใหม่"'); return; }
   if(force && !confirm('สร้าง PIN ใหม่?\nPIN เดิมจะใช้ไม่ได้ทันที และเครื่องเคาน์เตอร์ที่เข้าอยู่จะถูกออกจากระบบ (ต้องเข้าใหม่ด้วย PIN ใหม่)')) return;
@@ -1808,7 +1813,8 @@ window.addEventListener('popstate', function(e){
 function navBack(){ history.back(); }
 function updBackBtn(){
   const b = document.getElementById('nav-back'); if(!b) return;
-  const show = IS_TOUCH && (_navPage !== 'home' || !!document.querySelector('.modal-back.active'));
+  const _root = (typeof IS_COUNTER !== 'undefined' && IS_COUNTER) ? 'counterday' : 'home';
+  const show = IS_TOUCH && (_navPage !== _root || !!document.querySelector('.modal-back.active'));
   b.style.display = show ? 'flex' : 'none';
 }
 (function initNavBack(){
@@ -2457,8 +2463,13 @@ function selStu(id){
 }
 
 let pendingSlipId = null;   // สลิปที่กำลังออกใบเสร็จ (จากกล่องสลิป)
+function setPM(m){
+  payMethod = m;
+  document.querySelectorAll('#page-record .pm-opt').forEach(x => x.classList.toggle('active', x.dataset.pm === m));
+}
 function resetRec(){
   pendingSlipId = null;
+  setPM('เงินสด');   // 25 ต.ค. 69: ทุกครอบครัวเริ่มที่ "เงินสด" เสมอ (เดิมค้างค่าจากครอบครัวก่อน)
   selStudent = null;
   owedSelected = {};
   $('rec-search').value = '';
@@ -3062,11 +3073,7 @@ function updateTotal(){
   $('total-amt').textContent = fmt(sum);
 }
 
-function pickPM(el){
-  document.querySelectorAll('.pm-opt').forEach(x=>x.classList.remove('active'));
-  el.classList.add('active');
-  payMethod = el.dataset.pm;
-}
+function pickPM(el){ setPM(el.dataset.pm); }
 function pickRS(el){
   document.querySelectorAll('.rs-opt').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
@@ -3106,6 +3113,12 @@ async function cloudSaveNewTx(tx){
   return false;
 }
 async function saveTx(){
+  const _badEx = Array.from(document.querySelectorAll('#extra-items .owed-row')).filter(r => {
+    const it = r.querySelector('[data-role=item]'); const name = it ? String(it.value||'').trim() : '';
+    const q = +((r.querySelector('[data-role=qty]')||{}).value) || 0, p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
+    return name && name !== '__custom__' && (q <= 0 || p <= 0);
+  });
+  if(_badEx.length){ toast('⚠ ของขาย/ชุด ยังไม่ได้ใส่ราคาหรือจำนวน · ดูราคาจากตาราง แล้วใส่ให้ครบก่อนบันทึก (หรือกด × ลบแถวนั้น)', 'error'); _badEx[0].scrollIntoView({block:'center'}); return; }
   if(Object.keys(owedSelected).length === 0){
     toast('กรุณาเลือกอย่างน้อย 1 รายการ', 'error'); return;
   }
@@ -3130,11 +3143,12 @@ async function saveTx(){
   toast('⏳ กำลังบันทึกขึ้นคลาวด์...');
   const ok = await cloudSaveNewTx(tx);
   _savingTx = false;
+  if(!ok && IS_COUNTER){ if(await counterKickIfClosed()) return; }
   if(!ok){
     toast(window._lastSaveAuthFail ? '⚠ เซสชันหมดอายุ · กรุณากด "ออกจากระบบ" แล้วล็อกอินใหม่ (ข้อมูลไม่หาย · ยังไม่ออกใบเสร็จ)' : '⚠ ยังบันทึกไม่สำเร็จ (เน็ต/คลาวด์) · ยังไม่ออกใบเสร็จ · กรุณากดบันทึกใหม่อีกครั้ง', 'error');
     return;
   }
-  if(IS_COUNTER) tx.createdBy = COUNTER_UID;
+  if(IS_COUNTER) tx.createdBy = COUNTER_UID;   // (บันทึกสำเร็จแล้ว)
   tx.fixLog = []; tx.fixRequest = '';
   TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
   if(pendingSlipId){   // ออกใบเสร็จจากกล่องสลิป → ตอนนี้ค่อยตั้งสลิปเป็น "บันทึกแล้ว"
@@ -3305,6 +3319,7 @@ function renderHomeBreakdown(monthTx){
 }
 function renderHome(){
   try{ renderFixRequests(); }catch(e){ console.error(e); }
+  if(!IS_COUNTER && $('pin-c1')){ clearTimeout(window._pinT); window._pinT = setTimeout(loadCounterPins, 300); }
   $('today-date').textContent = today();
   $('h-students').textContent = activeStudents().length;
   $('h-bus').textContent = activeStudents().filter(s=>s.useBus && s.useBus!=='ไม่ใช้').length;
@@ -5673,10 +5688,7 @@ function slipToRecord(id){
   goto('record');
   pendingSlipId = slip.id;
   setTimeout(()=>{
-    payMethod = 'โอน';
-    document.querySelectorAll('.pm-opt').forEach(x=>x.classList.remove('active'));
-    const pm = document.querySelector('.pm-opt[data-pm="โอน"]');
-    if(pm) pm.classList.add('active');
+    setPM('โอน');
     if(matches.length === 1){
       selStu(matches[0].id);
     } else {

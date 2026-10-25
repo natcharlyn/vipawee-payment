@@ -1487,11 +1487,29 @@ function updBackBtn(){
 // คอม/Android ใช้แบบเดิม (เปิดหน้าต่างพิมพ์) ไม่เปลี่ยน
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
 function openPrintWindow(){
-  if(!IS_IOS) return window.open('', '_blank');
-  let buf = '';
-  let done = false;
-  // สั่งพิมพ์ทันทีตอน close() (ยังอยู่ในจังหวะที่ผู้ใช้แตะปุ่ม) — Safari บล็อกการพิมพ์ที่สั่งช้ากว่าการแตะ
-  return { closed:false, document:{ write: function(x){ buf += String(x); }, close: function(){ if(!done){ done = true; printInPage(buf); } } }, focus: function(){}, close: function(){}, print: function(){ if(!done){ done = true; printInPage(buf); } } };
+  // 25 ต.ค. (รอบ 3): กลับไปใช้หน้าต่างพิมพ์แบบเดิมทุกเครื่อง (iPhone เคยพิมพ์ได้ + ครูย่อ 80% ให้อยู่แผ่นเดียว)
+  // เพิ่มแถบปุ่มบนหน้าใบเสร็จสำหรับมือถือ/ไอแพด: "🖨 พิมพ์" + "✕ ปิด · รับเงินคนต่อไป" (เดิมพิมพ์เสร็จติดอยู่หน้านั้น ต้องปิดแอปเข้าใหม่)
+  const w = window.open('', '_blank');
+  if(!w || !IS_TOUCH) return w;
+  return {
+    get closed(){ return w.closed; },
+    document: { write: function(x){ w.document.write(x); }, close: function(){ w.document.close(); addPrintBar(w); } },
+    focus: function(){ try{ w.focus(); }catch(e){} }, close: function(){ w.close(); }, print: function(){ w.print(); }
+  };
+}
+function addPrintBar(w){
+  try{
+    const d = w.document, appUrl = location.origin + location.pathname;
+    const st = d.createElement('style');
+    st.textContent = '@media print{#vp-bar{display:none!important}}@media screen{body{padding-top:150px!important}}';
+    (d.head || d.body).appendChild(st);
+    const bar = d.createElement('div'); bar.id = 'vp-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;gap:18px;justify-content:center;align-items:center;padding:20px;background:#1A3A8F;font-family:sans-serif';
+    const bs = 'font-size:38px;padding:18px 34px;border-radius:18px;border:none;font-weight:700;font-family:inherit;';
+    bar.innerHTML = '<button type="button" onclick="window.print()" style="' + bs + 'background:#fff;color:#1A3A8F">🖨 พิมพ์</button>' +
+      '<button type="button" onclick="window.close();setTimeout(function(){if(!window.closed)location.href=\'' + appUrl + '\';},400)" style="' + bs + 'background:#E8804B;color:#fff">✕ ปิด · รับเงินคนต่อไป</button>';
+    d.body.appendChild(bar);
+  }catch(e){ console.error('printbar', e); }
 }
 function printInPage(html){
   try{

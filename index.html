@@ -1114,7 +1114,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
       <div class="field"><label>รูปแบบจ่ายค่ารถ</label><select class="select" id="f-payBus">
         <option>-</option><option>รายเดือน</option><option>รายเทอม</option><option>รายปี</option>
       </select></div>
-      <div class="field"><label>เดือนเริ่มเรียน <span style="color:#9CA3AF;font-weight:400">(เนอร์ส/เตรียม เข้ากลางปี)</span></label><select class="select" id="f-startMonth">
+      <div class="field"><label>เดือนเริ่มเรียน <span style="color:#9CA3AF;font-weight:400">(เด็กเข้ากลางปี · ล็อกเดือนก่อนเข้า)</span></label><select class="select" id="f-startMonth">
         <option value="">ต้นปี (พ.ค.)</option>
         <option>พ.ค.</option><option>มิ.ย.</option><option>ก.ค.</option><option>ส.ค.</option><option>ก.ย.</option><option>พ.ย.</option><option>ธ.ค.</option><option>ม.ค.</option><option>ก.พ.</option><option>มี.ค.</option>
       </select></div>
@@ -2495,7 +2495,9 @@ function paidState(s){
       });
     }
   }));
-  return {tuition, bus, annual, terms};
+  const lockT1 = startMonthIdx(s) >= MONTHS.indexOf('พ.ย.');   // เข้าเรียนเทอม 2 → ค่ารายเทอม เทอม 1 ไม่ต้องจ่าย
+  if(lockT1) BASES.forEach(b => { terms[b] = terms[b] || new Set(); terms[b].add(1); });
+  return {tuition, bus, annual, terms, lockT1};
 }
 function unpaidFeeItems(s){
   const p = getPriceForClass(s.cls);
@@ -2682,13 +2684,13 @@ function renderOwed(){
   html += '<div class="owed"><div class="owed-cat">📚 ค่ารายเทอม / รายปี</div>';
   if(p && p.book) html += rowItem('book', 'ค่าหนังสือ', p.book, 'annual', _ps.annual.has('ค่าหนังสือ'), null);
   if(p && p.insurance) html += rowItem('insurance', 'ค่าประกันอุบัติเหตุ', p.insurance, 'annual', _ps.annual.has('ค่าประกันอุบัติเหตุ'), null);
-  if(p && p.pool) html += rowItem('pool', 'ค่าสระว่ายน้ำ', p.pool, 'term', false, _ps.terms['ค่าสระว่ายน้ำ']);
-  if(p && p.music) html += rowItem('music', 'ค่าดนตรี', p.music, 'term', false, _ps.terms['ค่าดนตรี']);
-  if(p && p.english) html += rowItem('english', 'ค่าภาษาอังกฤษ', p.english, 'term', false, _ps.terms['ค่าภาษาอังกฤษ']);
+  if(p && p.pool) html += rowItem('pool', 'ค่าสระว่ายน้ำ', p.pool, 'term', false, _ps.terms['ค่าสระว่ายน้ำ'], _ps.lockT1);
+  if(p && p.music) html += rowItem('music', 'ค่าดนตรี', p.music, 'term', false, _ps.terms['ค่าดนตรี'], _ps.lockT1);
+  if(p && p.english) html += rowItem('english', 'ค่าภาษาอังกฤษ', p.english, 'term', false, _ps.terms['ค่าภาษาอังกฤษ'], _ps.lockT1);
   (SCHOOL.customFees||[]).forEach(cf => {
     const amt = (p && p.cf && p.cf[cf.key]) ? p.cf[cf.key] : 0;
     if(!amt) return;
-    if(cf.type === 'term') html += rowItem(cf.key, cf.label, amt, 'term', false, _ps.terms[cf.label]);
+    if(cf.type === 'term') html += rowItem(cf.key, cf.label, amt, 'term', false, _ps.terms[cf.label], _ps.lockT1);
     else html += rowItem(cf.key, cf.label, amt, 'annual', _ps.annual.has(cf.label), null);
   });
   html += '</div>';
@@ -2832,7 +2834,7 @@ function setRefCredit(el){
   updateTotal();
 }
 
-function rowItem(id, label, amount, rateType, paidAnnual, paidTerms){
+function rowItem(id, label, amount, rateType, paidAnnual, paidTerms, lockT1){
   if(rateType === 'term'){
     return `<div class="owed-row" data-id="${id}">
       <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
@@ -2845,7 +2847,7 @@ function rowItem(id, label, amount, rateType, paidAnnual, paidTerms){
     <div id="terms-${id}" class="months-picker">
       <div class="months-picker-title">📅 เลือกเทอม (ปีการศึกษา ${AY}):</div>
       <div class="terms-grid">
-${[1,2].map(tn => { const pd = paidTerms && paidTerms.has(tn); return `<label class="tchip${pd?' mchip-paid':''}"${pd?' title=\"จ่ายแล้ว\"':''}><input type="checkbox" class="tchk-${id}" value="${tn}" ${pd?'disabled':''} onchange="updTerms('${id}', ${amount}, '${label}', this)">${pd?'✓ ':''}เทอม ${tn}</label>`; }).join('')}
+${[1,2].map(tn => { const lk = lockT1 && tn === 1; const pd = paidTerms && paidTerms.has(tn); return `<label class="tchip${pd?(lk?' mchip-before':' mchip-paid'):''}"${pd?(lk?' title=\"ก่อนเข้าเรียน\"':' title=\"จ่ายแล้ว\"'):''}><input type="checkbox" class="tchk-${id}" value="${tn}" ${pd?'disabled':''} onchange="updTerms('${id}', ${amount}, '${label}', this)">${pd?(lk?'🔒 ':'✓ '):''}เทอม ${tn}</label>`; }).join('')}
       </div>
     </div>`;
   }
@@ -5756,7 +5758,7 @@ $('inv-filter') && ($('inv-filter').oninput = renderInvoice);
 // Helper: index ของเดือนเริ่มเรียน (เฉพาะเนอร์สเซอรี่/เตรียมอนุบาลที่เข้ากลางปี) · ระดับอื่นคืน 0 เสมอ
 function startMonthIdx(s){
   if(!s) return 0;
-  if((s.cls === 'เนอร์เซอรี่' || s.cls === 'เตรียมอนุบาล') && s.startMonth){
+  if(s.startMonth){   // 25 ต.ค. 69: ทุกชั้น (เดิมเฉพาะเนอร์ส/เตรียม) · เด็กเข้ากลางปี ไม่ต้องจ่ายเดือนก่อนเข้าเรียน
     const si = MONTHS.indexOf(s.startMonth);
     if(si > 0) return si;
   }

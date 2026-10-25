@@ -2554,9 +2554,12 @@ function toggleMonthRow(id, el, baseAmt){
     picker.classList.add('show');
     el.closest('.owed-row').classList.add('checked');
     // auto-tick เดือนปัจจุบัน · ถ้าถูกล็อก (เด็กเข้ากลางปี) ให้ติ๊กเดือนแรกที่กดได้แทน เพื่อไม่ให้ช่องเด้งปิด
-    const monthIdx = MONTH_NUMS.indexOf(new Date().getMonth()+1);
-    let chk = monthIdx >= 0 ? picker.querySelector(`.mchk-${id}[value="${MONTHS[monthIdx]}"]`) : null;
-    if(!chk || chk.disabled){ chk = Array.from(picker.querySelectorAll('.mchk-'+id)).find(c => !c.disabled) || null; }
+    // 25 ต.ค. 69: ติ๊ก "เดือนที่ค้างเก่าสุด" ก่อนเสมอ (ไม่เกินเดือนที่ถึงกำหนด) · ไม่มีค้าง → เดือนถัดไปที่ยังไม่จ่าย
+    // (เดิมติ๊กเดือนปัจจุบันเลย ทำให้ข้ามเดือนที่ยังค้าง เช่น ม.ค. ติ๊ก ม.ค. ทั้งที่ ธ.ค. ยังไม่จ่าย)
+    const chips = Array.from(picker.querySelectorAll('.mchk-'+id));
+    const curIdx = MONTH_NUMS.indexOf(new Date().getMonth()+1);
+    const dueIdx = curIdx >= 0 ? curIdx : dueMonthIdx();
+    let chk = chips.find(c => !c.disabled && MONTHS.indexOf(c.value) <= dueIdx) || chips.find(c => !c.disabled) || null;
     if(chk && !chk.disabled){ chk.checked = true; chk.closest('.mchip').classList.add('active'); }
     const label = id === 'tuition' ? 'ค่าเทอม' : el.closest('.owed-row').querySelector('strong').textContent;
     updMonths(id, baseAmt, label, null);

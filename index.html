@@ -1491,11 +1491,32 @@ function openPrintWindow(){
   // เพิ่มแถบปุ่มบนหน้าใบเสร็จสำหรับมือถือ/ไอแพด: "🖨 พิมพ์" + "✕ ปิด · รับเงินคนต่อไป" (เดิมพิมพ์เสร็จติดอยู่หน้านั้น ต้องปิดแอปเข้าใหม่)
   const w = window.open('', '_blank');
   if(!w || !IS_TOUCH) return w;
+  // ไอแพด: เขียนลงหน้าต่างใหม่แล้วขึ้นหน้าขาว → สร้างหน้าใบเสร็จเป็นไฟล์ชั่วคราว (blob) แล้วพาหน้าต่างไปเปิด · กดพิมพ์จากแถบปุ่ม
+  if(IS_IPAD){
+    let buf = '', done = false;
+    const go = function(){
+      if(done) return; done = true;
+      try{
+        const html = /<\/body>/i.test(buf) ? buf.replace(/<\/body>/i, printBarHTML() + '</body>') : buf + printBarHTML();
+        w.location.href = URL.createObjectURL(new Blob([html], {type:'text/html;charset=utf-8'}));
+      }catch(e){ console.error('ipad print', e); }
+    };
+    return { get closed(){ return w.closed; }, document: { write: function(x){ buf += String(x); }, close: go }, focus: function(){}, close: function(){ w.close(); }, print: go };
+  }
   return {
     get closed(){ return w.closed; },
     document: { write: function(x){ w.document.write(x); }, close: function(){ w.document.close(); addPrintBar(w); } },
     focus: function(){ try{ w.focus(); }catch(e){} }, close: function(){ w.close(); }, print: function(){ w.print(); }
   };
+}
+const IS_IPAD = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+function printBarHTML(){
+  const appUrl = location.origin + location.pathname;
+  const bs = 'font-size:38px;padding:18px 34px;border-radius:18px;border:none;font-weight:700;font-family:inherit;';
+  return '<style>@media print{#vp-bar{display:none!important}}@media screen{body{padding-top:150px!important}}</style>' +
+    '<div id="vp-bar" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;gap:18px;justify-content:center;align-items:center;padding:20px;background:#1A3A8F;font-family:sans-serif">' +
+    '<button type="button" onclick="window.print()" style="' + bs + 'background:#fff;color:#1A3A8F">🖨 พิมพ์</button>' +
+    '<button type="button" onclick="window.close();setTimeout(function(){if(!window.closed)location.href=\'' + appUrl + '\';},400)" style="' + bs + 'background:#E8804B;color:#fff">✕ ปิด · รับเงินคนต่อไป</button></div>';
 }
 function addPrintBar(w){
   try{

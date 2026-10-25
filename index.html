@@ -1489,9 +1489,14 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfo
 function openPrintWindow(){
   // 25 ต.ค. (รอบ 3): กลับไปใช้หน้าต่างพิมพ์แบบเดิมทุกเครื่อง (iPhone เคยพิมพ์ได้ + ครูย่อ 80% ให้อยู่แผ่นเดียว)
   // เพิ่มแถบปุ่มบนหน้าใบเสร็จสำหรับมือถือ/ไอแพด: "🖨 พิมพ์" + "✕ ปิด · รับเงินคนต่อไป" (เดิมพิมพ์เสร็จติดอยู่หน้านั้น ต้องปิดแอปเข้าใหม่)
+  if(IS_IPAD){
+    let buf = '', done = false;
+    const go = function(){ if(done) return; done = true; printInPage(buf, true); };
+    return { closed:false, document: { write: function(x){ buf += String(x); }, close: go }, focus: function(){}, close: function(){}, print: go };
+  }
   const w = window.open('', '_blank');
   if(!w || !IS_TOUCH) return w;
-  // ไอแพด: เขียนลงหน้าต่างใหม่แล้วขึ้นหน้าขาว → สร้างหน้าใบเสร็จเป็นไฟล์ชั่วคราว (blob) แล้วพาหน้าต่างไปเปิด · กดพิมพ์จากแถบปุ่ม
+  // (เดิม) ไอแพด: เขียนลงหน้าต่างใหม่แล้วขึ้นหน้าขาว → สร้างหน้าใบเสร็จเป็นไฟล์ชั่วคราว (blob) แล้วพาหน้าต่างไปเปิด · กดพิมพ์จากแถบปุ่ม
   if(IS_IPAD){
     let buf = '', done = false;
     const go = function(){
@@ -1509,6 +1514,7 @@ function openPrintWindow(){
     focus: function(){ try{ w.focus(); }catch(e){} }, close: function(){ w.close(); }, print: function(){ w.print(); }
   };
 }
+function closePrintOverlay(){ const h = document.getElementById('print-root'), b = document.getElementById('vp-bar2'); if(h) h.classList.remove('show'); if(b) b.classList.remove('show'); }
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
 function printBarHTML(){
   const appUrl = location.origin + location.pathname;
@@ -1532,7 +1538,7 @@ function addPrintBar(w){
     d.body.appendChild(bar);
   }catch(e){ console.error('printbar', e); }
 }
-function printInPage(html){
+function printInPage(html, overlay){
   try{
     const doc = new DOMParser().parseFromString(html, 'text/html');
     let css = Array.from(doc.querySelectorAll('style')).map(function(x){ return x.textContent; }).join('\n');
@@ -1544,7 +1550,24 @@ function printInPage(html){
     host.shadowRoot.innerHTML = links + '<style>:host{all:initial;display:block}' + css + '</style>' + doc.body.innerHTML;
     let ps = document.getElementById('print-root-style');
     if(!ps){ ps = document.createElement('style'); ps.id = 'print-root-style'; document.head.appendChild(ps); }
-    ps.textContent = '#print-root{display:none}@media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}}' + pageRules;
+    ps.textContent = '#print-root{display:none}#print-root.show{display:block;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;background:#fff;overflow:auto;-webkit-overflow-scrolling:touch;padding:140px 12px 30px}'
+      + '#vp-bar2{display:none}#vp-bar2.show{display:flex}'
+      + '@media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important;position:static!important;padding:0!important;overflow:visible!important}}' + pageRules;
+    if(overlay){
+      // ไอแพด: เปิดใบเสร็จเต็มจอ + แถบปุ่ม · กด 🖨 เองจึงพิมพ์ (Safari ไม่บล็อก)
+      host.classList.add('show');
+      let bar = document.getElementById('vp-bar2');
+      if(!bar){
+        bar = document.createElement('div'); bar.id = 'vp-bar2';
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9001;gap:18px;justify-content:center;align-items:center;padding:22px;background:#1A3A8F';
+        const bs = 'font-size:30px;padding:16px 32px;border-radius:16px;border:none;font-weight:700;font-family:inherit;';
+        bar.innerHTML = '<button type="button" onclick="window.print()" style="' + bs + 'background:#fff;color:#1A3A8F">🖨 พิมพ์</button>' +
+          '<button type="button" onclick="closePrintOverlay()" style="' + bs + 'background:#E8804B;color:#fff">✕ ปิด · รับเงินคนต่อไป</button>';
+        document.body.appendChild(bar);
+      }
+      bar.classList.add('show'); host.scrollTop = 0;
+      return;
+    }
     window.print();   // เรียกทันที ไม่หน่วงเวลา (กัน Safari ขึ้น "ปิดกั้นไม่ให้พิมพ์")
   }catch(err){ console.error('printInPage', err); toast('พิมพ์ไม่สำเร็จ · ลองกดพิมพ์อีกครั้ง', 'error'); }
 }

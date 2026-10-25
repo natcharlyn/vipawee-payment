@@ -215,7 +215,6 @@ details summary{cursor:pointer;outline:none}
 /* CHECKBOX big */
 .chk-big{width:18px;height:18px;cursor:pointer;accent-color:#E8804B}
 /* ===== เคาน์เตอร์ (ครูที่มาช่วย) · 25 ต.ค. 69 ===== */
-.menu a[data-page="counterday"]{display:none}
 body.counter-mode .menu a[data-page]:not([data-page="record"]):not([data-page="counterday"]):not([data-page="slip"]){display:none!important}
 body.counter-mode .adm-only{display:none!important}
 body.counter-mode .menu a[data-page="counterday"]{display:flex!important}
@@ -278,7 +277,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
   <div class="menu">
     <a class="active" data-page="home"><span class="ico">🏠</span> หน้าหลัก</a>
     <a data-page="record"><span class="ico">💰</span> บันทึกรับเงิน</a>
-    <a data-page="counterday"><span class="ico">🧾</span> ใบเสร็จวันนี้</a>
+    <a data-page="counterday"><span class="ico">🧾</span> ใบเสร็จวันนี้ · สรุป</a>
     <a data-page="slip"><span class="ico">📥</span> กล่องสลิป <span class="badge hidden" id="badge-slip">0</span></a>
     <a data-page="students"><span class="ico">👶</span> นักเรียน <span class="badge" id="badge-students">0</span></a>
     <a data-page="special"><span class="ico">⭐</span> คอร์สพิเศษ</a>
@@ -318,6 +317,10 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
     <div class="stat"><div class="stat-num" id="h-tx-month">0</div><div class="stat-lbl">บันทึกเดือนนี้</div></div>
     <div class="stat"><div class="stat-num" id="h-amount-month">฿0</div><div class="stat-lbl">รับเงินเดือนนี้</div></div>
   </div>
+  <div class="card hidden" id="h-fix-card" style="border-left:4px solid #DC2626;background:#FEF2F2">
+    <div class="card-title" style="color:#B91C1C">🚩 ใบเสร็จที่ครูขอแก้ไข <span id="h-fix-count" style="margin-left:8px"></span></div>
+    <div id="h-fix-list"></div>
+  </div>
   <div class="card" id="h-counter-card" style="border-left:4px solid #E8804B">
     <div class="card-title">🔑 เคาน์เตอร์ครูที่มาช่วย · PIN วันนี้ <span style="margin-left:auto;font-size:12px;color:#6B7280;font-weight:400">PIN หมดอายุเที่ยงคืน</span></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
@@ -351,14 +354,14 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
       <div class="page-title">🧾 ใบเสร็จวันนี้</div>
       <div class="page-sub" id="cd-date"></div>
     </div>
-    <div class="tools"><button class="btn" onclick="newStu()">➕ เพิ่มเด็กใหม่</button> <button class="btn btn-primary" onclick="goto('record')">💰 บันทึกรับเงิน</button></div>
+    <div class="tools"><button class="btn" onclick="printDaySummary()">🖨 พิมพ์สรุปรายรับ</button> <button class="btn" onclick="copyDaySummary()">📋 คัดลอกสรุปส่งไลน์</button> <button class="btn" onclick="newStu()">➕ เพิ่มเด็กใหม่</button> <button class="btn btn-primary" onclick="goto('record')">💰 บันทึกรับเงิน</button></div>
   </div>
   <div class="card" style="border-left:4px solid #10B981">
     <div class="card-title">👥 ยอดรับวันนี้ · แยกตามคนรับเงิน</div>
     <div id="cd-sum"></div>
   </div>
   <div class="card">
-    <div class="card-title">🧾 รายการวันนี้ · กด 🖨 เพื่อพิมพ์ใบเสร็จซ้ำ</div>
+    <div class="card-title">🧾 รายการวันนี้ · 🖨 พิมพ์ซ้ำ · ✏ แก้วิธีจ่าย/ชื่อผู้จ่าย (ใบของตัวเอง) · 🚩 ขอให้ครูแนทแก้/ยกเลิก</div>
     <input class="input" id="cd-filter" placeholder="🔍 ค้นชื่อเด็ก / เลขใบเสร็จ" oninput="renderCounterDay()" style="max-width:280px;margin-bottom:10px">
     <table class="tbl">
       <thead><tr><th>เวลา</th><th>เลขที่</th><th>นักเรียน</th><th style="text-align:right">เงิน</th><th>วิธี</th><th>ผู้รับเงิน</th><th></th></tr></thead>
@@ -1136,6 +1139,23 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
   </div>
 </div>
 
+<div class="modal-back" id="cfix-modal">
+  <div class="modal" style="max-width:440px">
+    <h3>✏ แก้ใบเสร็จ <span id="cfix-no" style="font-size:14px;color:#6B7280"></span></h3>
+    <div style="font-size:13px;color:#6B7280;margin-bottom:12px">แก้ได้เฉพาะ <b>วิธีจ่าย</b> กับ <b>ชื่อผู้จ่าย</b> · ระบบจดไว้ว่าใครแก้ · ผิดคน/ผิดยอด ให้กด 🚩 ขอแก้ไข</div>
+    <div class="field"><label>วิธีจ่าย</label>
+      <div class="pm-grid">
+        <div class="pm-opt" data-cfm="เงินสด" onclick="cfixPick(this)">💵 เงินสด</div>
+        <div class="pm-opt" data-cfm="โอน" onclick="cfixPick(this)">📱 โอน</div>
+      </div></div>
+    <div class="field"><label>ชื่อผู้จ่าย (ในใบเสร็จ)</label><input class="input" id="cfix-payer"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="$('cfix-modal').classList.remove('active')">ยกเลิก</button>
+      <button class="btn btn-primary" id="cfix-save" onclick="saveCounterFix()">💾 บันทึกการแก้</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1172,7 +1192,7 @@ function _rowsOf(table){
   return [];
 }
 function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date, payer_name:t.payerName||null, items:t.items, total:t.total, method:t.method, style:t.style||'F', edited_at:t.editedAt||null, receipt_no:t.receiptNo||null, cashier:t.cashier||null, voided_at:t.voidedAt||null, void_reason:t.voidReason||null, student_name:t.studentName||null, student_nick:t.studentNick||null, student_class:t.studentClass||null}; }
-function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', cashier:r.cashier||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||''}; }
+function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', cashier:r.cashier||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||'', createdBy:r.created_by||null, fixLog:Array.isArray(r.fix_log)?r.fix_log:[], fixRequest:r.fix_request||'', fixRequestAt:r.fix_request_at||null, fixRequestBy:r.fix_request_by||''}; }
 function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
 function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
 function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null, start_month:s.startMonth||null, external:!!s.external, ext_school:s.extSchool||null, phone:s.phone||null, ext_bus_price:s.extBusPrice||null, special_enroll:s.specialEnroll||[], carried:s.carried||[], course_ov:s.courseOv||null}; }
@@ -1502,11 +1522,14 @@ async function doCounterLogin(){
   try{ localStorage.setItem('vipawee_counter_name', name); }catch(e){}
   rememberCashierName(name);
   $('cl-pin').value = '';
-  setCounterIdentity(no, name);
+  let _uid = null; try{ const { data:_s } = await sb.auth.getSession(); _uid = _s && _s.session && _s.session.user ? _s.session.user.id : null; }catch(e){}
+  setCounterIdentity(no, name, _uid);
   $('cl-btn').disabled = false;
   await afterLogin();
 }
-function setCounterIdentity(no, name){
+let COUNTER_UID = null;
+function setCounterIdentity(no, name, uid){
+  COUNTER_UID = uid || null;
   IS_COUNTER = true; COUNTER_NO = Number(no)||0; COUNTER_NAME = name;
   cashierName = 'ครู' + name;   // ไม่บันทึกทับชื่อผู้รับเงินของครูแนทในเครื่อง (ไม่เรียก setCashier)
 }
@@ -1521,7 +1544,7 @@ async function counterResume(session){
     $('login-err').textContent = !st.ok ? 'PIN เมื่อวานหมดอายุแล้ว · ขอ PIN ของวันนี้จากครูแนท' : 'กรุณาเข้าระบบใหม่และพิมพ์ชื่อผู้รับเงิน';
     return false;
   }
-  setCounterIdentity(m ? m[1] : 0, name);
+  setCounterIdentity(m ? m[1] : 0, name, session.user.id);
   return true;
 }
 function applyCounterMode(){
@@ -1555,8 +1578,128 @@ function renderCounterDay(){
     : '<div style="color:#9CA3AF;padding:10px">วันนี้ยังไม่มีใบเสร็จ</div>';
   const q = ($('cd-filter') && $('cd-filter').value || '').trim().toLowerCase();
   const rows = list.filter(t => !q || [t.studentNick,t.studentName,t.receiptNo,t.payerName].join(' ').toLowerCase().indexOf(q) >= 0);
-  $('cd-list').innerHTML = rows.length ? rows.map(t => '<tr><td>'+new Date(t.date).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</td><td>'+esc(t.receiptNo||'')+'</td><td><strong>'+esc(t.studentNick||'')+'</strong> · '+esc(t.studentClass||'')+'</td><td style="text-align:right;font-weight:700">฿'+fmt(t.total)+'</td><td>'+esc(t.method||'')+'</td><td>'+esc(t.cashier||'')+'</td><td><button class="btn btn-sm" onclick="reprintTx('+t.id+')" title="พิมพ์ซ้ำ">🖨</button></td></tr>').join('')
+  $('cd-list').innerHTML = rows.length ? rows.map(t => '<tr><td>'+new Date(t.date).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</td><td>'+esc(t.receiptNo||'')+'</td><td><strong>'+esc(t.studentNick||'')+'</strong> · '+esc(t.studentClass||'')+'</td><td style="text-align:right;font-weight:700">฿'+fmt(t.total)+'</td><td>'+esc(t.method||'')+'</td><td>'+esc(t.cashier||'')+(t.fixLog&&t.fixLog.length?' <span style="font-size:11px;color:#92400E" title="'+esc(t.fixLog.map(l=>l.field+': '+(l.from||'-')+' → '+l.to+' ('+l.by+')').join(' | '))+'">✏ แก้แล้ว</span>':'')+(t.fixRequest?'<div style="font-size:11px;color:#B91C1C">🚩 ขอแก้: '+esc(t.fixRequest)+'</div>':'')+'</td><td style="white-space:nowrap">'+cdActions(t)+'</td></tr>').join('')
     : '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:20px">ไม่มีรายการ</td></tr>';
+}
+function canCounterFix(t){
+  if(!IS_COUNTER || t.voidedAt) return false;
+  const d = new Date(t.date), n = new Date();
+  return t.createdBy && t.createdBy === COUNTER_UID && t.cashier === cashierName && d.toDateString() === n.toDateString();
+}
+function cdActions(t){
+  let h = '<button class="btn btn-sm" onclick="reprintTx('+t.id+')" title="พิมพ์ซ้ำ">🖨</button>';
+  if(IS_COUNTER){
+    if(canCounterFix(t)) h += ' <button class="btn btn-sm" onclick="openCounterFix('+t.id+')" title="แก้วิธีจ่าย/ชื่อผู้จ่าย">✏</button>';
+    if(!t.fixRequest) h += ' <button class="btn btn-sm" onclick="requestFix('+t.id+')" title="ขอให้ครูแนทแก้/ยกเลิก" style="color:#B91C1C">🚩</button>';
+  } else {
+    h += ' <button class="btn btn-sm" onclick="openEditTx('+t.id+')" title="แก้ไข">✏</button>';
+    if(t.fixRequest) h += ' <button class="btn btn-sm" onclick="clearFix('+t.id+')" title="จัดการแล้ว">✓</button>';
+  }
+  return h;
+}
+let _cfixId = null, _cfixMethod = '';
+function cfixPick(el){ _cfixMethod = el.dataset.cfm; document.querySelectorAll('#cfix-modal .pm-opt').forEach(x => x.classList.toggle('active', x === el)); }
+function openCounterFix(id){
+  const t = TX.find(x => x.id === id); if(!t) return;
+  if(!canCounterFix(t)){ toast('แก้ได้เฉพาะใบที่ตัวเองออกวันนี้ · ใบอื่นกด 🚩 ขอแก้ไข', 'error'); return; }
+  _cfixId = id;
+  $('cfix-no').textContent = (t.receiptNo||'') + ' · ' + (t.studentNick||'') + ' · ฿' + fmt(t.total);
+  $('cfix-payer').value = t.payerName || '';
+  const el = document.querySelector('#cfix-modal .pm-opt[data-cfm="'+t.method+'"]'); if(el) cfixPick(el);
+  $('cfix-modal').classList.add('active');
+}
+async function saveCounterFix(){
+  const t = TX.find(x => x.id === _cfixId); if(!t) return;
+  const payer = $('cfix-payer').value.trim();
+  if(!payer){ toast('ใส่ชื่อผู้จ่าย', 'error'); return; }
+  if(_cfixMethod === t.method && payer === (t.payerName||'')){ $('cfix-modal').classList.remove('active'); return; }
+  $('cfix-save').disabled = true;
+  const { data, error } = await sb.rpc('counter_fix_tx', {p_id: t.id, p_cashier: cashierName, p_method: _cfixMethod, p_payer: payer});
+  $('cfix-save').disabled = false;
+  if(error){ toast('⚠ แก้ไม่สำเร็จ: ' + error.message, 'error'); return; }
+  t.method = _cfixMethod; t.payerName = payer; t.editedAt = new Date().toISOString();
+  t.fixLog = (t.fixLog||[]).concat((data && data.log) || []);
+  if(_snap['transactions']) _snap['transactions'].set(String(t.id), JSON.stringify(txToRow(t)));
+  $('cfix-modal').classList.remove('active');
+  renderCounterDay();
+  toast('✏ แก้แล้ว · ระบบจดไว้ว่าใครแก้');
+  if(confirm('แก้เรียบร้อย · พิมพ์ใบเสร็จใหม่ให้ผู้ปกครองไหม?')) reprintTx(t.id);
+}
+async function requestFix(id){
+  const t = TX.find(x => x.id === id); if(!t) return;
+  const why = prompt('🚩 ขอให้ครูแนทแก้/ยกเลิกใบ ' + (t.receiptNo||'') + ' (' + (t.studentNick||'') + ' ฿' + fmt(t.total) + ')\nพิมพ์ว่าผิดอะไร ควรเป็นอะไร:');
+  if(!why || !why.trim()) return;
+  const { error } = await sb.rpc('counter_request_fix', {p_id: t.id, p_cashier: cashierName, p_reason: why.trim()});
+  if(error){ toast('⚠ ส่งคำขอไม่สำเร็จ: ' + error.message, 'error'); return; }
+  t.fixRequest = why.trim(); t.fixRequestBy = cashierName; t.fixRequestAt = new Date().toISOString();
+  renderCounterDay();
+  toast('🚩 ส่งคำขอให้ครูแนทแล้ว · ใบนี้ยังใช้ได้จนกว่าครูแนทจะแก้');
+}
+async function clearFix(id){
+  if(!confirm('จัดการใบนี้เรียบร้อยแล้ว? (ลบธงแดงออก)')) return;
+  const { error } = await sb.rpc('admin_clear_fix', {p_id: id});
+  if(error){ toast('⚠ ' + error.message, 'error'); return; }
+  const t = TX.find(x => x.id === id); if(t){ t.fixRequest = ''; t.fixRequestBy = ''; t.fixRequestAt = null; }
+  renderFixRequests(); if(document.querySelector('#page-counterday.active')) renderCounterDay();
+  toast('✓ เรียบร้อย');
+}
+function renderFixRequests(){
+  const card = $('h-fix-card'); if(!card) return;
+  const list = TX.filter(t => t.fixRequest && !t.voidedAt).sort((a,b) => new Date(b.fixRequestAt||0) - new Date(a.fixRequestAt||0));
+  card.classList.toggle('hidden', list.length === 0 || IS_COUNTER);
+  $('h-fix-count').textContent = list.length ? '(' + list.length + ' ใบ)' : '';
+  $('h-fix-list').innerHTML = list.map(t => '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px dashed #FCA5A5"><b>'+esc(t.receiptNo||'')+'</b> · '+esc(t.studentNick||'')+' ('+esc(t.studentClass||'')+') · ฿'+fmt(t.total)+' · '+esc(t.method||'')+'<span style="flex:1;min-width:200px;color:#B91C1C">🚩 '+esc(t.fixRequest)+' <span style="color:#6B7280;font-size:12px">— '+esc(t.fixRequestBy||'')+(t.fixRequestAt?' · '+new Date(t.fixRequestAt).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'')+'</span></span><button class="btn btn-sm" onclick="reprintTx('+t.id+')">👁 ดู</button><button class="btn btn-sm" onclick="openEditTx('+t.id+')">✏ แก้/ยกเลิก</button><button class="btn btn-sm btn-primary" onclick="clearFix('+t.id+')">✓ จัดการแล้ว</button></div>').join('');
+}
+// ---- สรุปรายรับวันนี้ (พิมพ์ A4 / คัดลอกส่งไลน์) ----
+function daySummaryData(){
+  const now = new Date();
+  const isToday = t => new Date(t.date).toDateString() === now.toDateString();
+  const all = TX.filter(isToday).sort((a,b) => new Date(a.date) - new Date(b.date));
+  const ok = all.filter(t => !t.voidedAt), voided = all.filter(t => t.voidedAt);
+  const by = {};
+  ok.forEach(t => { const k = t.cashier || '-'; const o = by[k] || (by[k] = {n:0, cash:0, tr:0}); o.n++; if(t.method === 'เงินสด') o.cash += t.total; else o.tr += t.total; });
+  const cash = ok.filter(t => t.method === 'เงินสด').reduce((s,t) => s + t.total, 0);
+  const tr = ok.reduce((s,t) => s + t.total, 0) - cash;
+  return {now, ok, voided, by, cash, tr, flagged: ok.filter(t => t.fixRequest), fixed: ok.filter(t => t.fixLog && t.fixLog.length)};
+}
+function copyDaySummary(){
+  const d = daySummaryData();
+  const dt = d.now.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
+  let txt = '📊 สรุปรายรับ ' + dt + (IS_COUNTER ? ' (ส่งจาก ' + cashierName + ' · เคาน์เตอร์ ' + COUNTER_NO + ')' : '') + '\n';
+  Object.keys(d.by).sort().forEach(k => { const o = d.by[k]; txt += '• ' + k + ': ' + o.n + ' ใบ · สด ฿' + fmt(o.cash) + ' · โอน ฿' + fmt(o.tr) + ' · รวม ฿' + fmt(o.cash + o.tr) + '\n'; });
+  txt += '━━━━━━━━\nรวม ' + d.ok.length + ' ใบ ฿' + fmt(d.cash + d.tr) + '\n💵 เงินสด ฿' + fmt(d.cash) + ' · 📱 โอน ฿' + fmt(d.tr) + '\n';
+  if(d.voided.length) txt += '🚫 ยกเลิกวันนี้ ' + d.voided.length + ' ใบ\n';
+  if(d.fixed.length) txt += '✏ แก้วิธีจ่าย/ชื่อ ' + d.fixed.length + ' ใบ: ' + d.fixed.map(t => t.receiptNo).join(', ') + '\n';
+  if(d.flagged.length) txt += '🚩 ขอให้ครูแนทแก้ ' + d.flagged.length + ' ใบ:\n' + d.flagged.map(t => '   - ' + t.receiptNo + ' ' + t.studentNick + ' ฿' + fmt(t.total) + ' : ' + t.fixRequest).join('\n') + '\n';
+  const done = () => toast('📋 คัดลอกแล้ว · ไปวางในไลน์ส่งครูแนทได้เลย');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(() => prompt('กดค้างที่ข้อความ → คัดลอก แล้วไปวางในไลน์', txt));
+  } else prompt('กดค้างที่ข้อความ → คัดลอก แล้วไปวางในไลน์', txt);
+}
+function printDaySummary(){
+  const d = daySummaryData();
+  const dt = d.now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const keys = Object.keys(d.by).sort();
+  const rowsBy = keys.map(k => { const o = d.by[k]; return '<tr><td>'+esc(k)+'</td><td class="r">'+o.n+'</td><td class="r">'+fmt(o.cash)+'</td><td class="r">'+fmt(o.tr)+'</td><td class="r b">'+fmt(o.cash+o.tr)+'</td></tr>'; }).join('');
+  const rowsTx = d.ok.map((t,i) => '<tr><td>'+(i+1)+'</td><td>'+new Date(t.date).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</td><td>'+esc(t.receiptNo||'')+'</td><td>'+esc(t.studentNick||'')+' · '+esc(t.studentClass||'')+'</td><td>'+esc(t.method||'')+'</td><td class="r">'+fmt(t.total)+'</td><td>'+esc(t.cashier||'')+'</td><td>'+(t.fixRequest?'🚩 '+esc(t.fixRequest):'')+(t.fixLog&&t.fixLog.length?' ✏ '+esc(t.fixLog.map(l=>l.field+' '+(l.from||'-')+'→'+l.to).join(', ')):'')+'</td></tr>').join('');
+  const rowsVoid = d.voided.map(t => '<tr><td>'+esc(t.receiptNo||'')+'</td><td>'+esc(t.studentNick||'')+'</td><td class="r">'+fmt(t.total)+'</td><td>'+esc(t.voidReason||'')+'</td></tr>').join('');
+  const html = '<html><head><meta charset="utf-8"><title>สรุปรายรับ '+dt+'</title><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>'
+    + '@page{size:A4;margin:12mm}body{font-family:Sarabun,sans-serif;font-size:13px;color:#111}h1{font-size:19px;margin:0}h2{font-size:15px;margin:14px 0 6px}'
+    + 'table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eee}.r{text-align:right}.b{font-weight:700}'
+    + '.box{display:flex;gap:10px;margin:10px 0}.box div{flex:1;border:2px solid #111;border-radius:6px;padding:8px;text-align:center}.box b{font-size:20px;display:block}'
+    + '.sig{display:flex;justify-content:space-around;margin-top:34px;text-align:center}.sig div{width:30%}.sig .l{border-bottom:1px dotted #000;height:28px;margin-bottom:4px}</style></head><body>'
+    + '<h1>'+esc(SCHOOL.name||'')+' · สรุปรายรับประจำวัน</h1><div>'+dt+' · พิมพ์เมื่อ '+new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+(IS_COUNTER?' · โดย '+esc(cashierName)+' (เคาน์เตอร์ '+COUNTER_NO+')':'')+'</div>'
+    + '<div class="box"><div>💵 เงินสด (นับในลิ้นชัก)<b>฿'+fmt(d.cash)+'</b></div><div>📱 เงินโอน (เช็กแอปธนาคาร)<b>฿'+fmt(d.tr)+'</b></div><div>รวมทั้งหมด '+d.ok.length+' ใบ<b>฿'+fmt(d.cash+d.tr)+'</b></div></div>'
+    + '<h2>แยกตามผู้รับเงิน</h2><table><tr><th>ผู้รับเงิน</th><th class="r">ใบ</th><th class="r">เงินสด</th><th class="r">โอน</th><th class="r">รวม</th></tr>'+(rowsBy||'<tr><td colspan="5">ไม่มีรายการ</td></tr>')+'</table>'
+    + (d.flagged.length ? '<h2>🚩 ใบที่ขอให้ครูแนทแก้ ('+d.flagged.length+')</h2><table><tr><th>เลขที่</th><th>นักเรียน</th><th class="r">เงิน</th><th>เรื่องที่ขอแก้</th><th>ผู้ขอ</th></tr>'+d.flagged.map(t=>'<tr><td>'+esc(t.receiptNo)+'</td><td>'+esc(t.studentNick)+'</td><td class="r">'+fmt(t.total)+'</td><td>'+esc(t.fixRequest)+'</td><td>'+esc(t.fixRequestBy)+'</td></tr>').join('')+'</table>' : '')
+    + '<h2>รายการใบเสร็จวันนี้</h2><table><tr><th>#</th><th>เวลา</th><th>เลขที่</th><th>นักเรียน</th><th>วิธี</th><th class="r">เงิน</th><th>ผู้รับ</th><th>หมายเหตุ</th></tr>'+(rowsTx||'<tr><td colspan="8">ไม่มีรายการ</td></tr>')+'</table>'
+    + (d.voided.length ? '<h2>🚫 ใบที่ยกเลิกวันนี้ (ไม่นับในยอด)</h2><table><tr><th>เลขที่</th><th>นักเรียน</th><th class="r">เงิน</th><th>เหตุผล</th></tr>'+rowsVoid+'</table>' : '')
+    + '<div class="sig"><div><div class="l"></div>ผู้รับเงิน</div><div><div class="l"></div>ผู้นับเงินสด</div><div><div class="l"></div>ผู้ตรวจ (ครูแนท)</div></div>'
+    + '</body></html>';
+  const w = openPrintWindow();
+  if(!w){ toast('เบราว์เซอร์บล็อคหน้าต่างพิมพ์ · อนุญาต popup ก่อน', 'error'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(() => w.print(), 600);
 }
 // ---- ฝั่งครูแนท: สร้าง/ดู/ปิด PIN ----
 function showPins(d){
@@ -2991,6 +3134,8 @@ async function saveTx(){
     toast(window._lastSaveAuthFail ? '⚠ เซสชันหมดอายุ · กรุณากด "ออกจากระบบ" แล้วล็อกอินใหม่ (ข้อมูลไม่หาย · ยังไม่ออกใบเสร็จ)' : '⚠ ยังบันทึกไม่สำเร็จ (เน็ต/คลาวด์) · ยังไม่ออกใบเสร็จ · กรุณากดบันทึกใหม่อีกครั้ง', 'error');
     return;
   }
+  if(IS_COUNTER) tx.createdBy = COUNTER_UID;
+  tx.fixLog = []; tx.fixRequest = '';
   TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
   if(pendingSlipId){   // ออกใบเสร็จจากกล่องสลิป → ตอนนี้ค่อยตั้งสลิปเป็น "บันทึกแล้ว"
     const _sl = SLIPS.find(x => x.id === pendingSlipId);
@@ -3159,6 +3304,7 @@ function renderHomeBreakdown(monthTx){
       '<span style="font-size:18px;font-weight:800;color:#1F4E78">฿' + fmt(Math.round(total)) + '</span></div>';
 }
 function renderHome(){
+  try{ renderFixRequests(); }catch(e){ console.error(e); }
   $('today-date').textContent = today();
   $('h-students').textContent = activeStudents().length;
   $('h-bus').textContent = activeStudents().filter(s=>s.useBus && s.useBus!=='ไม่ใช้').length;

@@ -1193,8 +1193,8 @@ function _rowsOf(table){
 }
 function txToRow(t){ return {id:t.id, student_id:t.studentId||null, date:t.date, payer_name:t.payerName||null, items:t.items, total:t.total, method:t.method, style:t.style||'F', edited_at:t.editedAt||null, receipt_no:t.receiptNo||null, cashier:t.cashier||null, voided_at:t.voidedAt||null, void_reason:t.voidReason||null, student_name:t.studentName||null, student_nick:t.studentNick||null, student_class:t.studentClass||null}; }
 function rowToTx(r){ return {id:Number(r.id), studentId:r.student_id?Number(r.student_id):null, date:r.date, payerName:r.payer_name||'', items:r.items||[], total:Number(r.total), method:r.method, style:r.style||'F', editedAt:r.edited_at||null, receiptNo:r.receipt_no||'', cashier:r.cashier||'', voidedAt:r.voided_at||null, voidReason:r.void_reason||'', studentName:r.student_name||'', studentNick:r.student_nick||'', studentClass:r.student_class||'', createdBy:r.created_by||null, fixLog:Array.isArray(r.fix_log)?r.fix_log:[], fixRequest:r.fix_request||'', fixRequestAt:r.fix_request_at||null, fixRequestBy:r.fix_request_by||''}; }
-function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, matched:!!s.matched}; }
-function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', matched:!!r.matched}; }
+function slipToRow(s){ return {id:s.id, date:s.date, amount:s.amount, from_text:s.from||null, student_nick:s.studentNick||null, student_id:s.studentId||null, matched:!!s.matched}; }
+function rowToSlip(r){ return {id:Number(r.id), date:r.date, amount:Number(r.amount), from:r.from_text||'', studentNick:r.student_nick||'', studentId:r.student_id?Number(r.student_id):null, matched:!!r.matched}; }
 function stuToRow(s){ return {id:s.id, name:s.name, nick:s.nick, cls:s.cls, village:s.village||null, use_bus:s.useBus||'ไม่ใช้', bus_code:s.busCode||null, pay_tuition:s.payTuition||'รายเดือน', pay_bus:s.payBus||'-', status:s.status||'ปกติ', discount:s.discount||'ไม่มี', discount_reason:s.discountReason||null, note:s.note||null, deleted:!!s.deleted, deleted_at:s.deletedAt||null, referrer_name:s.referrerName||null, referrer_nick:s.referrerNick||null, referrer_child_id:s.referrerChildId||null, start_month:s.startMonth||null, external:!!s.external, ext_school:s.extSchool||null, phone:s.phone||null, ext_bus_price:s.extBusPrice||null, special_enroll:s.specialEnroll||[], carried:s.carried||[], course_ov:s.courseOv||null}; }
 function rowToStu(r){ return {id:Number(r.id), name:r.name, nick:r.nick, cls:r.cls, village:r.village||'', useBus:r.use_bus||'ไม่ใช้', busCode:r.bus_code||'', payTuition:r.pay_tuition||'รายเดือน', payBus:r.pay_bus||'-', status:r.status||'ปกติ', discount:r.discount||'ไม่มี', discountReason:r.discount_reason||'', note:r.note||'', deleted:!!r.deleted, deletedAt:r.deleted_at||null, referrerName:r.referrer_name||'', referrerNick:r.referrer_nick||'', referrerChildId:r.referrer_child_id?Number(r.referrer_child_id):null, startMonth:r.start_month||'', external:!!r.external, extSchool:r.ext_school||'', phone:r.phone||'', extBusPrice:r.ext_bus_price?Number(r.ext_bus_price):null, specialEnroll:r.special_enroll||[], carried:r.carried||[], courseOv:r.course_ov||{}}; }
 function poToRow(p){ return {id:p.id, bus_code:p.busCode, bus_name:p.busName||null, driver:p.driver||null, months:p.months||[], year:p.year||null, amount:p.amount, entries:p.entries, date:p.date, receiver:p.receiver, method:p.method, note:p.note||null, payer:p.payer||null}; }
@@ -3189,7 +3189,7 @@ async function saveTx(){
   TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
   if(pendingSlipId){   // ออกใบเสร็จจากกล่องสลิป → ตอนนี้ค่อยตั้งสลิปเป็น "บันทึกแล้ว"
     const _sl = SLIPS.find(x => x.id === pendingSlipId);
-    if(_sl && !_sl.matched && _sl.studentNick === tx.studentNick){ _sl.matched = true; saveSLIPS(); updBadges(); }
+    if(_sl && !_sl.matched && _sl.studentNick === tx.studentNick){ _sl.matched = true; _sl.studentId = tx.studentId; saveSLIPS(); updBadges(); }
     pendingSlipId = null;
   }
   showReceipt(tx);
@@ -5592,7 +5592,7 @@ function renderSlips(){
       <td>${s.date}</td>
       <td style="font-weight:700">฿${fmt(s.amount)}</td>
       <td>${s.from || '-'}</td>
-      <td>${s.studentNick ? '<span class="lnk" onclick="openDetailByNick(\''+s.studentNick+'\')">'+s.studentNick+'</span>' : slipSuggestHTML(s)}</td>
+      <td>${s.studentNick ? slipStuHTML(s) : slipSuggestHTML(s)}</td>
       <td>${s.matched ? '<span class="b b-paid">บันทึกแล้ว</span>' : '<span class="b b-pending">รอบันทึก</span>'}</td>
       <td>
         ${!s.matched ? `<button class="btn btn-sm btn-primary" onclick="slipToRecord(${s.id})">→ บันทึกรับเงิน</button>` : ''}
@@ -5651,12 +5651,21 @@ function slipSuggestHTML(slip){
   if(!list.length) return '<span style="color:#9CA3AF">ยังไม่ระบุ · <span class="lnk" onclick="quickSearchSlip('+slip.id+')">🔍 ค้นชื่อ</span></span>';
   if(list.length>6) return '<span style="color:#B45309">ยอดตรง '+list.length+' คน · <span class="lnk" onclick="quickSearchSlip('+slip.id+')">🔍 เลือก/ค้นชื่อ</span></span>';
   return '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center"><span style="font-size:11px;color:#9CA3AF">ยอดตรง:</span>'
-    + list.map(o=>'<button class="btn btn-sm" style="background:#ECFDF5;border:1px solid #6EE7B7;color:#065F46;padding:2px 8px" onclick="assignSlipStu('+slip.id+',\''+String(o.s.nick).replace(/'/g,"\\'")+'\')" title="'+o.why+' · ค้าง ฿'+fmt(o.owed)+'">'+_esc(o.s.nick)+' ('+_esc(o.s.cls)+')</button>').join('')
+    + list.map(o=>'<button class="btn btn-sm" style="background:#ECFDF5;border:1px solid #6EE7B7;color:#065F46;padding:2px 8px" onclick="assignSlipStu('+slip.id+',\''+String(o.s.nick).replace(/'/g,"\\'")+'\','+o.s.id+')" title="'+o.why+' · ค้าง ฿'+fmt(o.owed)+'">'+_esc(o.s.nick)+' ('+_esc(o.s.cls)+')</button>').join('')
     + ' <span class="lnk" style="font-size:12px" onclick="quickSearchSlip('+slip.id+')">🔍 ค้นเอง</span></div>';
 }
-function assignSlipStu(id, nick){
+// 26 ต.ค. 69: ชื่อเล่นซ้ำหลายคน (เช่น ไออุ่น 3 คน) → สลิปเก็บรหัสเด็ก (student_id) ด้วย กันเปิด/ออกใบผิดคน
+function slipStuHTML(sl){
+  const st = sl.studentId ? STUDENTS.find(x => x.id === sl.studentId) : null;
+  if(st) return '<span class="lnk" onclick="openDetail('+st.id+')">'+_esc(st.nick)+'</span> <span style="color:#6B7280;font-size:12px">('+_esc(st.cls)+')</span>';
+  const same = activeStudents().filter(x => x.nick === sl.studentNick);
+  if(same.length > 1) return '<b>'+_esc(sl.studentNick)+'</b> <span style="color:#B45309;font-size:12px">⚠ ชื่อซ้ำ '+same.length+' คน ('+same.map(x=>_esc(x.cls)).join(' / ')+') · ตอนออกใบเลือกให้ถูกชั้น</span>';
+  if(same.length === 1) return '<span class="lnk" onclick="openDetail('+same[0].id+')">'+_esc(same[0].nick)+'</span> <span style="color:#6B7280;font-size:12px">('+_esc(same[0].cls)+')</span>';
+  return _esc(sl.studentNick);
+}
+function assignSlipStu(id, nick, sid){
   const slip=SLIPS.find(s=>s.id===id); if(!slip)return;
-  slip.studentNick=nick; saveSLIPS(); renderSlips();
+  slip.studentNick=nick; slip.studentId = sid || null; saveSLIPS(); renderSlips();
   toast('จับคู่ '+nick+' แล้ว · กด → บันทึกรับเงิน ได้เลย ✓');
 }
 function quickSearchSlip(id){
@@ -5665,11 +5674,13 @@ function quickSearchSlip(id){
   const m=activeStudents().filter(s=>(s.nick||'').includes(t)||(s.name||'').includes(t));
   if(!m.length){ toast('ไม่พบชื่อนี้','error'); return; }
   if(m.length>1){ toast('เจอหลายคน: '+m.slice(0,6).map(s=>s.nick+'('+s.cls+')').join(', ')+' · พิมพ์เจาะจงขึ้น','error'); return; }
-  assignSlipStu(id, m[0].nick);
+  assignSlipStu(id, m[0].nick, m[0].id);
 }
 function openDetailByNick(nick){
   if(IS_COUNTER) return;
-  const s = STUDENTS.find(x => x.nick === nick);
+  const m = activeStudents().filter(x => x.nick === nick);
+  if(m.length > 1){ toast('ชื่อเล่น "'+nick+'" มี '+m.length+' คน ('+m.map(x=>x.cls).join(' / ')+') · เปิดจากหน้านักเรียนแทน', 'error'); return; }
+  const s = m[0] || STUDENTS.find(x => x.nick === nick);
   if(s) openDetail(s.id);
 }
 function newSlip(){
@@ -5678,7 +5689,7 @@ function newSlip(){
   $('sl-amount').value = '';
   $('sl-from').value = '';
   $('sl-student').value = '';
-  $('sl-student').dataset.nick = '';
+  $('sl-student').dataset.nick = ''; $('sl-student').dataset.sid = '';
   $('slip-modal').classList.add('active');
 }
 function closeSlip(){ $('slip-modal').classList.remove('active'); }
@@ -5690,12 +5701,13 @@ function slipSearch(input){
     (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)
   ).slice(0, 8);
   if(matches.length === 0){ box.classList.add('hidden'); return; }
-  box.innerHTML = matches.map(s => `<div class="search-result" onclick="pickSlipStu('${s.nick.replace(/'/g,"\\'")}', '${s.name.replace(/'/g,"\\'")}')">
+  box.innerHTML = matches.map(s => `<div class="search-result" onclick="pickSlipStu('${s.nick.replace(/'/g,"\\'")}', '${s.name.replace(/'/g,"\\'")}', ${s.id})">
     <strong>${s.nick}</strong> · <span style="color:#6B7280">${s.name} · ${s.cls}</span>
   </div>`).join('');
   box.classList.remove('hidden');
 }
-function pickSlipStu(nick, name){
+function pickSlipStu(nick, name, sid){
+  $('sl-student').dataset.sid = sid || '';
   $('sl-student').value = nick + ' (' + name + ')';
   $('sl-student').dataset.nick = nick;
   $('sl-results').classList.add('hidden');
@@ -5707,6 +5719,7 @@ function saveSlip(){
     amount: +$('sl-amount').value,
     from: $('sl-from').value,
     studentNick: $('sl-student').dataset.nick || '',
+    studentId: +($('sl-student').dataset.sid || 0) || null,
     matched: false
   };
   if(!slip.date || !slip.amount){ toast('กรอกข้อมูลไม่ครบ', 'error'); return; }
@@ -5732,7 +5745,10 @@ function slipToRecord(id){
   pendingSlipId = slip.id;
   setTimeout(()=>{
     setPM('โอน');
-    if(matches.length === 1){
+    const _byId = slip.studentId ? STUDENTS.find(x => x.id === slip.studentId) : null;
+    if(_byId){
+      selStu(_byId.id);
+    } else if(matches.length === 1){
       selStu(matches[0].id);
     } else {
       const inp = $('rec-search');

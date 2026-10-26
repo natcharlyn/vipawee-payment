@@ -1402,7 +1402,7 @@ async function _rtRefetch(){
     return;
   }
   if(IS_COUNTER && await counterKickIfClosed()) return;
-  try{ await cloudLoadAll(); rerenderActive(); } catch(e){ console.error(e); }
+  try{ await cloudLoadAll(); rerenderActive(); updBadges(); } catch(e){ console.error(e); }
 }
 function startRealtime(){
   sb.channel('vipawee-sync')
@@ -1568,6 +1568,7 @@ function applyCounterMode(){
   setInterval(async () => { if(!_savingTx) await counterKickIfClosed(); }, 120000);
 }
 function renderCounterDay(){
+  updBadges();
   const now = new Date();
   $('cd-date').textContent = now.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const isToday = t => { const d = new Date(t.date); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate(); };
@@ -3188,7 +3189,7 @@ async function saveTx(){
   TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
   if(pendingSlipId){   // ออกใบเสร็จจากกล่องสลิป → ตอนนี้ค่อยตั้งสลิปเป็น "บันทึกแล้ว"
     const _sl = SLIPS.find(x => x.id === pendingSlipId);
-    if(_sl && !_sl.matched && _sl.studentNick === tx.studentNick){ _sl.matched = true; saveSLIPS(); }
+    if(_sl && !_sl.matched && _sl.studentNick === tx.studentNick){ _sl.matched = true; saveSLIPS(); updBadges(); }
     pendingSlipId = null;
   }
   showReceipt(tx);
@@ -3352,6 +3353,15 @@ function renderHomeBreakdown(monthTx){
       '<span style="font-size:15px;font-weight:800">รวมรับเดือนนี้</span>' +
       '<span style="font-size:18px;font-weight:800;color:#1F4E78">฿' + fmt(Math.round(total)) + '</span></div>';
 }
+// ตัวเลขบนเมนู (กล่องสลิปรอบันทึก / จำนวนนักเรียน) · 26 ต.ค. 69: แยกออกมาให้ฝั่งเคาน์เตอร์เห็นด้วย (เดิมอัปเดตเฉพาะหน้าหลัก)
+function updBadges(){
+  try{
+    const pendingSlips = SLIPS.filter(s => !s.matched).length;
+    const bs = $('badge-slip');
+    if(bs){ if(pendingSlips > 0){ bs.textContent = pendingSlips; bs.classList.remove('hidden'); } else bs.classList.add('hidden'); }
+    const bst = $('badge-students'); if(bst) bst.textContent = activeStudents().length;
+  }catch(e){}
+}
 function renderHome(){
   try{ renderFixRequests(); }catch(e){ console.error(e); }
   if(!IS_COUNTER && $('pin-c1')){ clearTimeout(window._pinT); window._pinT = setTimeout(loadCounterPins, 300); }
@@ -3368,10 +3378,7 @@ function renderHome(){
   renderHomeBreakdown(monthTx);
   $('badge-students').textContent = activeStudents().length;
   
-  const pendingSlips = SLIPS.filter(s => !s.matched).length;
-  const bs = $('badge-slip');
-  if(pendingSlips > 0){ bs.textContent = pendingSlips; bs.classList.remove('hidden'); }
-  else bs.classList.add('hidden');
+  updBadges();
   
   const recent = TX.slice(0, 8);
   if(recent.length === 0){
@@ -5575,6 +5582,7 @@ function delTx(id){
 
 // === SLIPS ===
 function renderSlips(){
+  updBadges();
   if(SLIPS.length === 0){
     $('slip-list').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีสลิป · กด "เพิ่มสลิปใหม่"</td></tr>';
     return;

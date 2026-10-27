@@ -406,6 +406,16 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
         <div class="pm-opt active" data-pm="เงินสด" onclick="pickPM(this)">💵 เงินสด</div>
         <div class="pm-opt" data-pm="โอน" onclick="pickPM(this)">📱 โอน</div>
       </div>
+      <!-- 27 ต.ค. 69: ช่วยคิดเงินทอน (เฉพาะเงินสด · บนหน้าจอเท่านั้น ไม่บันทึกลงระบบ) -->
+      <div id="cash-box" style="margin-top:14px;padding:14px;border:1.5px dashed #E8804B;border-radius:10px;background:#FFFBF7">
+        <div style="font-size:14px;font-weight:700;color:#92400E;margin-bottom:6px">💵 รับเงินมา <span style="font-weight:400;color:#9CA3AF;font-size:12px">(ไม่บังคับ · ช่วยคิดเงินทอน)</span></div>
+        <input class="input" id="cash-rcv" type="number" inputmode="numeric" min="0" step="1" placeholder="พิมพ์จำนวนเงินที่ผู้ปกครองให้มา" oninput="updCash()" style="font-size:18px">
+        <div id="cash-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"></div>
+        <div id="cash-res" style="border-radius:8px;padding:12px;text-align:center;background:#F3F4F6">
+          <div style="font-size:13px;color:#6B7280">เงินทอน</div>
+          <div id="cash-chg" style="font-size:32px;font-weight:800">–</div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">👤 ผู้รับเงิน (ออกใบเสร็จ)</div>
@@ -2467,9 +2477,11 @@ let pendingSlipId = null;   // สลิปที่กำลังออกใ�
 function setPM(m){
   payMethod = m;
   document.querySelectorAll('#page-record .pm-opt').forEach(x => x.classList.toggle('active', x.dataset.pm === m));
+  try{ updCash(); }catch(e){}
 }
 function resetRec(){
   pendingSlipId = null;
+  if($('cash-rcv')) $('cash-rcv').value = '';
   setPM('เงินสด');   // 25 ต.ค. 69: ทุกครอบครัวเริ่มที่ "เงินสด" เสมอ (เดิมค้างค่าจากครอบครัวก่อน)
   selStudent = null;
   owedSelected = {};
@@ -3106,6 +3118,29 @@ function updateTotal(){
   let sum = 0;
   Object.values(owedSelected).forEach(x => sum += x.amount);
   $('total-amt').textContent = fmt(sum);
+  try{ updCash(); }catch(e){}
+}
+// ---- ช่วยคิดเงินทอน (เงินสด) · แสดงบนหน้าจออย่างเดียว ไม่บันทึก ----
+function _payTotal(){ return Math.round(Object.values(owedSelected).reduce((s,x) => s + (+x.amount||0), 0)); }
+function cashQuick(v){ $('cash-rcv').value = v; updCash(); }
+function updCash(){
+  const box = $('cash-box'); if(!box) return;
+  box.style.display = payMethod === 'เงินสด' ? '' : 'none';
+  const total = _payTotal();
+  const opts = [];
+  if(total > 0){
+    opts.push([total, 'พอดี']);
+    [100, 500, 1000].forEach(st => { const v = Math.ceil(total / st) * st; if(v > total) opts.push([v, fmt(v)]); });
+    [1000, 5000, 10000, 20000].forEach(v => { if(v > total) opts.push([v, fmt(v)]); });
+  }
+  const seen = new Set();
+  $('cash-quick').innerHTML = opts.filter(o => { if(seen.has(o[0])) return false; seen.add(o[0]); return true; }).slice(0, 6)
+    .map(o => '<button type="button" class="btn btn-sm" onclick="cashQuick(' + o[0] + ')">' + o[1] + '</button>').join('');
+  const v = Math.round(+$('cash-rcv').value || 0), res = $('cash-res'), chg = $('cash-chg');
+  if(!v || total <= 0){ chg.textContent = '–'; chg.style.color = '#6B7280'; res.style.background = '#F3F4F6'; return; }
+  const d = v - total;
+  if(d < 0){ chg.textContent = 'ขาดอีก ฿' + fmt(-d); chg.style.color = '#B91C1C'; res.style.background = '#FEE2E2'; }
+  else { chg.textContent = d === 0 ? 'พอดี ✓' : '฿' + fmt(d); chg.style.color = '#047857'; res.style.background = '#D1FAE5'; }
 }
 
 function pickPM(el){ setPM(el.dataset.pm); }
@@ -3153,6 +3188,8 @@ async function saveTx(){
     const q = +((r.querySelector('[data-role=qty]')||{}).value) || 0, p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
     return name && name !== '__custom__' && (q <= 0 || p <= 0);
   });
+  const _rcv = payMethod === 'เงินสด' && $('cash-rcv') ? Math.round(+$('cash-rcv').value || 0) : 0;
+  if(_rcv > 0 && _rcv < _payTotal()){ toast('⚠ รับเงินมา ฿' + fmt(_rcv) + ' ไม่พอ · ขาดอีก ฿' + fmt(_payTotal() - _rcv) + ' (ถ้าพิมพ์ผิด ลบช่อง "รับเงินมา" ได้)', 'error'); return; }
   if($('book-chk') && $('book-chk').checked && !owedSelected.book){ toast('⚠ ติ๊กค่าหนังสือแล้วแต่ยังไม่ใส่ราคา', 'error'); return; }
   if(_badEx.length){ toast('⚠ ของขาย/ชุด ยังไม่ได้ใส่ราคาหรือจำนวน · ดูราคาจากตาราง แล้วใส่ให้ครบก่อนบันทึก (หรือกด × ลบแถวนั้น)', 'error'); _badEx[0].scrollIntoView({block:'center'}); return; }
   if(Object.keys(owedSelected).length === 0){
@@ -3193,6 +3230,7 @@ async function saveTx(){
     pendingSlipId = null;
   }
   showReceipt(tx);
+  if(_rcv > tx.total && tx.method === 'เงินสด') toast('บันทึกเรียบร้อย ✓ · 💵 ทอน ฿' + fmt(_rcv - tx.total));
 }
 
 // === RECEIPT (F or C style) ===

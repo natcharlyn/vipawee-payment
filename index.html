@@ -3042,13 +3042,15 @@ function addExtra(){
       <option value="__custom__">+ พิมพ์เอง</option>
     </select>
     <input class="input" placeholder="จำนวน" type="number" style="width:80px" oninput="updExtra('${id}')" onchange="updExtra('${id}')" data-role="qty" value="1">
-    <input class="input" placeholder="ราคา/ชิ้น" type="number" style="width:100px" oninput="updExtra('${id}')" onchange="updExtra('${id}')" data-role="price">
+    <input class="input" placeholder="ราคา 1 ชิ้น" type="number" style="width:100px" oninput="updExtra('${id}')" onchange="updExtra('${id}')" data-role="price">
     <span style="font-weight:700;min-width:80px;text-align:right" data-role="sub">฿0</span>
     <button class="btn btn-sm btn-danger" onclick="rmExtra(this, '${id}')">×</button>
   `;
   row.id = 'row-' + id;
   box.appendChild(row);
 }
+// 27 ต.ค. 69: ราคาต่อชิ้นสูงกว่าราคาในคลัง → น่าจะใส่ราคารวมหลายชิ้นในช่อง "ราคา 1 ชิ้น" (ระบบคูณซ้ำ)
+function stockMaxPrice(item){ const st = STOCK.find(x => x.item === item); if(!st) return null; const n = String(st.price||'').match(/\d+/g); return n ? Math.max(...n.map(Number)) : null; }
 function rmExtra(btn, id){ btn.parentNode.remove(); delete owedSelected[id]; updateTotal(); }
 function updExtra(id){
   const row = $('row-' + id);
@@ -3073,7 +3075,7 @@ function updExtra(id){
   }
   
   const sub = qty * price;
-  row.querySelector('[data-role=sub]').textContent = '฿' + fmt(sub);
+  row.querySelector('[data-role=sub]').textContent = (qty > 1 && price > 0) ? (qty + '×' + fmt(price) + ' = ฿' + fmt(sub)) : ('฿' + fmt(sub));
   if(item && qty > 0 && price > 0){
     owedSelected[id] = {amount: sub, label: item + ' × ' + qty + ' @ ฿' + price, months: 0};
   } else {
@@ -3204,6 +3206,12 @@ async function saveTx(){
     const name = String(it.value||'').trim(); const p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
     return (!name || name === '__custom__') && p > 0;
   });
+  const _over = Array.from(document.querySelectorAll('#extra-items .owed-row')).map(r => {
+    const it = r.querySelector('[data-role=item]'); if(!it) return null;
+    const name = String(it.value||'').trim(), q = +((r.querySelector('[data-role=qty]')||{}).value) || 0, p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
+    const mx = stockMaxPrice(name); return (mx && p > mx) ? (name + ' ราคา 1 ชิ้น ฿' + fmt(p) + ' (ในคลัง สูงสุด ฿' + fmt(mx) + ') × ' + q + ' = ฿' + fmt(p*q)) : null;
+  }).filter(Boolean);
+  if(_over.length && !confirm('⚠ ตรวจราคาของขายก่อนบันทึก\n\n' + _over.join('\n') + '\n\nช่อง "ราคา" คือราคา 1 ชิ้น ระบบคูณจำนวนให้เอง\nถ้าใส่ราคารวมไปแล้ว กด "ยกเลิก" แล้วแก้ราคา\nถ้าราคานี้ถูกจริง (เช่น ไซส์ใหญ่) กด "ตกลง"')) return;
   if(_noName.length){ toast('⚠ ของขาย/ชุด ใส่ราคาแล้วแต่ยังไม่ได้เลือกหรือพิมพ์ชื่อของ · เลือกให้ครบก่อนบันทึก (หรือกด × ลบแถว)', 'error'); _noName[0].scrollIntoView({block:'center'}); return; }
   const _badEx = Array.from(document.querySelectorAll('#extra-items .owed-row')).filter(r => {
     const it = r.querySelector('[data-role=item]'); const name = it ? String(it.value||'').trim() : '';

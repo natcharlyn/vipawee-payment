@@ -2647,7 +2647,8 @@ function renderOwed(){
   const monthName = MONTHS[monthIdx] || 'พ.ค.';
   const _si = startMonthIdx(s); // เดือนก่อนเข้าเรียน (เนอร์ส/เตรียม) ล็อกกดไม่ได้
 
-  let html = courseOwedHtml(s);   // 🎨 ค้างค่าเรียนพิเศษ (ถ้ามี) โชว์บนสุด กันลืมเก็บ
+  let html = courseOwedHtml(s);
+  if(!p) html += '<div class="owed-row" style="background:#FEE2E2;border:1.5px solid #F87171;color:#991B1B;font-weight:700">⚠ ชั้น "'+esc(s.cls||'-')+'" ไม่มีราคาในระบบ · ค่าเทอม/ค่าหนังสือจะไม่ขึ้น · ติดต่อครูแนทให้แก้ชั้นของเด็ก (รูปแบบ เช่น อ.2/2)</div>';   // 🎨 ค้างค่าเรียนพิเศษ (ถ้ามี) โชว์บนสุด กันลืมเก็บ
   html += '<div class="owed"><div class="owed-cat">💰 ค่าเทอม / ค่ารถ (รายเดือน)</div>';
   // ค่าเทอม
   // 27 ต.ค. 69: จ่ายครบทุกเดือนแล้ว → โชว์ "✓ จ่ายครบแล้ว" แทนช่องติ๊ก (เดิมติ๊กได้แต่ไม่มีอะไรขึ้น ครูงงว่าระบบเสีย)
@@ -3728,7 +3729,7 @@ function renderSpecial(){
   if(csel){
     const cur = csel.value;
     const extra = [...new Set(all.map(s=>s.cls))].filter(c=>c && !CLASS_ORDER.includes(c));
-    csel.innerHTML = '<option value="">ทุกชั้น</option>' + CLASS_ORDER.concat(extra).map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+    csel.innerHTML = '<option value="">ทุกชั้น</option>' + CLASS_ORDER.concat(extra).sort((a,b)=>classRank(a)-classRank(b)).map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
   }
   let list = q ? all.filter(s => (s.nick||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)) : all.slice();
   const cf = csel ? csel.value : '';
@@ -3759,7 +3760,7 @@ function renderSpecial(){
     $('ext-tbody').innerHTML = '<tr><td colspan="13" style="text-align:center;color:#9CA3AF;padding:30px">ยังไม่มีใครในคอร์สรอบนี้ · กด "📋 ลงทะเบียนเด็กใน" หรือ "➕ เพิ่มเด็กนอก"</td></tr>';
     return;
   }
-  list.sort((a,b)=> ((a.external?1:0)-(b.external?1:0)) || (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  list.sort((a,b)=> ((a.external?1:0)-(b.external?1:0)) || (classRank(a.cls)-classRank(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   $('ext-tbody').innerHTML = list.map((s,ROWI) => {
     const fee = courseFeeEff(s,curRound), bus = courseBusEff(s,curRound), disc = courseDiscEff(s,curRound), paid = coursePaid(s,curRound), owed = courseOwed(s,curRound);
     const note = courseNote(s,curRound);
@@ -3793,7 +3794,7 @@ function unenroll(id){
 function openEnrollModal(){
   $('enroll-round-label').textContent = roundLabel(curRound);
   const csel = $('enroll-class');
-  if(csel.options.length <= 1){ csel.innerHTML = '<option value="">ทุกห้อง</option>' + CLASS_ORDER.map(c=>`<option>${c}</option>`).join(''); }
+  { const _cv = csel.value; csel.innerHTML = '<option value="">ทุกห้อง</option>' + promoClasses().map(c=>`<option>${c}</option>`).join(''); if(_cv) csel.value = _cv; }
   $('enroll-search').value = '';
   renderEnrollList();
   $('enroll-modal').classList.add('active');
@@ -3805,7 +3806,7 @@ function renderEnrollList(){
   let list = activeStudents();
   if(cls) list = list.filter(s=>s.cls===cls);
   if(q) list = list.filter(s=>(s.nick||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q));
-  list.sort((a,b)=> CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls));
+  list.sort((a,b)=> classRank(a.cls)-classRank(b.cls));
   $('enroll-list').innerHTML = list.map(s=>{
     const on = (s.specialEnroll||[]).includes(curRound);
     return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #F1F5F9;cursor:pointer">
@@ -3923,7 +3924,7 @@ function busPaymentsOn(dateStr){
     const amt=(t.items||[]).filter(it=>it.label&&it.label.indexOf('ค่าคอร์ส-ค่ารถ')>=0&&it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0);
     if(amt>0){ const s2=STUDENTS.find(x=>x.id===t.studentId); if(s2&&!s2.deleted) out.push({s:s2, amt:amt, rc:t.receiptNo||('#'+t.id), method:t.method||''}); }
   });
-  out.sort((a,b)=>(CLASS_ORDER.indexOf(a.s.cls)-CLASS_ORDER.indexOf(b.s.cls))||(a.s.nick||'').localeCompare(b.s.nick||'','th'));
+  out.sort((a,b)=>(classRank(a.s.cls)-classRank(b.s.cls))||(a.s.nick||'').localeCompare(b.s.nick||'','th'));
   return out;
 }
 function knownBusLines(){
@@ -4035,7 +4036,7 @@ function copyCourseOwedMsg(){
   if(tf==='in') list = list.filter(s => !s.external);
   if(tf==='out') list = list.filter(s => s.external);
   if(!list.length){ toast('ไม่มีคนค้างชำระ' + (tf==='in'?' (เด็กใน)':tf==='out'?' (เด็กนอก)':'') + (cf ? (' ห้อง ' + cf) : '') + ' 🎉'); return; }
-  list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  list.sort((a,b)=> (classRank(a.cls)-classRank(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   let msg = '📢 แจ้งยอดค่าเรียนพิเศษ (รอบ ' + lbl + ')' + (cf ? (' · ห้อง ' + cf) : '') + '\n';
   msg += 'เรียนผู้ปกครองนักเรียนที่ลงคอร์สเรียนพิเศษ ขออนุญาตแจ้งยอดคงค้างดังนี้ค่ะ\n\n';
   let curCls = '', n = 0;
@@ -4060,7 +4061,7 @@ function printCourseInvoicesOwed(){
   if(cf) list = list.filter(s=>s.cls===cf);
   if(tf==='in') list = list.filter(s=>!s.external);
   if(tf==='out') list = list.filter(s=>s.external);
-  list.sort((a,b)=> (CLASS_ORDER.indexOf(a.cls)-CLASS_ORDER.indexOf(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
+  list.sort((a,b)=> (classRank(a.cls)-classRank(b.cls)) || (a.nick||'').localeCompare(b.nick||'','th'));
   if(!list.length){ toast('ไม่มีคนค้างชำระ' + (tfLbl?(' ('+tfLbl+')'):'') + (cf?(' ห้อง '+cf):'ในรอบนี้') + ' 🎉'); return; }
   const blocks = list.map((s,i)=>{
     const fee=courseFeeEff(s,curRound), bus=courseBusEff(s,curRound), disc=courseDiscEff(s,curRound), paid=coursePaid(s,curRound), owed=courseOwed(s,curRound), note=courseNote(s,curRound);
@@ -4245,9 +4246,12 @@ function normalizeClass(cls){
 function promoClasses(){
   const used=new Set(STUDENTS.filter(s=>!s.deleted&&s.cls).map(s=>s.cls));
   const all=new Set([...CLASS_ORDER,...used,...PROMO_ROOMS]);
-  const ordered=CLASS_ORDER.filter(c=>all.has(c));
-  const extra=[...all].filter(c=>!CLASS_ORDER.includes(c)).sort();
-  return [...ordered,...extra];
+  const list=[...all].filter(c => {
+    if(used.has(c) || PROMO_ROOMS.includes(c)) return true;
+    // ห้องฐานว่าง (เช่น อ.2) แต่มีห้องย่อยแล้ว (อ.2/1, อ.2/2) → ไม่ต้องโชว์ กันใส่เด็กผิดห้อง
+    return ![...all].some(x => x !== c && x.replace(/\/\d+$/,'') === c);
+  });
+  return list.sort((a,b) => classRank(a) - classRank(b) || a.localeCompare(b,'th'));
 }
 function populateClassDropdown(){
   const sel=$('f-cls'); if(!sel) return; const cur=sel.value;
@@ -4327,6 +4331,7 @@ function promoRenderRooms(){
 function promoAddRoom(){
   const v=$('promo-newRoom').value.trim();
   if(!v){ toast('พิมพ์ชื่อห้องก่อน','error'); return; }
+  if(!getPriceForClass(v)){ toast('⚠ ชื่อห้อง "'+v+'" หาราคาไม่เจอ · ใช้รูปแบบ ชั้น/เลขห้อง เช่น อ.2/2 หรือ ป.4/2','error'); return; }
   if(promoClasses().includes(v)){ toast('มีห้องนี้แล้ว'); return; }
   PROMO_ROOMS.push(v); $('promo-newRoom').value='';
   promoRenderRooms(); promoFillSelects();
@@ -4335,6 +4340,7 @@ function promoAddRoom(){
 function promoDelRoom(c){ PROMO_ROOMS=PROMO_ROOMS.filter(x=>x!==c); promoRenderRooms(); promoFillSelects(); }
 function promoAddRoomQuick(){
   const v=prompt('ชื่อห้องใหม่ เช่น อ.2/2'); if(!v) return; const tv=v.trim(); if(!tv) return;
+  if(!getPriceForClass(tv)){ toast('⚠ ชื่อห้อง "'+tv+'" หาราคาไม่เจอ · ใช้รูปแบบ ชั้น/เลขห้อง เช่น อ.2/2 หรือ ป.4/2','error'); return; }
   if(!promoClasses().includes(tv)) PROMO_ROOMS.push(tv);
   promoFillSelects(); $('promo-toCls').value=tv;
   toast('เพิ่มห้อง '+tv);
@@ -4435,11 +4441,14 @@ function renderStudents(){
   const active = activeStudents();
   // เติมรายการห้องใน dropdown (ครั้งเดียว)
   const csel = $('stu-class-filter');
-  if(csel && csel.options.length <= 1){
-    CLASS_ORDER.forEach(c => {
+  if(csel){
+    const _cur = csel.value;
+    csel.innerHTML = '<option value="">ทุกห้อง</option>';
+    promoClasses().forEach(c => {
       const cnt = active.filter(s => s.cls === c).length;
       if(cnt > 0){ const o = document.createElement('option'); o.value = c; o.textContent = c + ' (' + cnt + ' คน)'; csel.appendChild(o); }
     });
+    if(_cur && [...csel.options].some(o => o.value === _cur)) csel.value = _cur;
   }
   const clsFilter = csel ? csel.value : '';
   const tc = $('trash-btn-count');
@@ -5294,6 +5303,16 @@ function inPeriod(dateStr, period){
 }
 
 const CLASS_ORDER = ['เนอร์เซอรี่','เตรียมอนุบาล','อ.1','อ.2','อ.3/1','อ.3/2','ป.1/1','ป.1/2','ป.2/1','ป.2/2','ป.3/1','ป.3/2','ป.4','ป.5','ป.6'];
+// 27 ต.ค. 69: แยก/ยุบห้อง (เช่น อ.2 → อ.2/1 + อ.2/2) · เรียงห้องใหม่ต่อจากชั้นฐานของมัน (เดิมห้องที่ไม่อยู่ใน CLASS_ORDER ขึ้นบนสุด/หายจากตัวกรอง)
+function classRank(c){
+  const i = CLASS_ORDER.indexOf(c); if(i >= 0) return i;
+  const base = (c||'').replace(/\/\d+$/,'');
+  let j = CLASS_ORDER.indexOf(base);
+  if(j < 0) j = CLASS_ORDER.findIndex(x => x.replace(/\/\d+$/,'') === base);
+  if(j < 0) return 99;
+  const mm = (c||'').match(/\/(\d+)$/);
+  return j + (mm ? (+mm[1]) / 100 : 0);
+}
 
 // ===== 📊 ยอดค้างค่าเทอมรายเดือน (ผปค.ยังไม่จ่าย) · ไว้วางแผนรายจ่าย =====
 // นับเฉพาะ "ค่าเทอม" · ข้ามเด็กเรียนฟรี 100% · เฉพาะเดือนอดีต-ปัจจุบันที่ถึงกำหนดแล้ว
@@ -5414,8 +5433,7 @@ function renderReport(){
     byClass[cls].total += t.total;
   });
   const classKeys = Object.keys(byClass).sort((a,b) => {
-    const ai = CLASS_ORDER.indexOf(a), bi = CLASS_ORDER.indexOf(b);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    return classRank(a) - classRank(b);
   });
   if(classKeys.length === 0){
     $('r-by-class').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:20px">ไม่มีข้อมูล</td></tr>';

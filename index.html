@@ -3036,13 +3036,13 @@ function addExtra(){
   const row = document.createElement('div');
   row.className = 'owed-row';
   row.innerHTML = `
-    <select class="select" style="flex:1;max-width:200px" data-role="item" oninput="updExtra('${id}')">
+    <select class="select" style="flex:1;max-width:200px" data-role="item" oninput="updExtra('${id}')" onchange="updExtra('${id}')">
       <option value="">-- เลือกของ --</option>
       ${STOCK.map(s => `<option value="${s.item}">${s.item}</option>`).join('')}
       <option value="__custom__">+ พิมพ์เอง</option>
     </select>
-    <input class="input" placeholder="จำนวน" type="number" style="width:80px" oninput="updExtra('${id}')" data-role="qty" value="1">
-    <input class="input" placeholder="ราคา/ชิ้น" type="number" style="width:100px" oninput="updExtra('${id}')" data-role="price">
+    <input class="input" placeholder="จำนวน" type="number" style="width:80px" oninput="updExtra('${id}')" onchange="updExtra('${id}')" data-role="qty" value="1">
+    <input class="input" placeholder="ราคา/ชิ้น" type="number" style="width:100px" oninput="updExtra('${id}')" onchange="updExtra('${id}')" data-role="price">
     <span style="font-weight:700;min-width:80px;text-align:right" data-role="sub">฿0</span>
     <button class="btn btn-sm btn-danger" onclick="rmExtra(this, '${id}')">×</button>
   `;
@@ -3197,6 +3197,14 @@ async function cloudSaveNewTx(tx){
   return false;
 }
 async function saveTx(){
+  // 27 ต.ค. 69: คำนวณของขาย/ส่วนลดทุกแถวใหม่ก่อนบันทึก (เดิมเลือกของเป็นอย่างสุดท้ายบนไอแพด ยอดไม่บวก → ของหายจากใบเสร็จเงียบๆ)
+  document.querySelectorAll('#extra-items .owed-row[id^="row-"]').forEach(r => { const rid = r.id.slice(4); try{ if(rid.indexOf('ex_') === 0) updExtra(rid); else if(rid.indexOf('dc_') === 0) updDiscount(rid); }catch(e){} });
+  const _noName = Array.from(document.querySelectorAll('#extra-items .owed-row')).filter(r => {
+    const it = r.querySelector('[data-role=item]'); if(!it) return false;
+    const name = String(it.value||'').trim(); const p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
+    return (!name || name === '__custom__') && p > 0;
+  });
+  if(_noName.length){ toast('⚠ ของขาย/ชุด ใส่ราคาแล้วแต่ยังไม่ได้เลือกหรือพิมพ์ชื่อของ · เลือกให้ครบก่อนบันทึก (หรือกด × ลบแถว)', 'error'); _noName[0].scrollIntoView({block:'center'}); return; }
   const _badEx = Array.from(document.querySelectorAll('#extra-items .owed-row')).filter(r => {
     const it = r.querySelector('[data-role=item]'); const name = it ? String(it.value||'').trim() : '';
     const q = +((r.querySelector('[data-role=qty]')||{}).value) || 0, p = +((r.querySelector('[data-role=price]')||{}).value) || 0;
@@ -5102,11 +5110,11 @@ function addDiscount(){
   const row = document.createElement('div');
   row.className = 'owed-row';
   row.innerHTML = `
-    <select class="select" style="flex:1;max-width:240px" data-role="dlabel" oninput="updDiscount('${id}')">
+    <select class="select" style="flex:1;max-width:240px" data-role="dlabel" oninput="updDiscount('${id}')" onchange="updDiscount('${id}')">
       <option value="ส่วนลดเพื่อนบ้านชวนเรียน">🤝 ส่วนลดเพื่อนบ้านชวนเรียน</option>
       <option value="ส่วนลดอื่นๆ">ส่วนลดอื่นๆ</option>
     </select>
-    <input class="input" type="number" min="0" style="width:110px" oninput="updDiscount('${id}')" data-role="damt" value="100">
+    <input class="input" type="number" min="0" style="width:110px" oninput="updDiscount('${id}')" onchange="updDiscount('${id}')" data-role="damt" value="100">
     <span style="font-weight:700;min-width:80px;text-align:right;color:#16A34A" data-role="sub">−฿100</span>
     <button class="btn btn-sm btn-danger" onclick="rmExtra(this, '${id}')">×</button>
   `;

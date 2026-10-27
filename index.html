@@ -2650,7 +2650,12 @@ function renderOwed(){
   let html = courseOwedHtml(s);   // 🎨 ค้างค่าเรียนพิเศษ (ถ้ามี) โชว์บนสุด กันลืมเก็บ
   html += '<div class="owed"><div class="owed-cat">💰 ค่าเทอม / ค่ารถ (รายเดือน)</div>';
   // ค่าเทอม
-  if(p && s.discount !== 'ฟรี 100%'){
+  // 27 ต.ค. 69: จ่ายครบทุกเดือนแล้ว → โชว์ "✓ จ่ายครบแล้ว" แทนช่องติ๊ก (เดิมติ๊กได้แต่ไม่มีอะไรขึ้น ครูงงว่าระบบเสีย)
+  const _tuiAllPaid = MONTHS.every((m,i) => _ps.tuition.has(m) || i < _si);
+  const _busAllPaid = MONTHS.every((m,i) => _ps.bus.has(m) || i < _si || (s.busCode==='A3' && i>1));
+  const _paidRow = (lbl) => '<div class="owed-row mchip-paid" style="cursor:default"><span>✓ <strong>'+lbl+'</strong> <span style="color:#047857;font-size:13px">จ่ายครบทุกเดือนแล้ว (ปี '+AY+')</span></span><span style="font-weight:700;color:#047857">ครบ</span></div>';
+  if(p && s.discount !== 'ฟรี 100%' && _tuiAllPaid){ html += _paidRow('ค่าเทอม'); }
+  else if(p && s.discount !== 'ฟรี 100%'){
     const amt = s.discount === 'ลด 50%' ? p.monthly * 0.5 : p.monthly;
     html += `<div class="owed-row" data-id="tuition">
       <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">
@@ -2668,7 +2673,8 @@ function renderOwed(){
     </div>`;
   }
   // ค่ารถ
-  if(s.useBus && s.useBus !== 'ไม่ใช้' && busPrice > 0 && !(s.busCode==='A3' && _ps.bus.has('พ.ค.') && _ps.bus.has('มิ.ย.'))){
+  if(s.useBus && s.useBus !== 'ไม่ใช้' && busPrice > 0 && _busAllPaid){ html += _paidRow('ค่ารถ'); }
+  else if(s.useBus && s.useBus !== 'ไม่ใช้' && busPrice > 0 && !(s.busCode==='A3' && _ps.bus.has('พ.ค.') && _ps.bus.has('มิ.ย.'))){
     let amt = busPrice;
     if(s.useBus !== 'ไป-กลับ') amt = Math.round(busPrice / 2);
     const busLabel = `ค่ารถ (${s.useBus}${s.busCode?' '+s.busCode:''})`;

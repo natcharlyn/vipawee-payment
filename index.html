@@ -4248,8 +4248,10 @@ function promoClasses(){
   const all=new Set([...CLASS_ORDER,...used,...PROMO_ROOMS]);
   const list=[...all].filter(c => {
     if(used.has(c) || PROMO_ROOMS.includes(c)) return true;
-    // ห้องฐานว่าง (เช่น อ.2) แต่มีห้องย่อยแล้ว (อ.2/1, อ.2/2) → ไม่ต้องโชว์ กันใส่เด็กผิดห้อง
-    return ![...all].some(x => x !== c && x.replace(/\/\d+$/,'') === c);
+    // ห้องว่างที่ชั้นเดียวกันมีห้องอื่นใช้อยู่ → ไม่ต้องโชว์ กันใส่เด็กผิดห้อง
+    //  แยกห้อง: อ.2 ว่าง แต่มี อ.2/1 อ.2/2 · ยุบห้อง: ป.3/2 ว่าง แต่ ป.3/1 มีเด็ก
+    const bc = c.replace(/\/\d+$/,'');
+    return ![...used].some(x => x !== c && x.replace(/\/\d+$/,'') === bc);
   });
   return list.sort((a,b) => classRank(a) - classRank(b) || a.localeCompare(b,'th'));
 }

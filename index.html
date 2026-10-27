@@ -2854,6 +2854,13 @@ function setRefCredit(el){
 }
 
 function rowItem(id, label, amount, rateType, paidAnnual, paidTerms, lockT1){
+  // 27 ต.ค. 69: ค่ารายเทอมที่จ่ายครบทั้ง 2 เทอมแล้ว → แถบสีเขียวเหมือนค่าหนังสือ/ประกัน
+  if(rateType === 'term' && paidTerms && paidTerms.has(1) && paidTerms.has(2)){
+    return `<label class="owed-row mchip-paid" data-id="${id}">
+    <span><input type="checkbox" class="chk-big" disabled> ${label} <span style="color:#9CA3AF;font-size:12px;font-weight:400">(ปี ${AY}) · ✓ ${lockT1 ? 'จ่ายเทอม 2 แล้ว (เข้าเรียนเทอม 2)' : 'จ่ายครบ 2 เทอมแล้ว'}</span></span>
+    <span style="font-weight:700">฿${fmt(amount)}/เทอม</span>
+  </label>`;
+  }
   if(rateType === 'term'){
     return `<div class="owed-row" data-id="${id}">
       <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">

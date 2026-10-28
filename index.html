@@ -321,6 +321,23 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
     <div class="card-title" style="color:#B91C1C">🚩 ใบเสร็จที่ครูขอแก้ไข <span id="h-fix-count" style="margin-left:8px"></span></div>
     <div id="h-fix-list"></div>
   </div>
+  <div class="card" id="h-t2-card" style="border-left:4px solid #1D9E75">
+    <div class="card-title">📊 ค่าเทอม <span id="t2-title">2/69</span> <span id="t2-range" style="font-size:12px;color:#6B7280;font-weight:400"></span><span id="t2-total" style="margin-left:auto;font-size:12px;color:#6B7280;font-weight:400"></span></div>
+    <div style="height:14px;background:#F3F4F6;border-radius:7px;overflow:hidden;display:flex"><div id="t2-bar-full" style="background:#1D9E75"></div><div id="t2-bar-part" style="background:#EF9F27"></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px">
+      <div style="background:#D1FAE5;border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:#047857">✅ จ่ายครบเทอม 2</div><div id="t2-full" style="font-size:22px;font-weight:800;color:#047857">0 คน</div></div>
+      <div style="background:#FEF3C7;border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:#92400E">🟡 แบ่งจ่ายรายเดือน</div><div id="t2-part" style="font-size:22px;font-weight:800;color:#92400E">0 คน</div></div>
+      <div style="background:#F3F4F6;border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:#6B7280">⏳ ยังไม่จ่ายเทอม 2</div><div id="t2-none" style="font-size:22px;font-weight:800">0 คน</div></div>
+    </div>
+    <div style="margin-top:12px;border:1.5px solid #FCA5A5;background:#FEF2F2;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b id="t2-due" style="color:#B91C1C;font-size:14px">🔔 ค้างถึงกำหนดวันนี้: 0 คน</b><span id="t2-due-note" style="font-size:12px;color:#6B7280"></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#6B7280;margin-top:10px;flex-wrap:wrap;gap:6px">
+      <span>💰 รับแล้ว <b id="t2-coll" style="color:#111827">฿0</b></span><span>เหลือทั้งเทอม <b id="t2-rem" style="color:#111827">฿0</b> (รวมเดือนที่ยังไม่ถึงกำหนด)</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-sm" onclick="toggleT2List()">👀 ดูรายชื่อแยกห้อง</button><button class="btn btn-sm" onclick="copyT2('')">📋 คัดลอกค้างทั้งโรงเรียนส่งไลน์</button></div>
+    <div id="t2-list" class="hidden" style="margin-top:12px"></div>
+  </div>
   <div class="card" id="h-counter-card" style="border-left:4px solid #E8804B">
     <div class="card-title">🔑 เคาน์เตอร์ครูที่มาช่วย · PIN วันนี้ <span style="margin-left:auto;font-size:12px;color:#6B7280;font-weight:400">PIN หมดอายุเที่ยงคืน</span></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
@@ -1574,6 +1591,7 @@ function applyCounterMode(){
   $('counter-badge-txt').textContent = 'ผู้รับเงิน: ครู' + COUNTER_NAME + ' · เคาน์เตอร์ ' + COUNTER_NO;
   $('counter-cashier-lock').textContent = '👤 ครู' + COUNTER_NAME + ' (เคาน์เตอร์ ' + COUNTER_NO + ')';
   const hc = $('h-counter-card'); if(hc) hc.remove();
+  const ht2 = $('h-t2-card'); if(ht2) ht2.remove();
   // เช็กทุก 3 นาที: เลยเที่ยงคืน / ครูแนทกดสร้าง PIN ใหม่ / ปิดเคาน์เตอร์ → ออกจากระบบ
   setInterval(async () => { if(!_savingTx) await counterKickIfClosed(); }, 120000);
 }
@@ -3430,7 +3448,74 @@ function updBadges(){
     const bst = $('badge-students'); if(bst) bst.textContent = activeStudents().length;
   }catch(e){}
 }
+// ===== 📊 ค่าเทอม 2 (28 ต.ค. 69) · นับจากเงินที่จ่ายจริง ไม่ดูรูปแบบที่ตั้งไว้ (ผปค.เปลี่ยนวิธีจ่ายได้ทุกเทอม) =====
+const T2_MONTHS = ['พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
+const T2_FEES = [['ค่าสระว่ายน้ำ','pool'],['ค่าดนตรี','music'],['ค่าภาษาอังกฤษ','english']];
+function term2Stats(){
+  const dueIdx = dueMonthIdx();
+  const rows = activeStudents().map(s => {
+    const ps = paidState(s), p = getPriceForClass(s.cls), si = startMonthIdx(s), free = s.discount === 'ฟรี 100%';
+    const per = !p || free ? 0 : (s.discount === 'ลด 50%' ? p.monthly * 0.5 : p.monthly);
+    const months = T2_MONTHS.filter(m => MONTHS.indexOf(m) >= si);
+    const remM = free ? [] : months.filter(m => !ps.tuition.has(m));
+    const paidM = free ? [] : months.filter(m => ps.tuition.has(m));
+    const fees = T2_FEES.filter(([b,k]) => p && p[k] > 0);
+    const remF = fees.filter(([b]) => !(ps.terms[b] && ps.terms[b].has(2)));
+    const dueM = remM.filter(m => MONTHS.indexOf(m) <= dueIdx);
+    const dueF = CUR_TERM >= 2 ? remF : [];
+    const st = (remM.length === 0 && remF.length === 0) ? 'full' : ((paidM.length > 0 || remF.length < fees.length) ? 'part' : 'none');
+    const remAmt = remM.length * per + remF.reduce((a,[b,k]) => a + p[k], 0);
+    const dueAmt = dueM.length * per + dueF.reduce((a,[b,k]) => a + p[k], 0);
+    return {s, st, remM, remF, dueM, dueF, remAmt, dueAmt};
+  });
+  let coll = 0;
+  activeTX().filter(t => inCurrentAY(t.date)).forEach(t => (t.items||[]).forEach(it => { const L = it.label || ''; if(L.indexOf('คอร์ส') >= 0) return; const ml = it.monthsList || [];
+    if(L.startsWith('ค่าเทอม') && ml.length){ coll += it.amount * ml.filter(m => T2_MONTHS.includes(m)).length / ml.length; }
+    else T2_FEES.forEach(([b]) => { if(L.indexOf(b) === 0){ const tt = (it.termsList && it.termsList.length) ? it.termsList.map(Number) : ((L.match(/เทอม\s*([12])/g)||[]).map(x => +x.match(/[12]/)[0])); if(tt.length) coll += it.amount * tt.filter(x => x === 2).length / tt.length; } }); }));
+  return {rows, coll: Math.round(coll), rem: Math.round(rows.reduce((a,r) => a + r.remAmt, 0)), due: rows.filter(r => r.dueAmt > 0)};
+}
+function renderT2Card(){
+  if(!$('h-t2-card') || IS_COUNTER) return;
+  const d = term2Stats(), n = d.rows.length, c = k => d.rows.filter(r => r.st === k).length;
+  const full = c('full'), part = c('part'), none = c('none');
+  $('t2-title').textContent = '2/' + String(AY).slice(-2);
+  $('t2-range').textContent = '(พ.ย. ' + String(AY).slice(-2) + ' – มี.ค. ' + String(AY+1).slice(-2) + ')';
+  $('t2-total').textContent = 'นักเรียน ' + n + ' คน';
+  $('t2-bar-full').style.width = (n ? full / n * 100 : 0) + '%'; $('t2-bar-part').style.width = (n ? part / n * 100 : 0) + '%';
+  $('t2-full').textContent = full + ' คน'; $('t2-part').textContent = part + ' คน'; $('t2-none').textContent = none + ' คน';
+  $('t2-due').textContent = '🔔 ค้างถึงกำหนดวันนี้: ' + d.due.length + ' คน' + (d.due.length ? ' · ฿' + fmt(d.due.reduce((a,r) => a + r.dueAmt, 0)) : '');
+  $('t2-due-note').textContent = (CUR_TERM < 2 && d.due.length === 0) ? 'ยังไม่ถึง พ.ย. · ตั้งแต่ 1 พ.ย. ใครยังไม่จ่ายจะขึ้นตรงนี้เอง' : 'ค้างเดือน/รายเทอมที่ถึงกำหนดแล้ว';
+  $('t2-coll').textContent = '฿' + fmt(d.coll); $('t2-rem').textContent = '฿' + fmt(d.rem);
+  if(!$('t2-list').classList.contains('hidden')) renderT2List(d);
+}
+function toggleT2List(){ const el = $('t2-list'); el.classList.toggle('hidden'); if(!el.classList.contains('hidden')) renderT2List(); }
+function renderT2List(d){
+  d = d || term2Stats();
+  const byCls = {};
+  d.rows.forEach(r => { (byCls[r.s.cls] = byCls[r.s.cls] || []).push(r); });
+  const tag = r => r.st === 'full' ? '<span style="color:#047857">✅ ครบ</span>' : (r.st === 'part' ? '<span style="color:#92400E">🟡 แบ่งจ่าย · เหลือ ฿' + fmt(r.remAmt) + '</span>' : '<span style="color:#6B7280">⏳ ยังไม่จ่าย · ฿' + fmt(r.remAmt) + '</span>');
+  $('t2-list').innerHTML = Object.keys(byCls).sort((a,b) => classRank(a) - classRank(b)).map(cls => {
+    const rs = byCls[cls].sort((a,b) => ({none:0,part:1,full:2}[a.st] - {none:0,part:1,full:2}[b.st]) || (a.s.nick||'').localeCompare(b.s.nick||'','th'));
+    const f = rs.filter(r => r.st === 'full').length, due = rs.filter(r => r.dueAmt > 0).length;
+    return '<details style="border:1px solid #E5E7EB;border-radius:8px;margin-bottom:6px;padding:6px 10px"><summary style="cursor:pointer;font-weight:700">' + esc(cls) + ' <span style="font-weight:400;color:#6B7280;font-size:13px">· ครบ ' + f + '/' + rs.length + (due ? ' · <span style="color:#B91C1C">ค้างถึงกำหนด ' + due + '</span>' : '') + '</span> <button class="btn btn-sm" style="margin-left:8px" onclick="event.preventDefault();copyT2(' + "'" + String(cls).replace(/'/g,"\\'") + "'" + ')">📋 คัดลอก</button></summary>'
+      + '<table class="tbl" style="margin-top:6px"><tbody>' + rs.map(r => '<tr><td><b>' + esc(r.s.nick) + '</b> <span style="color:#6B7280;font-size:12px">' + esc(r.s.name||'') + '</span></td><td style="text-align:right;font-size:13px">' + tag(r) + (r.dueAmt > 0 ? '<div style="font-size:11px;color:#B91C1C">ค้างถึงกำหนด ฿' + fmt(r.dueAmt) + '</div>' : '') + '</td></tr>').join('') + '</tbody></table></details>';
+  }).join('');
+}
+function copyT2(cls){
+  const d = term2Stats(); const rows = d.rows.filter(r => !cls || r.s.cls === cls);
+  const due = rows.filter(r => r.dueAmt > 0);
+  let txt = '📋 ค่าเทอม 2/' + String(AY).slice(-2) + (cls ? ' · ห้อง ' + cls : ' · ทั้งโรงเรียน') + '\n';
+  if(due.length){
+    txt += 'ค้างถึงกำหนด ' + due.length + ' คน\n' + due.map((r,i) => (i+1) + '. ' + r.s.nick + ' (' + (r.s.name||'') + ')' + (cls ? '' : ' · ' + r.s.cls) + ' · ค้าง ฿' + fmt(r.dueAmt) + (r.dueM.length ? ' (ค่าเทอม ' + r.dueM.join(', ') + ')' : '') + (r.dueF.length ? ' (' + r.dueF.map(x => x[0].replace('ค่า','')).join('/') + ' เทอม 2)' : '')).join('\n');
+  } else {
+    const nn = rows.filter(r => r.st === 'none');
+    txt += 'ยังไม่ถึงกำหนด · ยังไม่จ่ายเทอม 2 ' + nn.length + ' คน\n' + nn.map((r,i) => (i+1) + '. ' + r.s.nick + ' (' + (r.s.name||'') + ')' + (cls ? '' : ' · ' + r.s.cls)).join('\n');
+  }
+  const done = () => toast('📋 คัดลอกแล้ว · วางในไลน์ได้เลย');
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => prompt('กดค้าง → คัดลอก', txt)); else prompt('กดค้าง → คัดลอก', txt);
+}
 function renderHome(){
+  try{ renderT2Card(); }catch(e){ console.error(e); }
   try{ renderFixRequests(); }catch(e){ console.error(e); }
   if(!IS_COUNTER && $('pin-c1')){ clearTimeout(window._pinT); window._pinT = setTimeout(loadCounterPins, 300); }
   $('today-date').textContent = today();

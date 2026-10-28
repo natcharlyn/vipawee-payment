@@ -347,6 +347,8 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
         <button class="btn btn-primary" onclick="genCounterPins(false)">🔑 สร้าง PIN วันนี้</button>
         <button class="btn" onclick="genCounterPins(true)">🔄 สร้างใหม่ (PIN หลุด)</button>
         <button class="btn" onclick="closeCounters()">⛔ ปิดเคาน์เตอร์ทั้งหมด</button>
+        <button class="btn" onclick="copyPin(1)">📋 คัดลอก PIN 1 ส่งไลน์</button>
+        <button class="btn" onclick="copyPin(2)">📋 คัดลอก PIN 2 ส่งไลน์</button>
       </div>
     </div>
     <div id="pin-note" style="font-size:12px;color:#6B7280;margin-top:8px">ส่ง PIN ทางไลน์ส่วนตัวให้ครูที่มาช่วยวันนี้เท่านั้น · อย่าส่งในกลุ่ม</div>
@@ -1767,6 +1769,16 @@ async function genCounterPins(force){
   showPins(data);
   toast('🔑 สร้าง PIN วันนี้แล้ว · ส่งทางไลน์ส่วนตัวให้ครูที่มาช่วย');
 }
+// 28 ต.ค. 69: คัดลอก PIN ส่งไลน์ส่วนตัว (บน iPhone ลากเลือกตัวเลขเล็กๆ ยาก)
+function copyPin(n){
+  const pin = ($('pin-c' + n) || {}).textContent || '';
+  if(!/^\d{6}$/.test(pin)){ toast('ยังไม่มี PIN วันนี้ · กด "🔑 สร้าง PIN วันนี้" ก่อน', 'error'); return; }
+  const dt = new Date().toLocaleDateString('th-TH', {day:'numeric', month:'short'});
+  const txt = '🔑 PIN เคาน์เตอร์ ' + n + ' วันนี้ (' + dt + '): ' + pin + '\nเข้า ' + location.origin + location.pathname + ' → เลือก "ครูที่มาช่วย" → เคาน์เตอร์ ' + n + ' → ใส่ PIN + ชื่อตัวเอง\n(ใช้ได้ถึงเที่ยงคืนวันนี้ · ห้ามส่งต่อ)';
+  const done = () => toast('📋 คัดลอก PIN เคาน์เตอร์ ' + n + ' แล้ว · วางในไลน์ส่วนตัวครูที่มาช่วย');
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => prompt('กดค้าง → คัดลอก', txt));
+  else prompt('กดค้าง → คัดลอก', txt);
+}
 async function closeCounters(){
   if(!confirm('ปิดเคาน์เตอร์ทั้งหมดตอนนี้?\nเครื่องเคาน์เตอร์จะถูกออกจากระบบ และ PIN วันนี้ใช้ไม่ได้อีก')) return;
   const { error } = await sb.rpc('close_counters');
@@ -2493,8 +2505,10 @@ document.addEventListener('click', e => {
   if(!e.target.closest('.search-wrap')) $('rec-results').classList.add('hidden');
 });
 
+let _selStuTxIds = null;   // ใบเสร็จของเด็กคนนี้ ณ ตอนเปิดหน้ารับเงิน (กันรับเงินซ้ำจากอีกเครื่อง)
 function selStu(id){
   selStudent = STUDENTS.find(s=>s.id===id);
+  _selStuTxIds = new Set(TX.filter(t => t.studentId === id).map(t => String(t.id)));
   $('rec-search').value = selStudent.nick + ' · ' + selStudent.name;
   $('rec-results').classList.add('hidden');
   $('sel-name').textContent = selStudent.nick + ' (' + selStudent.name + ')';
@@ -3222,6 +3236,13 @@ async function cloudSaveNewTx(tx){
   window._lastSaveAuthFail = false;
   for(let i=1;i<=4;i++){
     try{
+      // 28 ต.ค. 69: เน็ตหลุดตอนรอผล → ใบอาจ "บันทึกสำเร็จแล้ว" แต่เครื่องไม่รู้ · ลองใหม่ต้องเช็กก่อน
+      // (เดิม: ขอเลขใหม่แล้วบันทึกทับ → เคาน์เตอร์โดนกันแก้ → ขึ้นว่าไม่สำเร็จ ทั้งที่ใบเข้าแล้ว → ครูกดซ้ำ = รับเงินซ้ำ)
+      if(i > 1){
+        const { data: ex, error: exErr } = await sb.from('transactions').select('receipt_no').eq('id', tx.id).limit(1);
+        if(exErr) throw exErr;
+        if(ex && ex[0] && ex[0].receipt_no){ tx.receiptNo = ex[0].receipt_no; return true; }
+      }
       tx.receiptNo = await cloudNextReceiptNo();
       const { error } = await sb.from('transactions').upsert(txToRow(tx));
       if(!error) return true;
@@ -3264,6 +3285,21 @@ async function saveTx(){
   const total = items.reduce((s,x)=>s+x.amount, 0);
   if(total <= 0){ toast('ยอดรวมต้องมากกว่า 0 บาท · ส่วนลดห้ามเกินยอดที่จ่าย', 'error'); return; }
   if(_savingTx) return; _savingTx = true;
+  // 28 ต.ค. 69: กันรับเงินซ้ำ — ระหว่างเปิดหน้านี้ อีกเครื่อง (เคาน์เตอร์อีกฝั่ง / ครูแนทบันทึกจากสลิป) อาจบันทึกเด็กคนนี้ไปแล้ว
+  try{
+    const { data: cur, error: curErr } = await sb.from('transactions').select('id,receipt_no,total,cashier,voided_at,items').eq('student_id', selStudent.id);
+    if(!curErr && Array.isArray(cur) && _selStuTxIds){
+      const fresh = cur.filter(r => !r.voided_at && !_selStuTxIds.has(String(r.id)));
+      if(fresh.length){
+        const lines = fresh.map(r => '• ' + (r.receipt_no||'') + ' ฿' + fmt(r.total) + ' โดย ' + (r.cashier||'-') + ' : ' + (r.items||[]).map(i => i.label).join(', '));
+        if(!confirm('⚠ เด็กคนนี้เพิ่งถูกบันทึกรับเงินจากอีกเครื่อง ระหว่างที่เปิดหน้านี้อยู่\n\n' + lines.join('\n') + '\n\nถ้าเป็นรายการเดียวกัน = รับเงินซ้ำ → กด "ยกเลิก" แล้วเปิดชื่อเด็กใหม่\nถ้าเป็นคนละรายการจริง → กด "ตกลง" บันทึกต่อ')){
+          _savingTx = false;
+          try{ await cloudLoadAll(); }catch(_){}
+          return;
+        }
+      }
+    }
+  }catch(e){ /* เน็ตหลุด → ไปลองบันทึกตามปกติ (ถ้าเน็ตหลุดจริง การบันทึกจะแจ้งไม่สำเร็จเอง) */ }
   const tx = {
     id: Date.now(),
     date: new Date().toISOString(),
@@ -3289,6 +3325,7 @@ async function saveTx(){
   if(IS_COUNTER) tx.createdBy = COUNTER_UID;   // (บันทึกสำเร็จแล้ว)
   tx.fixLog = []; tx.fixRequest = '';
   TX.unshift(tx);   // เพิ่มเข้าเครื่องเฉพาะเมื่อเซฟคลาวด์สำเร็จจริง
+  if(_selStuTxIds) _selStuTxIds.add(String(tx.id));
   if(pendingSlipId){   // ออกใบเสร็จจากกล่องสลิป → ตอนนี้ค่อยตั้งสลิปเป็น "บันทึกแล้ว"
     const _sl = SLIPS.find(x => x.id === pendingSlipId);
     if(_sl && !_sl.matched && _sl.studentNick === tx.studentNick){ _sl.matched = true; _sl.studentId = tx.studentId; saveSLIPS(); updBadges(); }

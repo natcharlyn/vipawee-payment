@@ -1287,6 +1287,19 @@ async function ensureReceiptNos(){
   saveTX();
   toast('🧾 เติมเลขใบเสร็จให้ ' + missing.length + ' ใบเรียบร้อย (จองเลขจากคลาวด์)');
 }
+// 28 ต.ค. 69: ใบเสร็จยาว/ฟอนต์ไอแพดใหญ่กว่า → เนื้อหาล้นกรอบ 135mm แล้วช่องเซ็นชื่อถูกตัดหาย (overflow:hidden)
+// → วัดจริงแล้วย่อทีละขั้น dense → xdense → xxdense จนช่องเซ็นอยู่ในกรอบ
+function fitReceiptCopies(root){
+  try{
+    (root.querySelectorAll ? root : document).querySelectorAll('.copy').forEach(function(c){
+      var steps = ['dense','xdense','xxdense'], i = 0, w0 = c.style.width;
+      c.style.width = '194mm';   // วัดที่ความกว้างกระดาษจริง (A4 − ขอบ 8mm) ไม่ใช่ความกว้างจอ
+      while(c.scrollHeight > c.clientHeight + 1 && i < steps.length){ if(!c.classList.contains(steps[i])) c.classList.add(steps[i]); i++; }
+      if(c.scrollHeight > c.clientHeight + 1){ c.style.height = 'auto'; c.style.minHeight = '135mm'; }
+      c.style.width = w0;
+    });
+  }catch(e){}
+}
 function receiptPrintDual(tx){
   const stu = (tx.payerName || tx.studentNick) + ' (' + tx.studentNick + (tx.studentName ? ' · ' + tx.studentName : '') + ' · ' + tx.studentClass + ')';
   const dt = new Date(tx.date).toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'});
@@ -1315,7 +1328,7 @@ function receiptPrintDual(tx){
   }
   return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>ใบเสร็จ '+no+'</title><style>' +
     '@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box;margin:0;padding:0}' +
-    "body{font-family:'Sarabun','TH SarabunPSK',sans-serif;background:white}" +
+    "body{font-family:'Sarabun','TH SarabunPSK',sans-serif;background:white;-webkit-text-size-adjust:100%;text-size-adjust:100%}" +
     '.copy{border:1.6px solid #000;padding:5mm 7mm 4mm;height:135mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
     '.cutline{height:0;margin:3mm 0;border-top:1.5px dashed #888}' +
     '.tag{position:absolute;top:5mm;right:7mm;border:1.4px solid #000;padding:2px 10px;font-size:13px;font-weight:700}' +
@@ -1341,6 +1354,7 @@ function receiptPrintDual(tx){
     copyBlock('ต้นฉบับ','') +
     '<div class="cutline"></div>' +
     copyBlock('สำเนา · โรงเรียนเก็บ','background:#000;color:#fff') +
+    '<script>(' + fitReceiptCopies.toString() + ')(document);window.addEventListener("load",function(){(' + fitReceiptCopies.toString() + ')(document);});<\/script>' +
     '</body></html>';
 }
 
@@ -1930,7 +1944,8 @@ function printInPage(html, overlay){
     const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(function(l){ return l.outerHTML; }).join('');
     let host = document.getElementById('print-root');
     if(!host){ host = document.createElement('div'); host.id = 'print-root'; document.body.appendChild(host); host.attachShadow({mode:'open'}); }
-    host.shadowRoot.innerHTML = links + '<style>:host{all:initial;display:block}' + css + '</style>' + doc.body.innerHTML;
+    doc.querySelectorAll('script').forEach(function(x){ x.remove(); });
+    host.shadowRoot.innerHTML = links + '<style>:host{all:initial;display:block;-webkit-text-size-adjust:100%}' + css + '</style>' + doc.body.innerHTML;
     let ps = document.getElementById('print-root-style');
     if(!ps){ ps = document.createElement('style'); ps.id = 'print-root-style'; document.head.appendChild(ps); }
     ps.textContent = '#print-root{display:none}#print-root.show{display:block;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;background:#fff;overflow:auto;-webkit-overflow-scrolling:touch;padding:140px 12px 30px}'
@@ -1949,8 +1964,10 @@ function printInPage(html, overlay){
         document.body.appendChild(bar);
       }
       bar.classList.add('show'); host.scrollTop = 0;
+      fitReceiptCopies(host.shadowRoot); setTimeout(function(){ fitReceiptCopies(host.shadowRoot); }, 400);
       return;
     }
+    host.style.cssText = 'display:block;position:absolute;left:-9999px;top:0;width:194mm'; fitReceiptCopies(host.shadowRoot); host.style.cssText = '';
     window.print();   // เรียกทันที ไม่หน่วงเวลา (กัน Safari ขึ้น "ปิดกั้นไม่ให้พิมพ์")
   }catch(err){ console.error('printInPage', err); toast('พิมพ์ไม่สำเร็จ · ลองกดพิมพ์อีกครั้ง', 'error'); }
 }

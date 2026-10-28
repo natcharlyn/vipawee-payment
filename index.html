@@ -1291,13 +1291,14 @@ async function ensureReceiptNos(){
 }
 // 28 ต.ค. 69: ใบเสร็จยาว/ฟอนต์ไอแพดใหญ่กว่า → เนื้อหาล้นกรอบ 135mm แล้วช่องเซ็นชื่อถูกตัดหาย (overflow:hidden)
 // → วัดจริงแล้วย่อทีละขั้น dense → xdense → xxdense จนช่องเซ็นอยู่ในกรอบ
+// 28 ต.ค. 69 (เย็น): ไอโฟนพิมพ์ผ่าน AirPrint ใช้ขอบกระดาษของเครื่อง HP + หัว/ท้ายกระดาษของ Safari → พื้นที่พิมพ์เหลือน้อยกว่า 276mm → สำเนาตกไปหน้า 2 · ลดกรอบเป็น 128mm (รวม 2 ใบ ≈ 260mm)
 function fitReceiptCopies(root){
   try{
     (root.querySelectorAll ? root : document).querySelectorAll('.copy').forEach(function(c){
       var steps = ['dense','xdense','xxdense'], i = 0, w0 = c.style.width;
       c.style.width = '194mm';   // วัดที่ความกว้างกระดาษจริง (A4 − ขอบ 8mm) ไม่ใช่ความกว้างจอ
       while(c.scrollHeight > c.clientHeight + 1 && i < steps.length){ if(!c.classList.contains(steps[i])) c.classList.add(steps[i]); i++; }
-      if(c.scrollHeight > c.clientHeight + 1){ c.style.height = 'auto'; c.style.minHeight = '135mm'; }
+      if(c.scrollHeight > c.clientHeight + 1){ c.style.height = 'auto'; c.style.minHeight = '128mm'; }
       c.style.width = w0;
     });
   }catch(e){}
@@ -1331,8 +1332,8 @@ function receiptPrintDual(tx){
   return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>ใบเสร็จ '+no+'</title><style>' +
     '@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box;margin:0;padding:0}' +
     "body{font-family:'Sarabun','TH SarabunPSK',sans-serif;background:white;-webkit-text-size-adjust:100%;text-size-adjust:100%}" +
-    '.copy{border:1.6px solid #000;padding:5mm 7mm 4mm;height:135mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
-    '.cutline{height:0;margin:3mm 0;border-top:1.5px dashed #888}' +
+    '.copy{border:1.6px solid #000;padding:5mm 7mm 4mm;height:128mm;position:relative;display:flex;flex-direction:column;overflow:hidden;break-inside:avoid;page-break-inside:avoid}' +
+    '.cutline{height:0;margin:2mm 0;border-top:1.5px dashed #888}' +
     '.tag{position:absolute;top:5mm;right:7mm;border:1.4px solid #000;padding:2px 10px;font-size:13px;font-weight:700}' +
     '.head{display:flex;gap:4mm;align-items:center;border-bottom:2px solid #000;padding-bottom:2mm}.head img{width:14mm!important;height:14mm!important}' +
     '.rlogo{width:17mm;height:17mm;border-radius:50%;border:1.6px solid #000;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}' +

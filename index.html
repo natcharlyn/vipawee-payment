@@ -167,7 +167,7 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .inv-grid.size-1{grid-template-columns:1fr;grid-template-rows:1fr}
 .inv-slip{border:1px dashed #94A3B8;border-radius:6px;padding:6mm;display:flex;flex-direction:column;page-break-inside:avoid}
 /* Size 4 (compact but elderly-friendly) */
-.size-4 .inv-slip{font-size:14px;padding:5mm}
+.size-4 .inv-slip{font-size:14px;padding:4mm 5mm}
 .size-4 .inv-school{font-size:14px;padding-bottom:4px;margin-bottom:6px}
 .size-4 .inv-title{font-size:16px;padding:5px;margin-bottom:8px}
 .size-4 .inv-debt{padding:8px;margin-bottom:8px}
@@ -191,6 +191,8 @@ body{font-family:'Sarabun','Segoe UI',sans-serif;background:#F0E9DA;color:#1F293
 .inv-title{background:#E0E7FF;color:#1A3A8F;text-align:center;font-weight:700;border-radius:3px}
 .inv-debt{background:#FEE2E2;border:1px solid #DC2626;border-radius:5px;text-align:center;padding:5px;margin-bottom:5px}
 .inv-debt strong{color:#991B1B}
+.inv-alt{font-size:12px;color:#1E3A8A;margin-top:2px;padding-top:3px;border-top:1px dashed #FCA5A5;line-height:1.25}
+.size-1 .inv-alt{font-size:16px}
 .inv-foot{margin-top:auto;border-top:1px dashed #94A3B8;padding-top:4px;color:#374151;text-align:center}
 
 /* PRINT */
@@ -6332,8 +6334,7 @@ function renderInvSlip(id){
     <div class="inv-school">${SCHOOL.name}<br><span style="font-weight:400;font-size:11px;color:#374151">${SCHOOL.addr}</span></div>
     <div class="inv-title">📄 ใบแจ้งหนี้</div>
     <div style="font-size:15px;margin-bottom:6px;line-height:1.3"><strong>${s.nick}</strong> <span style="font-size:13px;color:#374151">(${s.name})</span><br><span style="font-size:13px;color:#374151">${s.cls} · ${s.village || '-'}</span></div>
-    <div class="inv-debt"><div style="font-size:12px;color:#991B1B;font-weight:600">${IC.advIdx>=0?'ยอดชำระ (แบ่งจ่าย ล่วงหน้า 2 เดือน)':'ยอดค้างจ่าย'}</div><strong>฿${fmt(invTotal)}</strong></div>
-    ${IC.altTotal ? `<div style="font-size:13px;margin:-2px 0 8px;padding:5px 8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;color:#1E3A8A">หรือ <strong>จ่ายครบเทอม ${IC.tStart===5?'2 (พ.ย.–มี.ค.)':'1 (พ.ค.–ก.ย.)'} ฿${fmt(IC.altTotal)}</strong></div>` : ''}
+    <div class="inv-debt"><div style="font-size:12px;color:#991B1B;font-weight:600">${IC.advIdx>=0?'ยอดชำระ (แบ่งจ่าย ล่วงหน้า 2 เดือน)':'ยอดค้างจ่าย'}</div><strong>฿${fmt(invTotal)}</strong>${IC.altTotal ? `<div class="inv-alt">หรือจ่ายครบเทอม ${IC.tStart===5?'2 (พ.ย.–มี.ค.)':'1 (พ.ค.–ก.ย.)'} <b>฿${fmt(IC.altTotal)}</b></div>` : ''}</div>
     <div style="font-size:13px;margin-bottom:5px;font-weight:600">📅 สถานะรายเดือน · ประจำปีการศึกษา ${AY}</div>
     <div style="display:grid;grid-template-columns:38px repeat(10,1fr);gap:2px;margin-bottom:3px">
       <div></div>

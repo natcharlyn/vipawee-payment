@@ -669,6 +669,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
     </div>
     <div class="tools">
       <button class="btn" onclick="editStu(detailStudentId)">✏ แก้ข้อมูล</button>
+      <button class="btn" onclick="openClaim()" title="ใบเสร็จให้ผู้ปกครองเอาไปเบิกค่าเทอม (ข้าราชการ/หน่วยงาน)">🧾 ใบเสร็จสำหรับเบิก</button>
       <button class="btn btn-primary" onclick="recordForCurrent()">💰 บันทึกรับเงินคนนี้</button>
     </div>
   </div>
@@ -938,6 +939,28 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
 </div>
 
 <!-- Receipt Modal -->
+<div class="modal-back" id="claim-modal">
+  <div class="modal" style="max-width:540px">
+    <h3 id="cl-title">🧾 ใบเสร็จสำหรับเบิก</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>เทอม</label><select class="select" id="cl-term" onchange="_claim.term=+this.value;claimRender()"></select></div>
+      <div class="field"><label>วันที่ในใบ</label><input class="input" type="date" id="cl-date" onchange="claimRender()"></div>
+      <div class="field" style="grid-column:1/-1"><label>ได้รับเงินจาก (ชื่อเด็ก)</label><input class="input" id="cl-name" oninput="claimRender()"></div>
+    </div>
+    <div id="cl-paid" style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:9px 12px;font-size:13.5px;margin:4px 0 10px"></div>
+    <div class="field"><label>ยอดในใบเสร็จ</label>
+      <label style="display:flex;gap:8px;align-items:center;padding:6px 0;cursor:pointer"><input type="radio" name="clm" value="gov" onchange="setClaimMode('gov')"> ตามสิทธิรัฐ <span id="cl-govlbl" style="color:#6B7280;font-size:13px"></span></label>
+      <label style="display:flex;gap:8px;align-items:center;padding:6px 0;cursor:pointer"><input type="radio" name="clm" value="full" onchange="setClaimMode('full')"> เต็มจำนวนที่จ่ายจริง</label>
+      <label style="display:flex;gap:8px;align-items:center;padding:6px 0;cursor:pointer;flex-wrap:wrap"><input type="radio" name="clm" value="own" onchange="setClaimMode('own')"> พิมพ์เอง <input class="input" id="cl-own" type="number" inputmode="numeric" min="0" step="1" placeholder="เช่น 3000" style="width:130px" oninput="setClaimMode('own')"></label>
+    </div>
+    <div id="cl-sum" style="font-size:14px;margin:6px 0 10px"></div>
+    <div id="cl-hist" style="font-size:13.5px"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeClaim()">ปิด</button>
+      <button class="btn btn-primary" id="cl-go" onclick="claimIssue()">✅ ออกใบเสร็จ</button>
+    </div>
+  </div>
+</div>
 <div class="modal-back" id="rcpt-modal">
   <div class="modal">
     <h3>🧾 บันทึกเรียบร้อย</h3>
@@ -4839,6 +4862,212 @@ function renderDetail(s){
         </td>
       </tr>`).join('');
   }
+}
+
+// ===== 🧾 ใบเสร็จสำหรับเบิกค่าเทอม (ผปค.ข้าราชการ/หน่วยงาน) · 2 พ.ย. 69 =====
+// หน้าตาเหมือนใบเหลืองเล่มเดิม · A4 แนวนอนตัดครึ่ง = A5 2 ใบ (ซ้ายต้นฉบับ · ขวาสำเนา)
+// ยอดห้ามเกินค่าเทอมที่จ่ายจริงในเทอมนั้น · เลขที่รันใหม่ทุกเทอม · เก็บประวัติในตาราง claim_receipts
+const CLAIM_GOV = {k: 2400, p: 2100};
+const CLAIM_HEAD = {
+  addr: 'เลขที่ 216  หมู่ 12 ตำบลศรีวิไล  อำเภอศรีวิไล  จังหวัดบึงกาฬ',
+  phone: 'โทร. 094-2644334, 081-7009616, 086-0565095',
+  lic: 'ใบอนุญาต เลขที่ นค 3 02/2554',
+  receiver: 'นางสาววีรญา สุวรรณวงศ์'
+};
+const CLAIM_ROWS = ['ค่าธรรมเนียมการศึกษา','ค่าอุปกรณ์การเรียน','ค่ารถ รับ-ส่ง','ค่าชุดนักเรียน-ชุดกีฬา','ค่าประกันอุบัติเหตุ','ค่าบำรุงสระว่ายน้ำ'];
+let _claim = {sid: null, rows: [], mode: 'gov', term: 1, ok: false, lastId: null, busy: false};
+function claimDefaultTerm(){ const m = new Date().getMonth() + 1; return (m >= 11 || m <= 4) ? 2 : 1; }
+function claimTermMonths(term){ return term === 1 ? MONTHS.slice(0, 5) : MONTHS.slice(5); }
+function claimLevel(cls){
+  let m = String(cls||'').match(/^อ\.\s*(\d)/); if(m) return {k: m[1], p: '–', kind: 'k'};
+  m = String(cls||'').match(/^ป\.\s*(\d)/); if(m) return {k: '–', p: m[1], kind: 'p'};
+  return {k: String(cls||'–'), p: '–', kind: 'k'};
+}
+function claimName(n){ return String(n||'').trim().replace(/^เด็กชาย\s*/, 'ด.ช. ').replace(/^เด็กหญิง\s*/, 'ด.ญ. '); }
+function claimNoText(r){ return r.term + '/' + r.ay + '-' + String(r.no).padStart(3, '0'); }
+// ค่าเทอมที่จ่ายจริงในเทอมนั้น (แบ่งตามเดือน · หักส่วนลดในใบเดียวกันตามสัดส่วน ยกเว้นส่วนลดคอร์ส)
+function claimPaidTerm(s, term){
+  const ms = claimTermMonths(term); let sum = 0; const got = new Set();
+  activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date)).forEach(t => {
+    const items = t.items || [];
+    const pos = items.filter(i => Number(i.amount) > 0).reduce((a,i) => a + Number(i.amount), 0);
+    const neg = items.filter(i => Number(i.amount) < 0 && !/^ค่าคอร์ส/.test(i.label||'')).reduce((a,i) => a + Number(i.amount), 0);
+    const ratio = pos > 0 ? Math.max(0, (pos + neg) / pos) : 1;
+    items.forEach(i => {
+      const L = String(i.label||''); if(!L.startsWith('ค่าเทอม') || L.indexOf('คอร์ส') >= 0) return;
+      const ml = i.monthsList || []; if(!ml.length) return;
+      const per = Number(i.amount) / ml.length;
+      ml.forEach(m => { if(ms.indexOf(m) >= 0){ sum += per * ratio; got.add(m); } });
+    });
+  });
+  return {amount: Math.floor(sum + 0.0001), months: ms.filter(m => got.has(m))};
+}
+function claimAmount(s){
+  const P = claimPaidTerm(s, _claim.term), lv = claimLevel(s.cls);
+  const want = _claim.mode === 'gov' ? (lv.kind === 'p' ? CLAIM_GOV.p : CLAIM_GOV.k)
+             : _claim.mode === 'full' ? P.amount : Math.round(+$('cl-own').value || 0);
+  return {P, want, amt: Math.min(want, P.amount), over: want > P.amount};
+}
+function claimToday(){ return new Date().toLocaleDateString('en-CA', {timeZone: 'Asia/Bangkok'}); }
+async function openClaim(){
+  if(IS_COUNTER) return;
+  const s = STUDENTS.find(x => x.id === detailStudentId); if(!s) return;
+  _claim = {sid: s.id, rows: [], mode: 'gov', term: claimDefaultTerm(), ok: false, lastId: null, busy: false};
+  $('cl-title').textContent = '🧾 ใบเสร็จสำหรับเบิก · ' + s.nick + ' (' + s.cls + ')';
+  $('cl-term').innerHTML = '<option value="1">เทอม 1/' + AY + '</option><option value="2">เทอม 2/' + AY + '</option>';
+  $('cl-term').value = String(_claim.term);
+  $('cl-name').value = claimName(s.name);
+  $('cl-date').value = claimToday();
+  $('cl-own').value = '';
+  document.querySelectorAll('#claim-modal input[name=clm]').forEach(r => r.checked = (r.value === 'gov'));
+  const lv = claimLevel(s.cls);
+  $('cl-govlbl').textContent = lv.kind === 'p' ? '(ประถม ฿' + fmt(CLAIM_GOV.p) + ')' : '(อนุบาล ฿' + fmt(CLAIM_GOV.k) + ')';
+  $('cl-hist').innerHTML = '<span style="color:#6B7280">⏳ กำลังโหลดประวัติใบเบิก…</span>';
+  $('claim-modal').classList.add('active');
+  claimRender();
+  try{
+    const { data, error } = await sb.from('claim_receipts').select('*').eq('student_id', s.id).eq('ay', AY).order('id');
+    if(error) throw error;
+    _claim.rows = data || []; _claim.ok = true;
+  }catch(e){ _claim.ok = false; _claim.err = String((e && e.message) || e); }
+  if(_claim.sid === s.id) claimRender();
+}
+function closeClaim(){ $('claim-modal').classList.remove('active'); }
+function setClaimMode(m){
+  _claim.mode = m;
+  document.querySelectorAll('#claim-modal input[name=clm]').forEach(r => r.checked = (r.value === m));
+  claimRender();
+}
+function claimRender(){
+  const s = STUDENTS.find(x => x.id === _claim.sid); if(!s) return;
+  const A = claimAmount(s);
+  $('cl-paid').innerHTML = A.P.amount > 0
+    ? '💰 ค่าเทอม เทอม ' + _claim.term + '/' + AY + ' ที่จ่ายแล้ว <b>฿' + fmt(A.P.amount) + '</b> <span style="color:#6B7280">(' + A.P.months.join(', ') + ')</span>'
+    : '<span style="color:#B91C1C">⚠ เทอม ' + _claim.term + '/' + AY + ' ยังไม่มีค่าเทอมที่จ่ายแล้ว · ออกใบเบิกไม่ได้</span>';
+  let sum = '';
+  if(A.P.amount > 0){
+    if(_claim.mode === 'own' && !(+$('cl-own').value > 0)) sum = '<span style="color:#6B7280">พิมพ์ยอดที่ต้องการในช่อง "พิมพ์เอง"</span>';
+    else {
+      sum = 'ยอดในใบ <b style="font-size:17px;color:#1A3A8F">฿' + fmt(A.amt) + '</b> <span style="color:#6B7280">(' + bahtText(A.amt) + ')</span>';
+      if(A.over) sum += '<div style="color:#B91C1C;margin-top:4px">⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกินค่าเทอมที่จ่ายจริง → ใช้ได้ไม่เกิน ฿' + fmt(A.P.amount) + '</div>';
+    }
+  }
+  $('cl-sum').innerHTML = sum;
+  let h = '';
+  if(!_claim.ok && _claim.err) h = '<div style="color:#B91C1C">⚠ โหลดประวัติใบเบิกไม่ได้ · ' + (/claim_receipts|relation|schema cache/i.test(_claim.err) ? 'ยังไม่ได้รัน SQL_ใบเสร็จสำหรับเบิก.sql' : 'เน็ตหลุด ลองปิดแล้วเปิดใหม่') + '</div>';
+  else if(_claim.ok){
+    const rows = _claim.rows.slice().sort((a,b) => (b.term - a.term) || (b.no - a.no));
+    h = '<div style="font-weight:700;margin-bottom:4px">📂 ใบเบิกที่เคยออกให้เด็กคนนี้ (ปี ' + AY + ')</div>' + (rows.length ? rows.map(r => {
+      const v = !!r.voided_at, isNew = r.id === _claim.lastId;
+      return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-radius:8px;margin-bottom:4px;' + (isNew ? 'background:#DCFCE7;border:1.5px solid #16A34A' : 'background:#F9FAFB;border:1px solid #E5E7EB') + (v ? ';opacity:.6' : '') + '">' +
+        '<span style="' + (v ? 'text-decoration:line-through' : '') + '"><b>เลขที่ ' + claimNoText(r) + '</b> · ฿' + fmt(r.amount) + ' · ' + new Date(r.receipt_date + 'T12:00:00').toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'2-digit'}) + '</span>' +
+        (v ? '<span style="color:#B91C1C;font-size:12px">🚫 ยกเลิก · ' + esc(r.void_reason || '-') + '</span>'
+           : '<span style="margin-left:auto;display:flex;gap:6px"><button class="btn btn-sm' + (isNew ? ' btn-primary' : '') + '" onclick="claimPrint(' + r.id + ')">🖨 พิมพ์' + (isNew ? '' : 'ซ้ำ') + '</button><button class="btn btn-sm btn-danger" onclick="claimVoid(' + r.id + ')" title="ยกเลิกใบนี้ (เขียนผิด)">🚫</button></span>') +
+        '</div>';
+    }).join('') : '<span style="color:#6B7280">ยังไม่เคยออก</span>');
+  }
+  $('cl-hist').innerHTML = h;
+  const go = $('cl-go'); if(go) go.disabled = !!_claim.busy;
+}
+async function claimIssue(){
+  const s = STUDENTS.find(x => x.id === _claim.sid); if(!s || _claim.busy) return;
+  if(!_claim.ok){ toast('⚠ ยังโหลดประวัติใบเบิกไม่ได้ · ' + (/claim_receipts|relation|schema cache/i.test(_claim.err||'') ? 'ต้องรัน SQL ก่อน' : 'ลองปิดแล้วเปิดใหม่'), 'error'); return; }
+  const A = claimAmount(s), term = _claim.term;
+  if(A.P.amount <= 0){ toast('⚠ เทอมนี้ยังไม่มีค่าเทอมที่จ่ายแล้ว · ออกใบเบิกไม่ได้', 'error'); return; }
+  if(_claim.mode === 'own' && !(+$('cl-own').value > 0)){ toast('⚠ พิมพ์ยอดในช่อง "พิมพ์เอง" ก่อน', 'error'); return; }
+  if(A.amt <= 0){ toast('ยอดต้องมากกว่า 0', 'error'); return; }
+  const name = $('cl-name').value.trim(); if(!name){ toast('⚠ ใส่ชื่อเด็กก่อน', 'error'); return; }
+  const date = $('cl-date').value; if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ toast('⚠ เลือกวันที่ก่อน', 'error'); return; }
+  const prev = _claim.rows.filter(r => r.term === term && !r.voided_at);
+  let msg = '🧾 ออกใบเสร็จสำหรับเบิก\n\n' + name + ' (' + s.cls + ')\nเทอม ' + term + '/' + AY + '\nยอด ฿' + fmt(A.amt) + ' (' + bahtText(A.amt) + ')';
+  if(A.over) msg += '\n\n⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกินค่าเทอมที่จ่ายจริง → ใช้ ฿' + fmt(A.amt);
+  if(prev.length) msg = '⚠ เทอมนี้เคยออกใบเบิกให้เด็กคนนี้แล้ว:\n' + prev.map(r => '• เลขที่ ' + claimNoText(r) + ' ฿' + fmt(r.amount)).join('\n') + '\n\nถ้าแค่จะพิมพ์ใบเดิมอีกครั้ง → กด "ยกเลิก" แล้วกด 🖨 พิมพ์ซ้ำ\nถ้าจะออกใบใหม่จริง → กด "ตกลง"\n\n' + msg;
+  if(!confirm(msg)) return;
+  _claim.busy = true; claimRender();
+  const base = Date.now();
+  try{
+    for(let i = 0; i < 5; i++){
+      const { data: mx, error: e1 } = await sb.from('claim_receipts').select('no').eq('ay', AY).eq('term', term).order('no', {ascending: false}).limit(1);
+      if(e1) throw e1;
+      const row = {id: base + i, ay: AY, term, no: ((mx && mx[0] && mx[0].no) || 0) + 1, student_id: s.id, student_name: name, student_class: s.cls,
+        amount: A.amt, mode: _claim.mode, receipt_date: date, created_by: cashierName || 'วีรญา',
+        data: {level: claimLevel(s.cls), paid: A.P.amount, paidMonths: A.P.months, nick: s.nick}};
+      const { error } = await sb.from('claim_receipts').insert(row);
+      let ok = !error;
+      if(error && !/duplicate|unique/i.test(error.message || '')){
+        // เน็ตหลุดตอนรอผล → ใบอาจเข้าแล้ว · เช็กก่อน
+        const { data: ex } = await sb.from('claim_receipts').select('id').eq('id', row.id).limit(1);
+        if(ex && ex[0]) ok = true; else throw error;
+      }
+      if(ok){
+        _claim.rows.push(row); _claim.lastId = row.id; _claim.busy = false; claimRender();
+        toast('✅ ออกใบเสร็จสำหรับเบิกแล้ว · เลขที่ ' + claimNoText(row) + ' · กด 🖨 พิมพ์ (สีเขียว)');
+        return;
+      }
+    }
+    throw new Error('เลขที่ชนกันหลายครั้ง');
+  }catch(e){ toast('⚠ ออกใบไม่สำเร็จ · ' + ((e && e.message) || e) + ' · ลองกดใหม่', 'error'); }
+  _claim.busy = false; claimRender();
+}
+async function claimVoid(id){
+  const r = _claim.rows.find(x => x.id === id); if(!r || r.voided_at) return;
+  const why = prompt('ยกเลิกใบเบิกเลขที่ ' + claimNoText(r) + ' (฿' + fmt(r.amount) + ')\nเหตุผล (เช่น เขียนผิด / ผปค.ขอยอดใหม่)', '');
+  if(why === null) return;
+  const at = new Date().toISOString();
+  const { error } = await sb.from('claim_receipts').update({voided_at: at, void_reason: why.trim() || '-'}).eq('id', id);
+  if(error){ toast('⚠ ยกเลิกไม่สำเร็จ · ' + error.message, 'error'); return; }
+  r.voided_at = at; r.void_reason = why.trim() || '-'; claimRender(); toast('ยกเลิกใบเบิก ' + claimNoText(r) + ' แล้ว');
+}
+function claimPrintHTML(r){
+  const lv = (r.data && r.data.level) || claimLevel(r.student_class);
+  const d = new Date(r.receipt_date + 'T12:00:00');
+  const day = d.getDate(), mon = d.toLocaleDateString('th-TH', {month: 'long'}), yr = d.getFullYear() + 543;
+  const tl = r.term + '/' + r.ay;
+  const rows = CLAIM_ROWS.map((L, i) => '<tr><td class="c">' + (i + 1) + '</td><td>' + L + (i === 0 ? ' <span class="v">' + tl + '</span>' : '') + '</td><td class="a">' + (i === 0 ? fmt(r.amount) : '') + '</td><td class="st">' + (i === 0 ? '-' : '') + '</td></tr>').join('');
+  const half = (tag) =>
+    '<div class="cr">' +
+      '<div class="top"><span class="tag">' + tag + '</span><span>เลขที่ใบเสร็จ <b class="no">' + claimNoText(r) + '</b></span></div>' +
+      '<div class="logo"><img src="' + LOGO_SRC + '" alt=""></div>' +
+      '<div class="ttl">ใบเสร็จรับเงิน  โรงเรียนอนุบาลวิภาวี</div>' +
+      '<div class="hd">' + CLAIM_HEAD.addr + '<br>' + CLAIM_HEAD.phone + '<br>' + CLAIM_HEAD.lic + '</div>' +
+      '<div class="ln r">วันที่ <span class="v">' + day + '</span> เดือน <span class="v">' + mon + '</span> พ.ศ. <span class="v">' + yr + '</span></div>' +
+      '<div class="ln">ได้รับเงินจาก <span class="v grow">' + esc(r.student_name) + '</span> ชั้นอนุบาลปีที่ <span class="v">' + esc(lv.k) + '</span></div>' +
+      '<div class="ln">ชั้นประถมศึกษาปีที่ <span class="v">' + esc(lv.p) + '</span> ปีการศึกษา <span class="v">' + tl + '</span> ตามรายการต่อไปนี้</div>' +
+      '<table><tr><th style="width:14mm">ลำดับ</th><th>รายการ</th><th colspan="2" style="width:30mm">จำนวนเงิน</th></tr>' + rows +
+      '<tr><td colspan="2" class="c v">(' + bahtText(r.amount) + ')</td><td class="a v"><b>' + fmt(r.amount) + '</b></td><td class="st">-</td></tr></table>' +
+      '<div class="sigs"><div>ผู้รับเงิน ...................................<br>( ' + CLAIM_HEAD.receiver + ' )</div><div>ผู้จ่ายเงิน ...................................<br>( ......................................... )</div></div>' +
+    '</div>';
+  return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>ใบเสร็จสำหรับเบิก ' + claimNoText(r) + '</title><style>' +
+    '@page{size:A4 portrait;margin:0}*{box-sizing:border-box;margin:0;padding:0}' +
+    "body{font-family:'Sarabun','TH SarabunPSK',sans-serif;color:#111;background:#fff;-webkit-text-size-adjust:100%;text-size-adjust:100%}" +
+    '.pg{width:297mm;height:210mm;position:relative;overflow:hidden;margin:0 auto}' +
+    '.sheet{width:297mm;height:210mm;display:flex}' +
+    '.cr{width:148.5mm;height:210mm;padding:9mm 10mm 8mm;position:relative;font-size:15px;line-height:1.55}' +
+    '.cr+.cr{border-left:1.5px dashed #888}' +
+    '.top{display:flex;justify-content:space-between;align-items:center;font-size:13.5px}' +
+    '.tag{border:1.3px solid #111;padding:1px 10px;border-radius:4px;font-size:12.5px;font-weight:700}' +
+    '.no{color:#B91C1C;font-size:15px}' +
+    '.logo{text-align:center;margin:2mm 0 1mm}.logo img{width:20mm;height:20mm;object-fit:contain}' +
+    '.ttl{text-align:center;font-size:18px;font-weight:800}' +
+    '.hd{text-align:center;font-size:13px;line-height:1.5;margin-bottom:3mm}' +
+    '.ln{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;margin:1.2mm 0}.ln.r{justify-content:flex-end}' +
+    '.v{color:#0C3C8C;font-weight:600;border-bottom:1px dotted #555;padding:0 5px}.grow{flex:1;min-width:30mm}' +
+    'table{width:100%;border-collapse:collapse;margin-top:3mm;font-size:15px}' +
+    'th,td{border:1px solid #333;padding:1.8mm 2.5mm}th{font-weight:700}' +
+    '.c{text-align:center}.a{text-align:right;width:24mm}.st{width:7mm;text-align:center}' +
+    'td .v{border:none;padding:0}' +
+    '.sigs{display:flex;justify-content:space-between;margin-top:12mm;font-size:13.5px;text-align:center;line-height:2}' +
+    '@media print{.pg{width:210mm;height:297mm;margin:0}.sheet{position:absolute;top:0;left:0;transform-origin:top left;transform:rotate(90deg) translateY(-210mm)}}' +
+    '@media screen{body{padding:10px}.pg{box-shadow:0 2px 10px rgba(0,0,0,.15)}}' +
+    '</style></head><body><div class="pg"><div class="sheet">' + half('ต้นฉบับ') + half('สำเนา') + '</div></div></body></html>';
+}
+function claimPrint(id){
+  const r = _claim.rows.find(x => x.id === id); if(!r || r.voided_at) return;
+  const w = openPrintWindow();
+  if(!w){ toast('เบราว์เซอร์บล็อคหน้าต่างพิมพ์ · อนุญาต popup ก่อน', 'error'); return; }
+  w.document.write(claimPrintHTML(r));
+  w.document.close();
+  setTimeout(() => w.print(), 500);
 }
 
 function renderTimeline(s, myTx){

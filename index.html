@@ -2390,7 +2390,7 @@ function roomOwedKids(cls, monthNameTh){
     const od = getOverdueMonths(s);
     if(od.tuition && od.tuition.includes(mShort)) return true;
     // ต้นภาคเรียน (พ.ค./พ.ย.) ที่ถึงแล้ว: ยังไม่จ่ายเดือนล่วงหน้า (มิ.ย./ธ.ค.) ก็นับว่ายังชำระไม่ครบ 2 เดือน
-    if((si === 0 || si === 5) && dueMonthIdx() >= si){ const a = si + 1; if(a >= startMonthIdx(s) && !tuitionPaidSet(s).has(MONTHS[a])) return true; }
+    if((si === 0 || si === 5) && dueMonthIdx() >= si && invAdvClass(s.cls)){ const a = si + 1; if(a >= startMonthIdx(s) && !tuitionPaidSet(s).has(MONTHS[a])) return true; }
     return false;
   });
 }
@@ -2398,9 +2398,9 @@ function roomOwedKids(cls, monthNameTh){
 const MSG_ADV = {'พฤษภาคม':{p:'เดือนพฤษภาคม–มิถุนายน', s:'พ.ค.–มิ.ย.', t:'1', full:'พ.ค.–ก.ย.'}, 'พฤศจิกายน':{p:'เดือนพฤศจิกายน–ธันวาคม', s:'พ.ย.–ธ.ค.', t:'2', full:'พ.ย.–มี.ค.'}};
 function msgTpl(t, m, y, c){
   const SN = SCHOOL.name || 'โรงเรียนอนุบาลวิภาวี';
-  const ADV = MSG_ADV[m] || null;
+  const ADV = (MSG_ADV[m] && (t !== 'room' || invAdvClass(c))) ? MSG_ADV[m] : null;   // ห้องเนอร์ส/เตรียม = เดือนต่อเดือน
   const P = ADV ? ADV.p : 'เดือน' + m;   // "ประจำเดือนพฤศจิกายน–ธันวาคม" หรือ "ประจำเดือน…"
-  const ADVNOTE = ADV ? '\n\n📌 ต้นภาคเรียนที่ ' + ADV.t + ' ผู้ปกครองเลือกชำระได้ 2 แบบ ตามยอดในใบแจ้งชำระ\n   1) แบ่งชำระ ล่วงหน้า 2 เดือน (' + ADV.s + ')\n   2) ชำระครบทั้งภาคเรียน (' + ADV.full + ')' : '';
+  const ADVNOTE = ADV ? '\n\n📌 ต้นภาคเรียนที่ ' + ADV.t + ' (ชั้น อ.1–ป.6) ผู้ปกครองเลือกชำระได้ 2 แบบ ตามยอดในใบแจ้งชำระ\n   1) แบ่งชำระ ล่วงหน้า 2 เดือน (' + ADV.s + ')\n   2) ชำระครบทั้งภาคเรียน (' + ADV.full + ')' : '';
   if(t === 'notify') return '📢 ประชาสัมพันธ์ถึงผู้ปกครองนักเรียน\n🏫 ' + SN +
     '\nเรื่อง : ใบแจ้งชำระค่าเล่าเรียน ประจำ' + P + ' พ.ศ. ' + y +
     '\n\n📝 ' + SN + ' ขอเรียนแจ้งให้ทราบว่า ในวันนี้ทางโรงเรียนได้ดำเนินการแจก ใบแจ้งชำระค่าเล่าเรียน ประจำ' + P + ' พ.ศ. ' + y + ' ให้แก่นักเรียนเพื่อนำส่งผู้ปกครองเรียบร้อยแล้ว' +
@@ -2446,7 +2446,7 @@ function msgTpl(t, m, y, c){
   if(t === 'teacher') return '📢 แจ้งคุณครูทุกท่าน\n🏫 ' + SN +
     '\nเรื่อง : ขอเชิญรับใบแจ้งชำระค่าเล่าเรียน ประจำ' + P + ' พ.ศ. ' + y +
     '\n\n📝 งานธุรการได้จัดทำ ใบแจ้งชำระค่าเล่าเรียน ประจำ' + P + ' พ.ศ. ' + y + ' เรียบร้อยแล้ว' +
-    (ADV ? '\n\n📌 ใบแจ้งชำระต้นภาคเรียนที่ ' + ADV.t + ' แสดงยอดแบ่งชำระล่วงหน้า 2 เดือน (' + ADV.s + ') และยอดชำระครบทั้งภาคเรียน' : '') +
+    (ADV ? '\n\n📌 ใบแจ้งชำระต้นภาคเรียนที่ ' + ADV.t + ' ชั้น อ.1–ป.6 แสดงยอดแบ่งชำระล่วงหน้า 2 เดือน (' + ADV.s + ') และยอดชำระครบทั้งภาคเรียน · เนอร์เซอรี่/เตรียมอนุบาล ชำระเดือนต่อเดือน' : '') +
     '\n\n🙏 ขอความกรุณาคุณครูประจำชั้นทุกท่าน มารับใบแจ้งชำระได้ที่ห้องธุรการ เพื่อนำไปแจกให้นักเรียนนำส่งผู้ปกครอง' +
     '\n\n📌 ขอความกรุณาตรวจสอบจำนวนใบแจ้งให้ครบตามจำนวนนักเรียนในห้องด้วยนะคะ หากไม่ครบหรือมีข้อสงสัย แจ้งงานธุรการได้ทันที' +
     '\n\n☎️ สอบถามเพิ่มเติม : งานธุรการ\n📞 โทร. ' + (SCHOOL.phone||'081-700-9616') +
@@ -6238,13 +6238,15 @@ function tuitionPaidSet(s){
   }));
   return paid;
 }
+// 2 พ.ย. 69: ล่วงหน้า 2 เดือน + ทางเลือกจ่ายครบเทอม ใช้เฉพาะ อ.1–ป.6 · เนอร์เซอรี่/เตรียมอนุบาล เก็บเดือนต่อเดือน
+function invAdvClass(cls){ return !/^(เนอร์|เตรียม)/.test(String(cls||'')); }
 function invTermStart(d){ const m = (d || new Date()).getMonth() + 1; return m === 5 ? 0 : (m === 11 ? 5 : -1); }   // index เดือนแรกของเทอม หรือ -1
 function invoiceCalc(s){
   const p = getPriceForClass(s.cls);
   const busPrice = getBusPrice(s.village);
   const items = [];
   const overdueMonths = getOverdueMonths(s);
-  const tStart = invTermStart();
+  const tStart = invAdvClass(s.cls) ? invTermStart() : -1;
   let tuiMonths = overdueMonths.tuition.slice(), advIdx = -1, perMonth = 0, alt = 0;
   if(p && s.discount !== 'ฟรี 100%'){
     perMonth = s.discount==='ลด 50%' ? p.monthly*0.5 : p.monthly;

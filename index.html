@@ -4902,17 +4902,70 @@ function claimPaidTerm(s, term){
   });
   return {amount: Math.floor(sum + 0.0001), months: ms.filter(m => got.has(m))};
 }
+// 3 พ.ย. 69: เด็กที่ไม่ได้จ่ายค่าเทอมในเทอมนั้น (เรียนฟรี) → ใบแสดงเงินที่จ่ายจริงแยกตามบรรทัด (ค่ารถ/ชุด/สระ ฯลฯ) · ไม่ลงเป็นค่าธรรมเนียมการศึกษา
+function claimTermRange(term){ const y = AY - 543; return term === 1 ? [new Date(y, 4, 1), new Date(y, 10, 1)] : [new Date(y, 10, 1), new Date(y + 1, 4, 1)]; }
+function claimRowOf(L){
+  if(/^ค่าเทอม|คอร์ส|^หนี้เก่า|ส่วนลด/.test(L)) return null;
+  if(/^ค่าหนังสือ/.test(L)) return 2;
+  if(/^ค่ารถ/.test(L)) return 3;
+  if(/^ค่าประกัน/.test(L)) return 5;
+  if(/^ค่าสระ/.test(L)) return 6;
+  if(/^ค่าดนตรี/.test(L)) return 'ค่าดนตรี';
+  if(/^ค่าภาษาอังกฤษ/.test(L)) return 'ค่าภาษาอังกฤษ';
+  const cf = (SCHOOL.customFees || []).find(c => c.label && L.indexOf(c.label) === 0); if(cf) return String(cf.label);
+  const nm = L.replace(/^ค้างค่าของ \([^)]*\):\s*/, ''), base = nm.replace(/\s*×.*$/, '').trim();
+  if((STOCK || []).some(x => x.item === base) || /ชุด|เสื้อ|กางเกง|กระโปรง|เนคไท|โบว์|ถุงเท้า|รองเท้า|เข็มขัด|หมวก/.test(nm)) return 4;
+  if(/สมุด|ปากกา|ดินสอ|ยางลบ|ไม้บรรทัด|สีไม้|สีเทียน|กระเป๋า|แฟ้ม|เครื่องเขียน|อุปกรณ์/.test(nm)) return 2;
+  return base.slice(0, 40) || 'อื่นๆ';
+}
+function claimTermShare(i, t, term){
+  const ms = claimTermMonths(term), ml = i.monthsList || [], amt = Number(i.amount) || 0;
+  if(ml.length) return amt * ml.filter(m => ms.indexOf(m) >= 0).length / ml.length;
+  const tl = (i.termsList && i.termsList.length) ? i.termsList.map(String) : null;
+  if(tl) return tl.indexOf(String(term)) >= 0 ? amt / tl.length : 0;
+  const lm = String(i.label || '').match(/เทอม\s*(\d)/);
+  if(lm && /^ค่า(สระ|ดนตรี|ภาษา)/.test(i.label)) return +lm[1] === term ? amt : 0;
+  const rg = claimTermRange(term), d = new Date(t.date);
+  return (d >= rg[0] && d < rg[1]) ? amt : 0;
+}
+function claimItemsTerm(s, term){
+  const acc = {};
+  activeTX().filter(t => t.studentId === s.id && inCurrentAY(t.date)).forEach(t => {
+    const items = t.items || [];
+    const pos = items.filter(i => Number(i.amount) > 0).reduce((a,i) => a + Number(i.amount), 0);
+    const neg = items.filter(i => Number(i.amount) < 0 && !/^ค่าคอร์ส/.test(i.label||'')).reduce((a,i) => a + Number(i.amount), 0);
+    const ratio = pos > 0 ? Math.max(0, (pos + neg) / pos) : 1;
+    items.forEach(i => {
+      if(!(Number(i.amount) > 0)) return;
+      const R = claimRowOf(String(i.label || '')); if(R === null) return;
+      const v = claimTermShare(i, t, term) * ratio; if(v <= 0) return;
+      const k = String(R); acc[k] = (acc[k] || 0) + v;
+    });
+  });
+  const ord = k => isNaN(+k) ? 100 : +k;
+  return Object.keys(acc).map(k => ({key: k, row: isNaN(+k) ? k : +k, label: isNaN(+k) ? k : CLAIM_ROWS[+k - 1], amount: Math.floor(acc[k] + 0.0001)}))
+    .filter(x => x.amount > 0).sort((a,b) => (ord(a.key) - ord(b.key)) || a.key.localeCompare(b.key));
+}
 function claimAmount(s){
   const P = claimPaidTerm(s, _claim.term), lv = claimLevel(s.cls);
+  const itemized = P.amount <= 0;
+  const I = itemized ? claimItemsTerm(s, _claim.term) : [];
+  const on = I.filter(x => !(_claim.off || {})[x.key]);
+  const base = itemized ? on.reduce((a,x) => a + x.amount, 0) : P.amount;
   const want = _claim.mode === 'gov' ? (lv.kind === 'p' ? CLAIM_GOV.p : CLAIM_GOV.k)
-             : _claim.mode === 'full' ? P.amount : Math.round(+$('clm-own').value || 0);
-  return {P, want, amt: Math.min(want, P.amount), over: want > P.amount};
+             : _claim.mode === 'full' ? base : Math.round(+$('clm-own').value || 0);
+  const amt = Math.max(0, Math.min(want, base));
+  let left = amt;
+  const lines = itemized ? on.map(x => { const v = Math.min(x.amount, left); left -= v; return {row: x.row, label: x.label, amount: v}; }).filter(x => x.amount > 0)
+                         : (amt > 0 ? [{row: 1, label: CLAIM_ROWS[0], amount: amt}] : []);
+  return {P, I, itemized, base, want, amt, over: want > base, lines};
 }
+function claimToggle(el){ (_claim.off = _claim.off || {})[el.dataset.k] = !el.checked; claimRender(); }
 function claimToday(){ return new Date().toLocaleDateString('en-CA', {timeZone: 'Asia/Bangkok'}); }
 async function openClaim(){
   if(IS_COUNTER) return;
   const s = STUDENTS.find(x => x.id === detailStudentId); if(!s) return;
-  _claim = {sid: s.id, rows: [], mode: 'gov', term: claimDefaultTerm(), ok: false, lastId: null, busy: false};
+  _claim = {sid: s.id, rows: [], mode: 'gov', term: claimDefaultTerm(), ok: false, lastId: null, busy: false, off: {}};
   $('clm-title').textContent = '🧾 ใบเสร็จสำหรับเบิก · ' + s.nick + ' (' + s.cls + ')';
   $('clm-term').innerHTML = '<option value="1">เทอม 1/' + AY + '</option><option value="2">เทอม 2/' + AY + '</option>';
   $('clm-term').value = String(_claim.term);
@@ -4941,15 +4994,20 @@ function setClaimMode(m){
 function claimRender(){
   const s = STUDENTS.find(x => x.id === _claim.sid); if(!s) return;
   const A = claimAmount(s);
-  $('clm-paid').innerHTML = A.P.amount > 0
+  $('clm-paid').innerHTML = !A.itemized
     ? '💰 ค่าเทอม เทอม ' + _claim.term + '/' + AY + ' ที่จ่ายแล้ว <b>฿' + fmt(A.P.amount) + '</b> <span style="color:#6B7280">(' + A.P.months.join(', ') + ')</span>'
-    : '<span style="color:#B91C1C">⚠ เทอม ' + _claim.term + '/' + AY + ' ยังไม่มีค่าเทอมที่จ่ายแล้ว · ออกใบเบิกไม่ได้</span>';
+    : (A.I.length
+      ? '<div>💰 เทอม ' + _claim.term + '/' + AY + ' ไม่ได้จ่ายค่าเทอม (เรียนฟรี) · เงินที่จ่ายให้โรงเรียนในเทอมนี้:</div>' +
+        A.I.map(x => '<label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" data-k="' + esc(x.key) + '" onchange="claimToggle(this)"' + ((_claim.off || {})[x.key] ? '' : ' checked') + '> ' + esc(x.label) + ' <b style="margin-left:auto">฿' + fmt(x.amount) + '</b></label>').join('') +
+        '<div style="font-size:12.5px;color:#6B7280;margin-top:4px">ใบจะแสดงแยกบรรทัดตามเงินที่จ่ายจริง (ไม่ลงเป็นค่าธรรมเนียมการศึกษา) · หน่วยงานพิจารณาเองว่าเบิกบรรทัดไหนได้</div>'
+      : '<span style="color:#B91C1C">⚠ เทอม ' + _claim.term + '/' + AY + ' ยังไม่มีเงินที่จ่ายให้โรงเรียน · ออกใบเบิกไม่ได้</span>');
   let sum = '';
-  if(A.P.amount > 0){
+  if(A.base > 0){
     if(_claim.mode === 'own' && !(+$('clm-own').value > 0)) sum = '<span style="color:#6B7280">พิมพ์ยอดที่ต้องการในช่อง "พิมพ์เอง"</span>';
     else {
       sum = 'ยอดในใบ <b style="font-size:17px;color:#1A3A8F">฿' + fmt(A.amt) + '</b> <span style="color:#6B7280">(' + bahtText(A.amt) + ')</span>';
-      if(A.over) sum += '<div style="color:#B91C1C;margin-top:4px">⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกินค่าเทอมที่จ่ายจริง → ใช้ได้ไม่เกิน ฿' + fmt(A.P.amount) + '</div>';
+      if(A.over) sum += '<div style="color:#B91C1C;margin-top:4px">⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกิน' + (A.itemized ? 'เงินที่จ่ายจริง' : 'ค่าเทอมที่จ่ายจริง') + ' → ใช้ได้ไม่เกิน ฿' + fmt(A.base) + '</div>';
+      if(A.itemized && A.lines.length) sum += '<div style="font-size:13px;color:#374151;margin-top:4px">ในใบ: ' + A.lines.map(x => esc(x.label) + ' ฿' + fmt(x.amount)).join(' · ') + '</div>';
     }
   }
   $('clm-sum').innerHTML = sum;
@@ -4973,14 +5031,14 @@ async function claimIssue(){
   const s = STUDENTS.find(x => x.id === _claim.sid); if(!s || _claim.busy) return;
   if(!_claim.ok){ toast('⚠ ยังโหลดประวัติใบเบิกไม่ได้ · ' + (/claim_receipts|relation|schema cache/i.test(_claim.err||'') ? 'ต้องรัน SQL ก่อน' : 'ลองปิดแล้วเปิดใหม่'), 'error'); return; }
   const A = claimAmount(s), term = _claim.term;
-  if(A.P.amount <= 0){ toast('⚠ เทอมนี้ยังไม่มีค่าเทอมที่จ่ายแล้ว · ออกใบเบิกไม่ได้', 'error'); return; }
+  if(A.base <= 0){ toast(A.itemized ? '⚠ เทอมนี้ยังไม่มีเงินที่จ่ายให้โรงเรียน (หรือไม่ได้ติ๊กรายการ) · ออกใบเบิกไม่ได้' : '⚠ เทอมนี้ยังไม่มีค่าเทอมที่จ่ายแล้ว · ออกใบเบิกไม่ได้', 'error'); return; }
   if(_claim.mode === 'own' && !(+$('clm-own').value > 0)){ toast('⚠ พิมพ์ยอดในช่อง "พิมพ์เอง" ก่อน', 'error'); return; }
   if(A.amt <= 0){ toast('ยอดต้องมากกว่า 0', 'error'); return; }
   const name = $('clm-name').value.trim(); if(!name){ toast('⚠ ใส่ชื่อเด็กก่อน', 'error'); return; }
   const date = $('clm-date').value; if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ toast('⚠ เลือกวันที่ก่อน', 'error'); return; }
   const prev = _claim.rows.filter(r => r.term === term && !r.voided_at);
-  let msg = '🧾 ออกใบเสร็จสำหรับเบิก\n\n' + name + ' (' + s.cls + ')\nเทอม ' + term + '/' + AY + '\nยอด ฿' + fmt(A.amt) + ' (' + bahtText(A.amt) + ')';
-  if(A.over) msg += '\n\n⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกินค่าเทอมที่จ่ายจริง → ใช้ ฿' + fmt(A.amt);
+  let msg = '🧾 ออกใบเสร็จสำหรับเบิก\n\n' + name + ' (' + s.cls + ')\nเทอม ' + term + '/' + AY + '\nยอด ฿' + fmt(A.amt) + ' (' + bahtText(A.amt) + ')' + (A.itemized ? '\n\nรายการในใบ (ตามที่จ่ายจริง):\n' + A.lines.map(x => '• ' + x.label + ' ฿' + fmt(x.amount)).join('\n') : '');
+  if(A.over) msg += '\n\n⚠ ยอดที่เลือก ฿' + fmt(A.want) + ' เกิน' + (A.itemized ? 'เงินที่จ่ายจริง' : 'ค่าเทอมที่จ่ายจริง') + ' → ใช้ ฿' + fmt(A.amt);
   if(prev.length) msg = '⚠ เทอมนี้เคยออกใบเบิกให้เด็กคนนี้แล้ว:\n' + prev.map(r => '• เลขที่ ' + claimNoText(r) + ' ฿' + fmt(r.amount)).join('\n') + '\n\nถ้าแค่จะพิมพ์ใบเดิมอีกครั้ง → กด "ยกเลิก" แล้วกด 🖨 พิมพ์ซ้ำ\nถ้าจะออกใบใหม่จริง → กด "ตกลง"\n\n' + msg;
   if(!confirm(msg)) return;
   _claim.busy = true; claimRender();
@@ -4991,7 +5049,7 @@ async function claimIssue(){
       if(e1) throw e1;
       const row = {id: base + i, ay: AY, term, no: ((mx && mx[0] && mx[0].no) || 0) + 1, student_id: s.id, student_name: name, student_class: s.cls,
         amount: A.amt, mode: _claim.mode, receipt_date: date, created_by: cashierName || 'วีรญา',
-        data: {level: claimLevel(s.cls), paid: A.P.amount, paidMonths: A.P.months, nick: s.nick}};
+        data: {level: claimLevel(s.cls), paid: A.itemized ? A.base : A.P.amount, paidMonths: A.P.months, nick: s.nick, itemized: A.itemized, items: A.lines}};
       const { error } = await sb.from('claim_receipts').insert(row);
       let ok = !error;
       if(error && !/duplicate|unique/i.test(error.message || '')){
@@ -5023,9 +5081,14 @@ function claimPrintHTML(r){
   const d = new Date(r.receipt_date + 'T12:00:00');
   const day = d.getDate(), mon = d.toLocaleDateString('th-TH', {month: 'long'}), yr = d.getFullYear() + 543;
   const tl = r.term + '/' + r.ay;
-  const rows = CLAIM_ROWS.map((L, i) => '<tr><td class="c">' + (i + 1) + '</td><td>' + L + (i === 0 ? ' <span class="v">' + tl + '</span>' : '') + '</td><td class="a">' + (i === 0 ? fmt(r.amount) : '') + '</td><td class="st">' + (i === 0 ? '-' : '') + '</td></tr>').join('');
+  const its = (r.data && Array.isArray(r.data.items) && r.data.items.length) ? r.data.items : null;
+  const amtOf = n => its ? its.filter(x => x.row === n).reduce((a,x) => a + Number(x.amount), 0) : (n === 1 ? Number(r.amount) : 0);
+  const extras = its ? its.filter(x => typeof x.row === 'string') : [];
+  const trow = (n, L, v) => '<tr><td class="c">' + n + '</td><td>' + L + '</td><td class="a">' + (v > 0 ? fmt(v) : '') + '</td><td class="st">' + (v > 0 ? '-' : '') + '</td></tr>';
+  const rows = CLAIM_ROWS.map((L, i) => trow(i + 1, L + (i === 0 ? ' <span class="v">' + tl + '</span>' : ''), amtOf(i + 1))).join('') + extras.map((x, j) => trow(7 + j, esc(x.label), Number(x.amount))).join('');
+  const dense = extras.length ? ' dense' : '';
   const half = (tag) =>
-    '<div class="cr">' +
+    '<div class="cr' + dense + '">' +
       '<div class="top"><span class="tag">' + tag + '</span><span>เลขที่ใบเสร็จ <b class="no">' + claimNoText(r) + '</b></span></div>' +
       '<div class="logo"><img src="' + LOGO_SRC + '" alt=""></div>' +
       '<div class="ttl">ใบเสร็จรับเงิน  โรงเรียนอนุบาลวิภาวี</div>' +
@@ -5057,6 +5120,7 @@ function claimPrintHTML(r){
     '.c{text-align:center}.a{text-align:right;width:24mm}.st{width:7mm;text-align:center}' +
     'td .v{border:none;padding:0}' +
     '.sigs{display:flex;justify-content:space-between;margin-top:12mm;font-size:13.5px;text-align:center;line-height:2}' +
+    '.cr.dense th,.cr.dense td{padding:1.1mm 2.5mm}.cr.dense .sigs{margin-top:6mm}.cr.dense .logo img{width:16mm;height:16mm}' +
     '@media print{.pg{width:210mm;height:297mm;margin:0}.sheet{position:absolute;top:0;left:0;transform-origin:top left;transform:rotate(90deg) translateY(-210mm)}}' +
     '@media screen{body{padding:10px}.pg{box-shadow:0 2px 10px rgba(0,0,0,.15)}}' +
     '</style></head><body><div class="pg"><div class="sheet">' + half('ต้นฉบับ') + half('สำเนา') + '</div></div></body></html>';

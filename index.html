@@ -3691,7 +3691,9 @@ function term2Stats(){
     const paidM = free ? [] : months.filter(m => ps.tuition.has(m));
     const fees = T2_FEES.filter(([b,k]) => p && p[k] > 0);
     const remF = fees.filter(([b]) => !(ps.terms[b] && ps.terms[b].has(2)));
-    const dueM = remM.filter(m => MONTHS.indexOf(m) <= dueIdx);
+    // 3 พ.ย. 69: ต้นเทอม (พ.ย.) ชั้น อ.1–ป.6 นับ ธ.ค. เป็นถึงกำหนดด้วย ให้ตรงกับใบแจ้งหนี้/ข้อความไลน์ (ล่วงหน้า 2 เดือน)
+    const advI = (invTermStart() === 5 && invAdvClass(s.cls)) ? 6 : -1;
+    const dueM = remM.filter(m => MONTHS.indexOf(m) <= dueIdx || MONTHS.indexOf(m) === advI);
     const dueF = CUR_TERM >= 2 ? remF : [];
     const st = (remM.length === 0 && remF.length === 0) ? 'full' : ((paidM.length > 0 || remF.length < fees.length) ? 'part' : 'none');
     const remAmt = remM.length * per + remF.reduce((a,[b,k]) => a + p[k], 0);

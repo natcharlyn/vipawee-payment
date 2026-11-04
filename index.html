@@ -2170,6 +2170,50 @@ function doRefSearch(v){ refSearchTxt = (v||'').trim(); renderReferralPage(); }
 function openRefDetail(key){ refDetailKey = key; renderReferralPage(); window.scrollTo(0,0); }
 function backRefList(){ refDetailKey = null; renderReferralPage(); window.scrollTo(0,0); }
 
+// 4 พ.ย. 69: ข้อความแจ้งผู้แนะนำ (กดคัดลอก → วางไลน์) · ข้อมูลจากระบบจริง
+function refT2Done(child){
+  if(!child) return false; if(child.discount === 'ฟรี 100%') return true;
+  const ps = paidState(child), si = startMonthIdx(child);
+  return T2_MONTHS.filter(m => MONTHS.indexOf(m) >= si).every(m => ps.tuition.has(m));
+}
+function refMsgText(r){
+  const isT = r.type === 'teacher';
+  const kidsTxt = r.kids.map(k => 'น้อง' + k.nick).join(' และ ');
+  const earned = [];
+  r.kids.forEach(k => refKidMonthRows(k).forEach(x => { if(x.credit > 0) earned.push(x.label + (r.kids.length > 1 ? ' (น้อง' + k.nick + ')' : '')); }));
+  const nm = String(r.name || '').trim();
+  const L = ['🤝 โครงการเพื่อนบ้านชวนเรียน · ' + (isT ? 'สำหรับคุณครู' : SCHOOL.name), ''];
+  if(isT){
+    L.push('ขอบคุณ' + (/^ครู/.test(nm) ? '' : 'ครู') + nm + ' ที่แนะนำ' + kidsTxt + ' มาเรียนกับเรานะคะ 🙏', '');
+    L.push('✅ สิทธิ์ที่ได้รับ', 'โบนัส 100 บาท/เดือน ต่อน้อง 1 คน ทุกเดือนที่น้องชำระค่าเทอมภายในเดือนนั้น (เริ่ม พ.ย. 2569)');
+    L.push(r.bonus > 0 ? 'ตอนนี้ได้สิทธิ์โบนัสรวม ' + fmt(r.bonus) + ' บาท (' + earned.join(', ') + ')' : 'ตอนนี้ยังไม่มีเดือนที่ได้สิทธิ์ · จะเริ่มนับเมื่อน้องชำระค่าเทอมภายในเดือน', '');
+    L.push('💵 รับเป็นโบนัสในเงินเดือน (ไม่ใช่ส่วนลดค่าเทอม)', 'โบนัสของเดือนไหน จะเข้าสลิปเงินเดือนเดือนถัดไป', 'เช่น น้องจ่ายตรงเดือน พ.ย. → โบนัสเข้าสลิปเงินเดือน ธ.ค.', '');
+    L.push('ชวนได้ไม่จำกัดจำนวนน้องค่ะ 😊');
+    return L.join('\n');
+  }
+  const who = r.child ? ((/^นาย(?!ก)/.test(nm) ? 'คุณพ่อ' : (/^(นาง|นางสาว|น\.ส\.)/.test(nm) ? 'คุณแม่' : 'คุณพ่อคุณแม่')) + 'น้อง' + r.child.nick) : ('คุณ' + nm);
+  L.push('ขอบคุณ' + who + ' ที่แนะนำ' + kidsTxt + ' มาเรียนกับเรานะคะ 🙏', '');
+  L.push('✅ สิทธิ์ที่ได้รับ', 'เครดิต 100 บาท/เดือน ทุกเดือนที่' + kidsTxt + 'ชำระค่าเทอมภายในเดือนนั้น (เริ่ม พ.ย. 2569)' + (r.kids.length > 1 ? ' · คิดแยกรายคน' : ''));
+  if(r.accrued > 0) L.push('ตอนนี้มีเครดิตคงเหลือ ' + fmt(r.balance) + ' บาท' + (r.redeemed > 0 ? ' (สะสม ' + fmt(r.accrued) + ' · ใช้ไปแล้ว ' + fmt(r.redeemed) + ')' : '') + ' · เดือนที่ได้เครดิต: ' + earned.join(', '));
+  else L.push('ตอนนี้ยังไม่มีเครดิต · จะเริ่มนับเมื่อ' + kidsTxt + 'ชำระค่าเทอมภายในเดือน');
+  L.push('');
+  const done = refT2Done(r.child), kn = r.child ? 'น้อง' + r.child.nick : 'บุตร';
+  L.push(r.free ? '💰 วิธีรับเครดิต' : '💰 รับเครดิตได้ 2 แบบ');
+  if(r.free){
+    L.push('• รับเป็นเงินสดที่โรงเรียน (' + kn + 'เรียนฟรี จึงหักเป็นส่วนลดไม่ได้) · แจ้งธุรการได้เลยค่ะ');
+  } else {
+    L.push('1) หักเป็นส่วนลดค่าเทอม' + kn + ' ตอนมาชำระ' + (done ? 'ครั้งถัดไป' : ' (ระบบหักให้อัตโนมัติ)'));
+    L.push('2) รับเป็นเงินสดที่โรงเรียน' + (done ? ' (เนื่องจากชำระค่าเทอม 2 ครบแล้ว)' : '') + ' · แจ้งธุรการได้เลยค่ะ');
+  }
+  L.push('', '🧾 ดูยอดเครดิตคงเหลือได้ที่ท้ายใบเสร็จทุกใบ', '', 'ชวนเพื่อนบ้านเพิ่มได้ไม่จำกัด ยิ่งชวนมาก ยิ่งได้เครดิตมากค่ะ 😊');
+  return L.join('\n');
+}
+function copyRefMsg(key){
+  const r = refBuildList().find(x => x.key === key); if(!r){ toast('ไม่พบผู้แนะนำ', 'error'); return; }
+  const txt = refMsgText(r);
+  const done = () => toast('📋 คัดลอกข้อความแจ้ง ' + r.name + ' แล้ว · วางในไลน์ได้เลย');
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => prompt('กดค้าง → คัดลอก', txt)); else prompt('กดค้าง → คัดลอก', txt);
+}
 function renderReferralPage(){
   const box = $('ref-page'); if(!box) return;
   const list = refBuildList();
@@ -2248,7 +2292,8 @@ function renderReferralPage(){
       '<div style="flex:1;min-width:240px">' +
         '<div style="font-size:16.5px;font-weight:800">' + esc(r.name) + ' ' + badge + '</div>' +
         '<div style="font-size:12.5px;color:#6B7280;margin-top:3px">' + sub + '</div>' +
-        '<div style="margin-top:8px"><span class="lnk" style="color:#E8804B;font-weight:700;font-size:13.5px;cursor:pointer" onclick="openRefDetail(\'' + r.key.replace(/'/g,"\\'") + '\')">▶ ดูรายละเอียด (ชวนมา ' + r.kids.length + ' คน) →</span></div>' +
+        '<div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="lnk" style="color:#E8804B;font-weight:700;font-size:13.5px;cursor:pointer" onclick="openRefDetail(\'' + r.key.replace(/'/g,"\\'") + '\')">▶ ดูรายละเอียด (ชวนมา ' + r.kids.length + ' คน) →</span>' +
+        '<button class="btn btn-sm" onclick="copyRefMsg(\'' + r.key.replace(/'/g,"\\'") + '\')">📋 คัดลอกข้อความแจ้ง</button></div>' +
       '</div><div style="text-align:right;min-width:130px">' + money + '</div></div></div>';
   });
   box.innerHTML = h;
@@ -2260,7 +2305,7 @@ function renderRefDetail(box, list){
   const isT = r.type === 'teacher';
   const CARD = 'background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:12px';
   const HD = isT ? 'linear-gradient(135deg,#5B21B6,#7C3AED)' : 'linear-gradient(135deg,#1F4E78,#2E75B6)';
-  let h = '<div style="margin-bottom:10px"><button class="btn" onclick="backRefList()">← กลับไปรายชื่อ</button></div>';
+  let h = '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="backRefList()">← กลับไปรายชื่อ</button><button class="btn btn-primary" onclick="copyRefMsg(\'' + r.key.replace(/'/g,"\\'") + '\')">📋 คัดลอกข้อความแจ้งผู้แนะนำ</button></div>';
   h += '<div style="background:' + HD + ';color:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px">' +
     '<div style="font-size:21px;font-weight:800">' + (isT?'👩‍🏫 ':'👩 ') + esc(r.name) + '</div>' +
     '<div style="font-size:13px;opacity:.92;margin-top:3px">' +

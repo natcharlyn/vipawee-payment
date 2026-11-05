@@ -925,7 +925,7 @@ body.counter-mode #counter-cashier-lock{display:inline-block;font-weight:700;fon
    </div>
    <div class="card" style="border-left:4px solid #B45309">
     <div class="card-title" style="color:#B45309">🗓️ ปิดปีการศึกษา / ยกยอดค้างขึ้นปีใหม่</div>
-    <p style="color:#6B7280;margin-bottom:10px;font-size:14px">ใช้ตอน<strong>สิ้นปีการศึกษา</strong> (มี.ค.–เม.ย.) ก่อนเลื่อนชั้น · ระบบจะคำนวณยอดค้างทั้งปีของนักเรียนทุกคน แล้วยกไปเป็น "ยอดยกมา" ในปีใหม่ เพื่อตามเก็บต่อ<br>⚠ <strong>ทำครั้งเดียวต่อปี</strong> · แนะนำกด Backup ก่อนทุกครั้ง · ควรยกยอดก่อนเลื่อนชั้นเสมอ</p>
+    <p style="color:#6B7280;margin-bottom:10px;font-size:14px">ใช้ตอน<strong>สิ้นปีการศึกษา</strong> (ภายใน 31 มี.ค. · 1 เม.ย. ระบบขึ้นปีการศึกษาใหม่) ก่อนเลื่อนชั้น · ระบบจะคำนวณยอดค้างทั้งปีของนักเรียนทุกคน แล้วยกไปเป็น "ยอดยกมา" ในปีใหม่ เพื่อตามเก็บต่อ<br>⚠ <strong>ทำครั้งเดียวต่อปี</strong> · แนะนำกด Backup ก่อนทุกครั้ง · ควรยกยอดก่อนเลื่อนชั้นเสมอ</p>
     <button class="btn" style="background:#B45309;color:#fff" onclick="previewCarryForward()">📥 ดูตัวอย่าง + ยกยอดค้างขึ้นปีใหม่</button>
   </div>
    <div class="card" style="border-left:4px solid #DC2626">
@@ -1858,24 +1858,24 @@ const today = () => new Date().toLocaleDateString('th-TH',{year:'numeric',month:
 const MONTHS = ['พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.'];
 const MONTH_NUMS = [5,6,7,8,9,11,12,1,2,3]; // skip October (closed)
 // เดือนล่าสุดที่ถึงกำหนดจ่ายแล้ว (index ใน MONTHS) · ต.ค. (ปิดเทอม) = ถึง ก.ย. · เม.ย. (ปิดเทอม) = ถึง มี.ค. — แก้บั๊ก 1 ต.ค. 69 ยอดค้างหายหมดช่วงปิดเทอม
-function dueMonthIdx(d){ const m=(d||new Date()).getMonth()+1; const i=MONTH_NUMS.indexOf(m); if(i>=0) return i; if(m===10) return MONTH_NUMS.indexOf(9); if(m===4) return MONTH_NUMS.indexOf(3); return 0; }
+function dueMonthIdx(d){ const m=(d||new Date()).getMonth()+1; const i=MONTH_NUMS.indexOf(m); if(i>=0) return i; if(m===10) return MONTH_NUMS.indexOf(9); if(m===4) return -1; return 0; }   // เม.ย. = ปีใหม่ ยังไม่มีเดือนถึงกำหนด (-1)
 function getAcademicYear(){
   const now = new Date();
   const m = now.getMonth() + 1;
   const y = now.getFullYear();
-  return ((m >= 5) ? y : y - 1) + 543;
+  return ((m >= 4) ? y : y - 1) + 543;   // 5 พ.ย. 69: เม.ย. = ปีการศึกษาใหม่แล้ว (ผปค.ทยอยจ่ายค่าเทอมปีหน้า)
 }
 function getCurrentTerm(){
   const m = new Date().getMonth() + 1;
   if(m >= 5 && m <= 9) return 1;
   if(m >= 11 || m <= 3) return 2;
-  return 1;
+  return 1;   // เม.ย. = เทอม 1 ของปีการศึกษาใหม่ · ต.ค. = ปิดเทอมหลังเทอม 1
 }
 const AY = getAcademicYear();
 const CUR_TERM = getCurrentTerm();
-// ช่วงปีการศึกษาปัจจุบัน (1 พ.ค. ปีนี้ → 30 เม.ย. ปีหน้า) · ใช้กรองธุรกรรมไม่ให้ค่าจ่ายของปีเก่าปนเข้าปีใหม่
-const AY_START = new Date(AY - 543, 4, 1);
-const AY_END = new Date(AY - 543 + 1, 3, 30, 23, 59, 59);
+// ช่วงปีการศึกษาปัจจุบัน (1 เม.ย. ปีนี้ → 31 มี.ค. ปีหน้า · 5 พ.ย. 69 เดิม 1 พ.ค.) · ใช้กรองธุรกรรมไม่ให้ค่าจ่ายของปีเก่าปนเข้าปีใหม่
+const AY_START = new Date(AY - 543, 3, 1);                 // 1 เม.ย. (เดิม 1 พ.ค.)
+const AY_END = new Date(AY - 543 + 1, 2, 31, 23, 59, 59);   // 31 มี.ค. ปีหน้า
 function inCurrentAY(d){ const x = new Date(d); return x >= AY_START && x <= AY_END; }
 
 function toast(msg, type='success'){
@@ -2102,7 +2102,7 @@ function refBuildList(){
 function refActionItems(list){
   const items = [];
   const freeOwed = list.filter(r => r.type==='parent' && r.free && r.balance > 0);
-  if(freeOwed.length) items.push({t:'w', x:'ผู้แนะนำ ' + freeOwed.length + ' คน ลูกเรียนฟรี 100% (หักส่วนลดไม่ได้) → ต้องคืนเป็นเงินสด รวม ฿' + fmt(freeOwed.reduce((a,r)=>a+r.balance,0))});
+  if(freeOwed.length) items.push({t:'w', x:'ผู้แนะนำ ' + freeOwed.length + ' คน ลูกเรียนฟรี 100% (หักค่าเทอมไม่ได้) → คืนเป็นเงินสด หรือใช้หักค่าชุด/ค่าของ รวม ฿' + fmt(freeOwed.reduce((a,r)=>a+r.balance,0))});
   const noChild = list.filter(r => r.type==='parent' && !r.child);
   if(noChild.length) items.push({t:'w', x:'ผู้แนะนำ ' + noChild.length + ' คน ยังไม่ได้ระบุ "ลูกของผู้แนะนำ" → ระบบหักส่วนลดที่ใบเสร็จไม่ได้ (แก้ที่หน้านักเรียน)'});
   const bal = list.reduce((a,r)=>a+r.balance,0);
@@ -2133,7 +2133,7 @@ function refKidMonthRows(kid){
         if(!(it.label && it.label.startsWith('ค่าเทอม'))) return;
         if(!(it.monthsList||[]).includes(m.name)) return;
         const d = new Date(t.date);
-        const ay = (d.getMonth()+1) >= 5 ? d.getFullYear() : d.getFullYear()-1;
+        const ay = (d.getMonth()+1) >= 4 ? d.getFullYear() : d.getFullYear()-1;
         const yOfM = m.num >= 5 ? ay : ay+1;
         if(yOfM !== m.gy) return;
         if(!paidDate || d < new Date(paidDate)) paidDate = t.date;
@@ -2199,13 +2199,9 @@ function refMsgText(r){
   else L.push('ตอนนี้ยังไม่มีเครดิต · จะเริ่มนับเมื่อ' + kidsTxt + 'ชำระค่าเทอมภายในเดือน');
   L.push('');
   const done = refT2Done(r.child), kn = r.child ? 'น้อง' + r.child.nick : 'บุตร';
-  L.push(r.free ? '💰 วิธีรับเครดิต' : '💰 รับเครดิตได้ 2 แบบ');
-  if(r.free){
-    L.push('• รับเป็นเงินสดที่โรงเรียน (' + kn + 'เรียนฟรี จึงหักเป็นส่วนลดไม่ได้) · แจ้งธุรการได้เลยค่ะ');
-  } else {
-    L.push('1) หักเป็นส่วนลดค่าเทอม' + kn + ' ตอนมาชำระ' + (done ? 'ครั้งถัดไป' : ' (ระบบหักให้อัตโนมัติ)'));
-    L.push('2) รับเป็นเงินสดที่โรงเรียน' + (done ? ' (เนื่องจากชำระค่าเทอม 2 ครบแล้ว)' : '') + ' · แจ้งธุรการได้เลยค่ะ');
-  }
+  L.push('💰 รับเครดิตได้ 2 แบบ');
+  L.push('1) หักเป็นส่วนลดตอนมาชำระ' + (done ? 'ครั้งถัดไป' : '') + ' ใช้ได้ทั้ง' + (r.free ? '' : 'ค่าเทอม ') + 'ค่าชุด และค่าอื่นๆ ของ' + kn + ' (แจ้งครูตอนชำระว่าจะใช้เครดิต)');
+  L.push('2) รับเป็นเงินสดที่โรงเรียน' + (r.free ? '' : (done ? ' (เนื่องจากชำระค่าเทอม 2 ครบแล้ว)' : '')) + ' · แจ้งธุรการได้เลยค่ะ');
   L.push('', '🧾 ดูยอดเครดิตคงเหลือได้ที่ท้ายใบเสร็จทุกใบ', '', 'ชวนเพื่อนบ้านเพิ่มได้ไม่จำกัด ยิ่งชวนมาก ยิ่งได้เครดิตมากค่ะ 😊');
   return L.join('\n');
 }
@@ -2679,7 +2675,8 @@ function paidState(s){
 }
 function unpaidFeeItems(s){
   const p = getPriceForClass(s.cls);
-  if(!p) return [];   // เด็กฟรี 100% = ฟรีเฉพาะค่าเทอมรายเดือน · ค่าหนังสือ/ประกัน/รายเทอม จ่ายเองปกติ (ครูแนทยืนยัน 1 ต.ค. 69)
+  if(!p) return [];
+  if(dueMonthIdx() < 0) return [];   // 5 พ.ย. 69: เม.ย. = ปีการศึกษาใหม่แต่ยังไม่เปิดเทอม → ค่าหนังสือ/ประกัน/รายเทอม ยังไม่ถึงกำหนด (จ่ายล่วงหน้าได้ที่หน้ารับเงิน)   // เด็กฟรี 100% = ฟรีเฉพาะค่าเทอมรายเดือน · ค่าหนังสือ/ประกัน/รายเทอม จ่ายเองปกติ (ครูแนทยืนยัน 1 ต.ค. 69)
   const ps = paidState(s);
   const items = [];
   if(p.book && !ps.annual.has('ค่าหนังสือ')) items.push({label:'ค่าหนังสือ (ปี '+AY+')', amount:p.book});
@@ -2810,7 +2807,16 @@ let HAS_IDEBT = false;
 // 2 พ.ย. 69: เดือนเริ่มขึ้นรถ (เด็กเรียนอยู่แล้วแต่เพิ่งเริ่มใช้รถกลางปี เช่น นินจา/จ๊ะจ๋า เริ่ม พ.ย.) → เดือนรถก่อนหน้าไม่นับค้าง
 let HAS_BUSSTART = false;
 function busStartIdx(s){ const si = startMonthIdx(s); const b = (s && s.busStart) ? MONTHS.indexOf(s.busStart) : -1; return Math.max(si, b > 0 ? b : 0); }
-function unpaidDebts(s){ return (Array.isArray(s && s.itemDebts) ? s.itemDebts : []).filter(d => !d.paidAt && !d.cancelledAt); }
+// 5 พ.ย. 69: "จ่ายแล้ว" ดูจากใบเสร็จจริงเป็นหลัก · ยกเลิกใบเสร็จ = รายการกลับมาค้าง (เดิมค้างหายถาวร) · เน็ตหลุดตอนตั้ง paidAt = ยังนับว่าจ่าย (กันเก็บซ้ำ)
+function paidDebtIdSet(){ const set = new Set(); TX.forEach(t => { if(t.voidedAt) return; (t.items||[]).forEach(i => { if(i.debtId != null) set.add(String(i.debtId)); }); }); return set; }
+function debtIsPaid(d, ids){
+  ids = ids || paidDebtIdSet();
+  if(ids.has(String(d.id))) return true;                      // มีใบเสร็จ (ไม่ถูกยกเลิก) ที่จ่ายรายการนี้
+  if(!d.paidAt) return false;
+  if(d.paidReceipt && TX.some(x => x.receiptNo === d.paidReceipt)) return false;   // ใบที่จ่ายถูกยกเลิก / ไม่มีรายการนี้แล้ว → กลับมาค้าง
+  return true;                                                 // ข้อมูลเก่า หรือหาใบไม่เจอ → เชื่อ paidAt
+}
+function unpaidDebts(s){ const arr = Array.isArray(s && s.itemDebts) ? s.itemDebts : []; if(!arr.length) return []; const ids = paidDebtIdSet(); return arr.filter(d => !d.cancelledAt && !debtIsPaid(d, ids)); }
 function debtsTotal(s){ return unpaidDebts(s).reduce((a,d) => a + (Number(d.total)||0), 0); }
 function debtDesc(d){ return (d.items||[]).map(i => i.label).join(' + '); }
 function debtDate(d){ try{ return new Date(d.date).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); }catch(e){ return ''; } }
@@ -2861,7 +2867,7 @@ async function markDebtsPaid(tx){
   const ids = (tx.items||[]).filter(i => i.debtId).map(i => String(i.debtId)); if(!ids.length) return;
   const s = STUDENTS.find(x => x.id === tx.studentId); if(!s) return;
   await _freshDebts(s);
-  s.itemDebts.forEach(d => { if(ids.includes(String(d.id)) && !d.paidAt){ d.paidAt = tx.date; d.paidReceipt = tx.receiptNo; } });
+  s.itemDebts.forEach(d => { if(!ids.includes(String(d.id))) return; const oldOk = d.paidAt && d.paidReceipt && TX.some(x => x.receiptNo === d.paidReceipt && !x.voidedAt && x.id !== tx.id); if(!oldOk){ d.paidAt = tx.date; d.paidReceipt = tx.receiptNo; } });
   saveStudents();
 }
 function toggleItemDebt(el, id){
@@ -2900,7 +2906,7 @@ async function cancelItemDebt(sid, did){
   if(IS_COUNTER) return;
   const s = STUDENTS.find(x => x.id === sid); if(!s) return;
   await _freshDebts(s);
-  const d = s.itemDebts.find(x => String(x.id) === String(did)); if(!d || d.paidAt) return;
+  const d = s.itemDebts.find(x => String(x.id) === String(did)); if(!d || debtIsPaid(d)) return;
   const why = prompt('ลบรายการค้าง: ' + s.nick + ' · ' + debtDesc(d) + ' ฿' + fmt(d.total) + '\n\nเหตุผล (เช่น บันทึกผิด / คืนของแล้ว):'); if(why === null) return;
   d.cancelledAt = new Date().toISOString(); d.cancelReason = String(why||'').trim() || 'ลบโดยครูแนท';
   saveStudents(); renderDebtCards(); toast('ลบรายการค้างแล้ว');
@@ -3053,7 +3059,7 @@ function refOnTimeMonths(cId){ // จำนวนเดือนที่เด�
   const seen = new Set();
   activeTX().filter(t => t.studentId === cId).forEach(t => {
     const d = new Date(t.date);
-    const ay = (d.getMonth()+1) >= 5 ? d.getFullYear() : d.getFullYear()-1; // ปีการศึกษาของใบเสร็จ (เริ่ม พ.ค.)
+    const ay = (d.getMonth()+1) >= 4 ? d.getFullYear() : d.getFullYear()-1; // ปีการศึกษาของใบเสร็จ (เริ่ม เม.ย. · 5 พ.ย. 69)
     (t.items||[]).forEach(it => {
       if(!(it.label && it.label.startsWith('ค่าเทอม'))) return;
       (it.monthsList||[]).forEach(mName => {
@@ -3094,14 +3100,11 @@ function renderAutoDiscount(){
     if(bal <= 0){
       box += '<div style="padding:8px 10px;font-size:13px;color:#6B7280">ยังไม่มีเครดิตคงเหลือ · นับเมื่อน้องที่แนะนำจ่ายค่าเทอมตรงเดือน (สะสม ฿' + fmt(refCreditAccrued(s)) + ' · ใช้ไป ฿' + fmt(refCreditRedeemed(s)) + ')</div>';
     } else {
-      const p = getPriceForClass(s.cls);
-      const monthTuition = (p && s.discount !== 'ฟรี 100%') ? (s.discount === 'ลด 50%' ? p.monthly*0.5 : p.monthly) : 0;
-      const dflt = Math.min(bal, monthTuition > 0 ? monthTuition : bal);
-      owedSelected['refcredit'] = {amount: -dflt, label: 'ส่วนลดเครดิตชวนเรียน (คงเหลือ ฿' + fmt(bal) + ')', months: 0};
+      // 5 พ.ย. 69: ครูติ๊กเองว่าจะใช้เครดิตหรือไม่ (เดิมหักอัตโนมัติ −฿100 ทันทีที่เปิดชื่อ) · หักได้ทุกรายการในใบ ไม่เกินยอดในใบ
       box += '<div class="owed-row" style="background:#DCFCE7">' +
-        '<label style="display:flex;align-items:center;gap:8px;flex:1"><span style="color:#15803D;font-weight:600">💳 เครดิตคงเหลือ ฿' + fmt(bal) + ' · หักจากใบเสร็จนี้:</span></label>' +
-        '<span style="display:flex;align-items:center;gap:4px;font-weight:700;color:#16A34A">−฿<input type="number" id="refcredit-amt" min="0" max="' + bal + '" step="10" value="' + dflt + '" style="width:88px;padding:4px 6px;border:1px solid #16A34A;border-radius:6px;text-align:right;font-weight:700" oninput="setRefCredit(this)"></span></div>' +
-        '<div style="font-size:11px;color:#16A34A;margin-top:6px">💡 กรอกยอดที่จะหักได้เอง (ไม่เกินเครดิตคงเหลือ) · ส่วนที่ไม่หักเก็บเป็นเครดิตต่อ · ระบบกันยอดสุทธิไม่ให้ติดลบตอนบันทึก</div>' +
+        '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer"><input type="checkbox" class="chk-big" id="refcredit-on" onchange="updateTotal()"><span style="color:#15803D;font-weight:600">💳 ใช้เครดิต (คงเหลือ ฿' + fmt(bal) + ') · หักจากใบเสร็จนี้:</span></label>' +
+        '<span style="display:flex;align-items:center;gap:4px;font-weight:700;color:#16A34A">−฿<input type="number" id="refcredit-amt" min="0" max="' + bal + '" step="10" value="' + bal + '" data-want="' + bal + '" style="width:88px;padding:4px 6px;border:1px solid #16A34A;border-radius:6px;text-align:right;font-weight:700" oninput="setRefCredit(this)"></span></div>' +
+        '<div style="font-size:11px;color:#16A34A;margin-top:6px">💡 ติ๊ก = หักเครดิตจากยอดในใบนี้ (ค่าเทอม ค่าชุด หรือค่าอื่นๆ) ไม่เกินยอดในใบ · ไม่ติ๊ก = เก็บเครดิตไว้ใช้ครั้งหน้า</div>' +
         '<div id="refcredit-warn" style="color:#DC2626;font-weight:700;font-size:11.5px;margin-top:4px"></div>';
     }
   }
@@ -3109,21 +3112,29 @@ function renderAutoDiscount(){
   $('owed-list').insertAdjacentHTML('beforeend', box);
 }
 function setRefCredit(el){
-  const s = selStudent; if(!s) return;
-  const bal = refCreditBalance(s);
-  // หักเครดิตได้เฉพาะ "ค่าเทอม" ในใบเสร็จนี้ (ไม่รวมค่ารถ/ค่าชุด/ค่าอื่น) · กันยอดติดลบ
-  let sub = 0; Object.keys(owedSelected).forEach(k => { const it = owedSelected[k]; if(k !== 'refcredit' && it.label && String(it.label).startsWith('ค่าเทอม')) sub += (it.amount||0); });
-  const cap = Math.max(0, Math.min(bal, sub));
-  let v = Math.max(0, Number(el.value)||0);
-  let capped = false;
-  if(v > cap){ v = cap; capped = true; el.value = v; }   // กันพิมพ์เกิน — ปรับลงอัตโนมัติ
-  const warn = document.getElementById('refcredit-warn');
-  if(warn) warn.textContent = capped ? ('⚠ หักได้ไม่เกิน ฿' + fmt(cap) + ' (เครดิตคงเหลือ ฿' + fmt(bal) + (sub>0?' · ยอดที่จ่าย ฿'+fmt(sub):'') + ') — ระบบปรับให้แล้ว') : '';
-  if(v <= 0){ delete owedSelected['refcredit']; }
-  else { owedSelected['refcredit'] = {amount: -v, label: 'ส่วนลดเครดิตชวนเรียน (คงเหลือ ฿' + fmt(bal) + ')', months: 0}; }
+  if(!selStudent) return;
+  el.dataset.want = Math.max(0, Number(el.value) || 0);   // ยอดที่ครูอยากหัก
+  const on = $('refcredit-on'); if(on && Number(el.value) > 0) on.checked = true;   // พิมพ์ยอด = ตั้งใจใช้เครดิต
   updateTotal();
 }
-
+// 5 พ.ย. 69: เครดิตชวนเรียน — ใช้เมื่อครูติ๊กเท่านั้น · หักได้ทุกรายการในใบ ไม่เกินยอดในใบ (ยอดไม่ติดลบ) · คำนวณใหม่ทุกครั้งที่ติ๊ก/เอาติ๊กออก
+function syncRefCredit(){
+  const inp = $('refcredit-amt'), on = $('refcredit-on'); if(!inp || !selStudent) return;
+  const warn = $('refcredit-warn');
+  if(!on || !on.checked){ delete owedSelected['refcredit']; if(warn) warn.textContent = ''; return; }
+  const bal = refCreditBalance(selStudent);
+  let sub = 0; Object.keys(owedSelected).forEach(k => { if(k !== 'refcredit') sub += (Number(owedSelected[k] && owedSelected[k].amount) || 0); });
+  const want = Math.max(0, Number(inp.dataset.want != null ? inp.dataset.want : inp.value) || 0);
+  const v = Math.max(0, Math.min(bal, sub, want));
+  if(String(inp.value) !== String(v)) inp.value = v;
+  if(v > 0) owedSelected['refcredit'] = {amount: -v, label: 'ส่วนลดเครดิตชวนเรียน (คงเหลือ ฿' + fmt(bal) + ')', months: 0};
+  else delete owedSelected['refcredit'];
+  if(warn){
+    if(sub <= 0){ warn.style.color = '#B45309'; warn.textContent = 'ℹ ยังไม่มีรายการในใบนี้ · เลือกรายการที่จะจ่ายก่อน ระบบจะหักเครดิตให้'; }
+    else if(want > v){ warn.style.color = '#DC2626'; warn.textContent = '⚠ หักได้ไม่เกิน ฿' + fmt(v) + ' (ยอดในใบนี้ ฿' + fmt(sub) + ' · เครดิตคงเหลือ ฿' + fmt(bal) + ')'; }
+    else warn.textContent = '';
+  }
+}
 function rowItem(id, label, amount, rateType, paidAnnual, paidTerms, lockT1){
   // 27 ต.ค. 69: ค่ารายเทอมที่จ่ายครบทั้ง 2 เทอมแล้ว → แถบสีเขียวเหมือนค่าหนังสือ/ประกัน
   if(rateType === 'term' && paidTerms && paidTerms.has(1) && paidTerms.has(2)){
@@ -3401,6 +3412,7 @@ function updTerms(id, baseAmt, label, chk){
 }
 
 function updateTotal(){
+  try{ syncRefCredit(); }catch(e){}
   let sum = 0;
   Object.values(owedSelected).forEach(x => sum += x.amount);
   $('total-amt').textContent = fmt(sum);
@@ -3502,6 +3514,7 @@ async function saveTx(){
   if(Object.keys(owedSelected).length === 0){
     toast('กรุณาเลือกอย่างน้อย 1 รายการ', 'error'); return;
   }
+  try{ syncRefCredit(); }catch(e){}
   const items = Object.values(owedSelected);
   const total = items.reduce((s,x)=>s+x.amount, 0);
   if(total <= 0){ toast('ยอดรวมต้องมากกว่า 0 บาท · ส่วนลดห้ามเกินยอดที่จ่าย', 'error'); return; }
@@ -4149,7 +4162,7 @@ function externalStudents(){ return STUDENTS.filter(s => !s.deleted && s.externa
 // ===== คอร์สพิเศษ · เด็กนอก รร.อื่น =====
 let editingExternalId = null;
 // รอบคอร์ส: ต.ค. (ปีนี้) และ เม.ย. (ปีถัดไป) อยู่ในปีการศึกษาเดียวกัน
-const COURSE_ROUNDS = [{key: AY+'-ต.ค.', label:'ต.ค. '+AY}, {key: AY+'-เม.ย.', label:'เม.ย. '+(AY+1)}];
+const COURSE_ROUNDS = ((new Date().getMonth() + 1) === 4 ? [{key: (AY-1)+'-เม.ย.', label:'เม.ย. '+AY}] : []).concat([{key: AY+'-ต.ค.', label:'ต.ค. '+AY}, {key: AY+'-เม.ย.', label:'เม.ย. '+(AY+1)}]);   // 5 พ.ย. 69: เม.ย. = ปีใหม่แล้ว แต่คอร์ส เม.ย. ที่กำลังเรียนต้องยังอยู่
 let curRound = COURSE_ROUNDS[0].key;
 function roundLabel(key){ const r = COURSE_ROUNDS.find(x=>x.key===key); return r ? r.label : key; }
 function courseFee(cls){ if(cls==='เนอร์เซอรี่') return 1500; if(cls==='เตรียมอนุบาล') return 1400; return 1000; }
@@ -4161,7 +4174,7 @@ function courseBus(s){
 }
 function coursePaid(s, roundKey){
   const lbl = roundLabel(roundKey);
-  return activeTX().filter(t => t.studentId===s.id && inCurrentAY(t.date))
+  return activeTX().filter(t => t.studentId===s.id)
     .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('คอร์ส')>=0 && it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0), 0);
 }
 // ---- ค่าคอร์ส/ค่ารถ แก้เองได้รายคน-รายรอบ + หมายเหตุ (เพิ่ม ก.ย.69: รองรับเด็กซ้อมเต้น ลดค่าเรียน/รร.ซัพพอร์ตค่ารถ) ----
@@ -4175,7 +4188,7 @@ function courseLine(s, roundKey){ const o=courseOvGet(s,roundKey); return (o.lin
 // ยอด "ค่ารถ" ของคอร์สที่จ่ายแล้วจริง (นับเฉพาะรายการ ค่าคอร์ส-ค่ารถ ในใบเสร็จ)
 function courseBusPaid(s, roundKey){
   const lbl = roundLabel(roundKey);
-  return activeTX().filter(t => t.studentId===s.id && inCurrentAY(t.date))
+  return activeTX().filter(t => t.studentId===s.id)
     .reduce((sum,t) => sum + (t.items||[]).filter(it => it.label && it.label.indexOf('ค่าคอร์ส-ค่ารถ')>=0 && it.label.indexOf(lbl)>=0).reduce((a,it)=>a+(it.amount||0),0), 0);
 }
 function setCourseOv(id, field, val){
@@ -5011,7 +5024,7 @@ const CLAIM_HEAD = {
 };
 const CLAIM_ROWS = ['ค่าธรรมเนียมการศึกษา','ค่าอุปกรณ์การเรียน','ค่ารถ รับ-ส่ง','ค่าชุดนักเรียน-ชุดกีฬา','ค่าประกันอุบัติเหตุ','ค่าบำรุงสระว่ายน้ำ'];
 let _claim = {sid: null, rows: [], mode: 'gov', term: 1, ok: false, lastId: null, busy: false};
-function claimDefaultTerm(){ const m = new Date().getMonth() + 1; return (m >= 11 || m <= 4) ? 2 : 1; }
+function claimDefaultTerm(){ const m = new Date().getMonth() + 1; return (m >= 11 || m <= 3) ? 2 : 1; }
 function claimTermMonths(term){ return term === 1 ? MONTHS.slice(0, 5) : MONTHS.slice(5); }
 function claimLevel(cls){
   let m = String(cls||'').match(/^อ\.\s*(\d)/); if(m) return {k: m[1], p: '–', kind: 'k'};
@@ -5215,7 +5228,7 @@ function renderTimeline(s, myTx){
   
   // mark future
   MONTH_NUMS.forEach((m, i) => {
-    if(curMonthIdx !== -1 && i > curMonthIdx) {
+    if(curMonthIdx < 0 || i > curMonthIdx) {
       monthsTuition[i] = 'future';
       monthsBus[i] = 'future';
     }
@@ -6324,7 +6337,8 @@ function delTx(id){
   tx.voidReason = (reason || '').trim() || 'ไม่ระบุ';
   saveTX();
   rerenderActive();
-  toast('🚫 ยกเลิกใบเสร็จแล้ว · รายการยังเก็บไว้ในประวัติ');
+  toast((tx.items||[]).some(i => i.debtId) ? '🚫 ยกเลิกใบเสร็จแล้ว · ค่าของที่จ่ายในใบนี้กลับไปเป็น "ค้างจ่าย" ให้แล้ว' : '🚫 ยกเลิกใบเสร็จแล้ว · รายการยังเก็บไว้ในประวัติ');
+  try{ renderDebtCards(); }catch(e){}
 }
 
 // === SLIPS ===
@@ -6795,7 +6809,7 @@ function renderInvSlip(id){
   const curMonth = now.getMonth() + 1;
   const curMonthIdx = dueMonthIdx(); // ต.ค./เม.ย. นับถึงเดือนก่อนหน้า
   for(let i=0; i<10; i++){
-    if(curMonthIdx !== -1 && i > curMonthIdx){ monthsTuition.push('future'); monthsBus.push('future'); }
+    if(curMonthIdx < 0 || i > curMonthIdx){ monthsTuition.push('future'); monthsBus.push('future'); }
     else { monthsTuition.push('pending'); monthsBus.push('pending'); }
   }
   // Parse tuition + bus paid months
@@ -6910,7 +6924,7 @@ function previewCarryForward(){
   });
   if(cnt === 0){ alert('✅ ไม่มีนักเรียนค้างชำระในปี '+AY+' — ไม่มียอดต้องยก'); return; }
   const _m = new Date().getMonth()+1;
-  const _sw = (_m<2||_m>5) ? '⚠ ตอนนี้ยังไม่ใช่ช่วงสิ้นปีการศึกษา (ควรทำ ก.พ.–เม.ย.) — ยอดที่คำนวณจะคิดค่าเทอมครบทั้งปีล่วงหน้า อาจไม่ใช่ยอดจริง ณ ตอนนี้'+String.fromCharCode(10,10) : '';
+  const _sw = (_m<2||_m>3) ? '⚠ ตอนนี้ยังไม่ใช่ช่วงสิ้นปีการศึกษา (ควรทำ ก.พ.–มี.ค. ก่อน 1 เม.ย. เพราะ เม.ย. ระบบขึ้นปีการศึกษาใหม่) — ยอดที่คำนวณจะคิดค่าเทอมครบทั้งปีล่วงหน้า อาจไม่ใช่ยอดจริง ณ ตอนนี้'+String.fromCharCode(10,10) : '';
   let msg = _sw + '📥 ยกยอดค้างปีการศึกษา '+AY+' → ปี '+(AY+1)+'\n\n';
   if(already) msg += '⚠ ปีนี้เคยยกยอดไปแล้ว! ระบบจะข้ามคนที่ยกแล้ว ไม่บวกซ้ำ\n\n';
   msg += 'นักเรียนที่มียอดค้าง: '+cnt+' คน · รวม ฿'+fmt(total)+'\n\n';

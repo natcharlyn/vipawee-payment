@@ -938,17 +938,19 @@ function copyDutyLink(){const msg='📋 บันทึกเวลา ลา/�
 
 // ===== สรุปประเมินครู (มาสาย/ลา/ขาด · รายเดือน/เทอม/ปี) =====
 let evalMetric='late', evalAY=null, EVAL_ROWS=null;
-const EVAL_TL={5:'พ.ค.',6:'มิ.ย.',7:'ก.ค.',8:'ส.ค.',9:'ก.ย.',11:'พ.ย.',12:'ธ.ค.',1:'ม.ค.',2:'ก.พ.',3:'มี.ค.'};
+// 5 พ.ย. 69 (ครูแนทกำหนด): ปีการศึกษาของครู = เม.ย.–มี.ค. ครบ 12 เดือน · เทอม 1 = เม.ย.–ต.ค. · เทอม 2 = พ.ย.–มี.ค. · สรุปประเมินจบปีที่ มี.ค.
+const EVAL_TL={4:'เม.ย.',5:'พ.ค.',6:'มิ.ย.',7:'ก.ค.',8:'ส.ค.',9:'ก.ย.',10:'ต.ค.',11:'พ.ย.',12:'ธ.ค.',1:'ม.ค.',2:'ก.พ.',3:'มี.ค.'};
 function ayMonths(gy){
-  const t1=[5,6,7,8,9].map(m=>({gy,bm:m,term:1}));
+  const t1=[4,5,6,7,8,9,10].map(m=>({gy,bm:m,term:1}));
   const t2=[11,12].map(m=>({gy,bm:m,term:2})).concat([1,2,3].map(m=>({gy:gy+1,bm:m,term:2})));
   return t1.concat(t2).map(o=>({key:o.gy+'-'+String(o.bm).padStart(2,'0'),bm:o.bm,term:o.term,label:EVAL_TL[o.bm]}));
 }
-function ayOf(month){const p=String(month).split('-').map(Number);const gy=p[0],bm=p[1];return bm>=5?gy:gy-1;}
+function ayOf(month){const p=String(month).split('-').map(Number);const gy=p[0],bm=p[1];return bm>=4?gy:gy-1;}
+function evalAYs(){return [...new Set((EVAL_ROWS||[]).filter(r=>EVAL_TL[Number(String(r.month).split('-')[1])]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);}
 async function renderEval(){
   document.getElementById('content').innerHTML=`<div class="panel">กำลังโหลดข้อมูล…</div>`;
   if(!EVAL_ROWS){try{EVAL_ROWS=await q(sb.from('payroll_entries').select('month,staff_id,items'));}catch(e){EVAL_ROWS=[];}}
-  const ays=[...new Set((EVAL_ROWS||[]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);
+  const ays=evalAYs();
   if(!ays.length){document.getElementById('content').innerHTML=`<div class="panel">ยังไม่มีข้อมูลลา/ขาด/มาสายในระบบ</div>`;return;}
   if(evalAY==null||!ays.includes(evalAY))evalAY=ays[ays.length-1];
   drawEval();
@@ -962,16 +964,16 @@ function drawEval(){
   const unit=evalMetric==='late'?'นาที (= บาทที่หัก · 1 นาที = 1 บาท)':'วัน';
   const metricName=evalMetric==='late'?'มาสาย (นาที)':evalMetric==='leave'?'ลา (วัน)':'ขาด (วัน)';
   const staff=STAFF.filter(s=>!s.resigned);
-  const ays=[...new Set((EVAL_ROWS||[]).map(r=>ayOf(r.month)))].sort((a,b)=>a-b);
+  const ays=evalAYs();
   let h=`<div class="print-head"><div class="ph1">โรงเรียนอนุบาลวิภาวี · สรุปประเมินครู</div><div class="ph2">ปีการศึกษา ${evalAY} · ${metricName}</div></div>`+
-    `<div class="tip">📋 สรุป <b>${metricName}</b> ปีการศึกษา ${evalAY} · เทอม 1 (พ.ค.–ก.ย.) · เทอม 2 (พ.ย.–มี.ค.) · ใช้ประกอบการประเมินครูท้ายปี (ต.ค./เม.ย. ปิดเทอม ไม่รวม)</div>`+
+    `<div class="tip">📋 สรุป <b>${metricName}</b> ปีการศึกษา ${evalAY} (เม.ย.–มี.ค. ครบ 12 เดือน) · เทอม 1 (เม.ย.–ต.ค.) · เทอม 2 (พ.ย.–มี.ค.) · ใช้ประกอบการประเมินครูท้ายปี (สรุปจบปีการศึกษาที่ มี.ค.)</div>`+
     `<div class="tabs print-hide" style="align-items:center">
       <button class="tab ${evalMetric==='late'?'active':''}" onclick="setEvalMetric('late')">🕐 มาสาย</button>
       <button class="tab ${evalMetric==='leave'?'active':''}" onclick="setEvalMetric('leave')">🌴 ลา</button>
       <button class="tab ${evalMetric==='absent'?'active':''}" onclick="setEvalMetric('absent')">❌ ขาด</button>
       <select class="big" style="margin-left:8px" onchange="setEvalAY(this.value)">${ays.map(y=>`<option value="${y}" ${y===evalAY?'selected':''}>ปีการศึกษา ${y}</option>`).join('')}</select>
       <button class="btn" onclick="window.print()" style="margin-left:auto">🖨️ พิมพ์</button></div>`;
-  h+=`<div class="etable-wrap"><table class="entry" style="min-width:900px"><thead><tr><th style="text-align:left">ชื่อ-สกุล</th>`+
+  h+=`<div class="etable-wrap"><table class="entry" style="min-width:1000px"><thead><tr><th style="text-align:left">ชื่อ-สกุล</th>`+
     months.map(m=>`<th class="num">${m.label}</th>`).join('')+
     `<th class="num" style="background:#EFF6FF">เทอม1</th><th class="num" style="background:#EFF6FF">เทอม2</th><th class="num" style="background:#FEF9C3">ทั้งปี</th></tr></thead><tbody>`;
   const yearTots=staff.map(s=>{const mm=byStaff[s.id]||{};return months.reduce((a,m)=>a+(mm[m.key]||0),0);});
